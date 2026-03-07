@@ -1,4 +1,4 @@
-module gin-demo
+module golang-gin-rpc
 
 go 1.25.0
 
