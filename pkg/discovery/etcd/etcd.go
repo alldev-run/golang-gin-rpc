@@ -2,7 +2,9 @@ package etcd
 
 import (
 	"encoding/json"
-	"go-micro-demo/pkg/discovery"
+	"golang-gin-rpc/pkg/discovery"
+
+	"context"
 
 	"go.etcd.io/etcd/client/v3"
 )

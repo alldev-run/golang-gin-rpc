@@ -1,6 +1,10 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"golang-gin-rpc/pkg/jwt"
+
+	"github.com/gin-gonic/gin"
+)
 import "golang-gin-rpc/pkg/response"
 
 func JWTAuth() gin.HandlerFunc {
@@ -16,7 +20,12 @@ func JWTAuth() gin.HandlerFunc {
 		}
 
 		// 解析token
-		// TODO verify jwt
+		_, err := jwt.DecodeJwt(token)
+		if err != nil {
+			response.Error(c, "invalid token", err)
+			c.Abort()
+			return
+		}
 
 		c.Next()
 	}
