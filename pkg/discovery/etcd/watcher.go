@@ -86,3 +86,7 @@ func (sw *ServiceWatcher) watchLoop() {
 func (sw *ServiceWatcher) List() []*ServiceInstance {
 	return sw.instances.Load().([]*ServiceInstance)
 }
+
+func (sw *ServiceWatcher) Stop() {
+	sw.cancel()
+}
