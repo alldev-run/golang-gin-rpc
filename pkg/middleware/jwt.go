@@ -2,10 +2,10 @@ package middleware
 
 import (
 	"golang-gin-rpc/pkg/jwt"
+	"golang-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
-import "golang-gin-rpc/pkg/response"
 
 func JWTAuth() gin.HandlerFunc {
 
