@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 )
 
-// 接口抽象：只要实现了 List()，就能用这个负载均衡器
+// ListableWatcher 接口抽象：只要实现了 List()，就能用这个负载均衡器
 type ListableWatcher interface {
 	List() []*ServiceInstance
 }
