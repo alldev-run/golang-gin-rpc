@@ -11,6 +11,7 @@ import (
 	"io"
 )
 
+// encrypt encrypts data using AES-GCM with the configured secret key.
 func encrypt(data []byte) (string, error) {
 
 	key := sha256.Sum256([]byte(config.Secret))
@@ -36,6 +37,7 @@ func encrypt(data []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
+// decrypt decrypts an encrypted token using AES-GCM.
 func decrypt(token string) ([]byte, error) {
 
 	key := sha256.Sum256([]byte(config.Secret))
@@ -65,6 +67,7 @@ func decrypt(token string) ([]byte, error) {
 	return gcm.Open(nil, nonce, ciphertext, nil)
 }
 
+// encodeClaims marshals and encrypts claims into a token string.
 func encodeClaims(c Claims) (string, error) {
 
 	data, err := json.Marshal(c)
@@ -75,6 +78,7 @@ func encodeClaims(c Claims) (string, error) {
 	return encrypt(data)
 }
 
+// decodeClaims decrypts and unmarshals a token string into claims.
 func decodeClaims(token string) (*Claims, error) {
 
 	data, err := decrypt(token)

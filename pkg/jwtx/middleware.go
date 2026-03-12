@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Middleware returns a Gin middleware that validates JWT access tokens from the Authorization header.
+// Sets user_id and username in context on successful validation.
 func Middleware() gin.HandlerFunc {
 
 	return func(c *gin.Context) {

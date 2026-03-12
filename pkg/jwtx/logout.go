@@ -2,6 +2,7 @@ package jwtx
 
 import "time"
 
+// Logout invalidates a token by adding it to the blacklist.
 func Logout(token string) error {
 
 	claims, err := decodeClaims(token)
@@ -23,6 +24,7 @@ func Logout(token string) error {
 	return nil
 }
 
+// RevokeUser revokes all tokens for a user by incrementing their version.
 func RevokeUser(userID string) {
 
 	if config.Store == nil {

@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// Refresh validates a refresh token and generates a new token pair.
+// Deletes the used refresh token from the store after successful validation.
 func Refresh(refreshToken string) (*TokenPair, error) {
 
 	claims, err := decodeClaims(refreshToken)

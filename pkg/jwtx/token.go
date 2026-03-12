@@ -8,11 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// TokenPair represents a pair of access and refresh tokens.
 type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
 
+// GenerateTokenPair generates a new pair of access and refresh tokens for a user.
 func GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
 
 	now := time.Now()
@@ -82,6 +84,8 @@ func GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
 	}, nil
 }
 
+// ValidateAccessToken validates an access token and returns its claims.
+// Checks token type, expiration, blacklist status, and user version.
 func ValidateAccessToken(token string) (*Claims, error) {
 
 	claims, err := decodeClaims(token)
