@@ -22,6 +22,8 @@ The `pkg/db` package provides a comprehensive, production-ready database client 
 ┌─────────────────────────────────────────────────────────────┐
 │                    Application Layer                        │
 ├─────────────────────────────────────────────────────────────┤
+│  pkg/db/sqlprevention (SQL Injection Prevention)           │
+├─────────────────────────────────────────────────────────────┤
 │  pkg/db/poolcb (Connection Pool + Circuit Breaker)         │
 ├─────────────────────────────────────────────────────────────┤
 │  pkg/db/poolrw (Pool + Read-Write Split)                    │
@@ -213,6 +215,39 @@ circuit_breaker_state{name}
 circuit_breaker_failures_total{name}
 ```
 
+### 6. SQL Injection Prevention
+
+- Input validation and sanitization
+- Pattern-based injection detection
+- Parameterized query builder
+- Safe identifier validation
+
+```go
+import "golang-gin-rpc/pkg/db/sqlprevention"
+
+// Validate input
+validator := sqlprevention.New(sqlprevention.DefaultConfig())
+if err := validator.ValidateInput(userInput); err != nil {
+    return errors.New("invalid input")
+}
+
+// Detect injection patterns
+result := sqlprevention.DetectInjection("' OR '1'='1")
+if result.IsInjected {
+    log.Printf("SQL injection detected: %s (severity: %s)", result.Pattern, result.Severity)
+}
+
+// Use parameterized queries
+pq := sqlprevention.NewParameterizedQuery("SELECT * FROM users WHERE id = ?")
+pq.AddParam(userID)
+query, params := pq.Build()
+rows, err := db.Query(query, params...)
+
+// Sanitize LIKE patterns
+safePattern := sqlprevention.CleanLikePattern("test%") 
+// Result: test\% (escapes special characters)
+```
+
 ## Configuration
 
 ### YAML Configuration
@@ -294,6 +329,8 @@ for _, s := range statuses {
 - [ ] Configure Prometheus metrics export
 - [ ] Set up database migration system
 - [ ] Use read-write split for read-heavy workloads
+- [ ] **Enable SQL injection validation for all user inputs**
+- [ ] Use parameterized queries instead of string concatenation
 - [ ] Monitor connection pool usage
 - [ ] Test failover scenarios
 

@@ -9,8 +9,9 @@ This guide provides detailed examples for using the database client packages.
 3. [Read-Write Splitting](#read-write-splitting)
 4. [Circuit Breaker](#circuit-breaker)
 5. [Slow Query Logging](#slow-query-logging)
-6. [Database Migration](#database-migration)
-7. [Metrics Collection](#metrics-collection)
+6. [SQL Injection Prevention](#sql-injection-prevention)
+7. [Database Migration](#database-migration)
+8. [Metrics Collection](#metrics-collection)
 
 ## Factory Pattern
 
