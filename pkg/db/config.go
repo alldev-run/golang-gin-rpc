@@ -135,6 +135,17 @@ func applyDefaults(cfg *Config) {
 		if len(cfg.ES.Addresses) == 0 {
 			cfg.ES.Addresses = []string{"http://localhost:9200"}
 		}
+	case TypeMemcache:
+		if len(cfg.Memcache.Hosts) == 0 {
+			cfg.Memcache.Hosts = []string{"localhost:11211"}
+		}
+	case TypeMongoDB:
+		if cfg.MongoDB.URI == "" {
+			cfg.MongoDB.URI = "mongodb://localhost:27017"
+		}
+		if cfg.MongoDB.Database == "" {
+			cfg.MongoDB.Database = "default"
+		}
 	}
 }
 

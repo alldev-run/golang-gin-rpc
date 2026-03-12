@@ -10,6 +10,8 @@ import (
 
 	"golang-gin-rpc/pkg/clickhouse"
 	"golang-gin-rpc/pkg/elasticsearch"
+	"golang-gin-rpc/pkg/memcache"
+	"golang-gin-rpc/pkg/mongodb"
 	"golang-gin-rpc/pkg/mysql"
 	"golang-gin-rpc/pkg/postgres"
 	"golang-gin-rpc/pkg/redis"
@@ -24,16 +26,20 @@ const (
 	TypePostgres   Type = "postgres"
 	TypeClickHouse Type = "clickhouse"
 	TypeES         Type = "elasticsearch"
+	TypeMemcache   Type = "memcache"
+	TypeMongoDB    Type = "mongodb"
 )
 
 // Config holds configuration for all database types.
 type Config struct {
-	Type   Type              `yaml:"type" json:"type"`
-	MySQL  mysql.Config      `yaml:"mysql" json:"mysql"`
-	Redis  redis.Config      `yaml:"redis" json:"redis"`
-	PG     postgres.Config   `yaml:"postgres" json:"postgres"`
-	CH     clickhouse.Config `yaml:"clickhouse" json:"clickhouse"`
-	ES     elasticsearch.Config `yaml:"elasticsearch" json:"elasticsearch"`
+	Type     Type                 `yaml:"type" json:"type"`
+	MySQL    mysql.Config         `yaml:"mysql" json:"mysql"`
+	Redis    redis.Config         `yaml:"redis" json:"redis"`
+	PG       postgres.Config      `yaml:"postgres" json:"postgres"`
+	CH       clickhouse.Config    `yaml:"clickhouse" json:"clickhouse"`
+	ES       elasticsearch.Config `yaml:"elasticsearch" json:"elasticsearch"`
+	Memcache memcache.Config      `yaml:"memcache" json:"memcache"`
+	MongoDB  mongodb.Config       `yaml:"mongodb" json:"mongodb"`
 }
 
 // Client is the unified database client interface.
@@ -80,6 +86,10 @@ func (f *Factory) Create(cfg Config) (Client, error) {
 		return f.createClickHouse(cfg.CH)
 	case TypeES:
 		return f.createES(cfg.ES)
+	case TypeMemcache:
+		return f.createMemcache(cfg.Memcache)
+	case TypeMongoDB:
+		return f.createMongoDB(cfg.MongoDB)
 	case "":
 		return nil, errors.New("database type is required")
 	default:
@@ -130,6 +140,24 @@ func (f *Factory) createES(cfg elasticsearch.Config) (Client, error) {
 		return nil, fmt.Errorf("failed to create elasticsearch client: %w", err)
 	}
 	return &esAdapter{client: client}, nil
+}
+
+// createMemcache creates a Memcached client.
+func (f *Factory) createMemcache(cfg memcache.Config) (Client, error) {
+	client, err := memcache.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create memcache client: %w", err)
+	}
+	return &memcacheAdapter{client: client}, nil
+}
+
+// createMongoDB creates a MongoDB client.
+func (f *Factory) createMongoDB(cfg mongodb.Config) (Client, error) {
+	client, err := mongodb.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mongodb client: %w", err)
+	}
+	return &mongodbAdapter{client: client}, nil
 }
 
 // ==================== Adapters ====================
@@ -247,4 +275,30 @@ func (a *esAdapter) Ping(ctx context.Context) error {
 func (a *esAdapter) Close() error {
 	// ES client doesn't need explicit close
 	return nil
+}
+
+// memcacheAdapter adapts memcache.Client to db.Client.
+type memcacheAdapter struct {
+	client *memcache.Client
+}
+
+func (a *memcacheAdapter) Ping(ctx context.Context) error {
+	return a.client.Ping(ctx)
+}
+
+func (a *memcacheAdapter) Close() error {
+	return a.client.Close()
+}
+
+// mongodbAdapter adapts mongodb.Client to db.Client.
+type mongodbAdapter struct {
+	client *mongodb.Client
+}
+
+func (a *mongodbAdapter) Ping(ctx context.Context) error {
+	return a.client.Ping(ctx)
+}
+
+func (a *mongodbAdapter) Close() error {
+	return a.client.Close(nil)
 }
