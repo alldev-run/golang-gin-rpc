@@ -3,19 +3,20 @@
 package bloomfilter
 
 import (
-	"hash"
 	"hash/fnv"
 	"math"
+	"sync"
 )
 
 // BloomFilter is a probabilistic data structure for set membership testing.
 // It may return false positives but never false negatives.
+// Safe for concurrent use.
 type BloomFilter struct {
-	bits    []uint64
-	size    uint64
-	hashes  uint64
-	salt    []byte
-	hashers []hash.Hash64
+	bits   []uint64
+	size   uint64
+	hashes uint64
+	salt   []byte
+	mu     sync.RWMutex
 }
 
 // New creates a Bloom filter optimized for n elements with target false positive rate p.
@@ -37,13 +38,16 @@ func New(n uint64, p float64) *BloomFilter {
 		bits:    make([]uint64, words),
 		size:    words * 64,
 		hashes:  hashes,
-		hashers: []hash.Hash64{fnv.New64a(), fnv.New64()},
 	}
 }
 
-// Add inserts an element into the filter.
+// Add inserts an element into the filter. Safe for concurrent use.
 func (bf *BloomFilter) Add(data []byte) {
 	positions := bf.positions(data)
+
+	bf.mu.Lock()
+	defer bf.mu.Unlock()
+
 	for _, pos := range positions {
 		word, bit := pos/64, pos%64
 		bf.bits[word] |= 1 << bit
@@ -52,8 +56,13 @@ func (bf *BloomFilter) Add(data []byte) {
 
 // Contains checks if an element might be in the set.
 // Returns true if probably present, false if definitely not present.
+// Safe for concurrent use.
 func (bf *BloomFilter) Contains(data []byte) bool {
 	positions := bf.positions(data)
+
+	bf.mu.RLock()
+	defer bf.mu.RUnlock()
+
 	for _, pos := range positions {
 		word, bit := pos/64, pos%64
 		if bf.bits[word]&(1<<bit) == 0 {
@@ -63,8 +72,11 @@ func (bf *BloomFilter) Contains(data []byte) bool {
 	return true
 }
 
-// Clear resets the filter, removing all elements.
+// Clear resets the filter, removing all elements. Safe for concurrent use.
 func (bf *BloomFilter) Clear() {
+	bf.mu.Lock()
+	defer bf.mu.Unlock()
+
 	for i := range bf.bits {
 		bf.bits[i] = 0
 	}
@@ -82,12 +94,10 @@ func (bf *BloomFilter) positions(data []byte) []uint64 {
 }
 
 // hash computes two hash values from the data using FNV variants.
+// Creates new hashers locally for thread safety.
 func (bf *BloomFilter) hash(data []byte) (uint64, uint64) {
-	h1 := bf.hashers[0]
-	h2 := bf.hashers[1]
-
-	h1.Reset()
-	h2.Reset()
+	h1 := fnv.New64a()
+	h2 := fnv.New64()
 
 	h1.Write(data)
 	h2.Write(data)
