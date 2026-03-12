@@ -16,10 +16,10 @@ import (
 
 // RWPoolConfig holds configuration for the integrated pool.
 type RWPoolConfig struct {
-	MasterConfig   db.Config         // Master database config
-	ReplicaConfigs []db.Config       // Replica database configs
+	MasterConfig   db.Config          // Master database config
+	ReplicaConfigs []db.Config        // Replica database configs
 	Strategy       rwproxy.LBStrategy // Load balancing strategy
-	PoolConfig     PoolSettings      // Pool settings
+	PoolConfig     PoolSettings       // Pool settings
 }
 
 // PoolSettings holds pool-specific settings.
@@ -45,15 +45,15 @@ func DefaultRWPoolConfig() RWPoolConfig {
 
 // Pool manages a pool of read-write splitting clients.
 type Pool struct {
-	config        RWPoolConfig
-	factory       *db.Factory
-	master        db.Client         // Master connection
-	replicas      []db.Client       // Replica connections
-	rwClient      *rwproxy.Client   // Read-write split client wrapper
-	mutex         sync.RWMutex
-	healthStop    chan struct{}
-	wg            sync.WaitGroup
-	state         int32 // Pool state
+	config     RWPoolConfig
+	factory    *db.Factory
+	master     db.Client       // Master connection
+	replicas   []db.Client     // Replica connections
+	rwClient   *rwproxy.Client // Read-write split client wrapper
+	mutex      sync.RWMutex
+	healthStop chan struct{}
+	wg         sync.WaitGroup
+	state      int32 // Pool state
 }
 
 // Pool state constants.
@@ -322,10 +322,10 @@ func (p *Pool) GetStats() PoolStats {
 	defer p.mutex.RUnlock()
 
 	stats := PoolStats{
-		MasterConnected:  p.master != nil,
-		ReplicaCount:     len(p.replicas),
-		ReplicasHealthy:  0,
-		ForceMaster:      p.IsMasterForced(),
+		MasterConnected: p.master != nil,
+		ReplicaCount:    len(p.replicas),
+		ReplicasHealthy: 0,
+		ForceMaster:     p.IsMasterForced(),
 	}
 
 	if p.rwClient != nil {

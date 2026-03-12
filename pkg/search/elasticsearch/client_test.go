@@ -50,8 +50,8 @@ func TestConfigStruct(t *testing.T) {
 // TestNewWithInvalidHost tests connection with invalid host
 func TestNewWithInvalidHost(t *testing.T) {
 	cfg := Config{
-		Addresses: []string{"http://invalid.host.that.does.not.exist:9200"},
-		Timeout:   1 * time.Second,
+		Addresses:  []string{"http://invalid.host.that.does.not.exist:9200"},
+		Timeout:    1 * time.Second,
 		MaxRetries: 0,
 	}
 

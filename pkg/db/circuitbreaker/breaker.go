@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
 	"go.uber.org/zap"
+	"golang-gin-rpc/pkg/logger"
 )
 
 // State represents the circuit breaker state.
@@ -59,11 +59,11 @@ type Config struct {
 // DefaultConfig returns default circuit breaker configuration.
 func DefaultConfig() Config {
 	return Config{
-		MaxFailures:           5,
-		ResetTimeout:          30 * time.Second,
-		HalfOpenMaxRequests:   3,
-		SuccessThreshold:      2,
-		Name:                  "default",
+		MaxFailures:         5,
+		ResetTimeout:        30 * time.Second,
+		HalfOpenMaxRequests: 3,
+		SuccessThreshold:    2,
+		Name:                "default",
 	}
 }
 
@@ -75,9 +75,9 @@ type CircuitBreaker struct {
 	state int32
 
 	// atomic counters
-	failures    uint32
-	successes   uint32
-	requests    uint32 // for half-open state
+	failures  uint32
+	successes uint32
+	requests  uint32 // for half-open state
 
 	// last failure time (atomic)
 	lastFailureTime int64

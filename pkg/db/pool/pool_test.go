@@ -187,18 +187,18 @@ func TestConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Try to acquire (will fail without registered connections, but tests concurrency)
 			_, _ = pool.Acquire(context.Background(), "test")
-			
+
 			// Get stats
 			_ = pool.GetStats()
-			
+
 			// Get names
 			_ = pool.GetConnectionNames()
 		}(i)
 	}
-	
+
 	wg.Wait()
 	// If we get here without panic, concurrency is working
 	t.Log("Concurrent access test passed")

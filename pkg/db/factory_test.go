@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"golang-gin-rpc/pkg/mysql"
-	"golang-gin-rpc/pkg/redis"
+	"golang-gin-rpc/pkg/db/mysql"
+	"golang-gin-rpc/pkg/cache/redis"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -196,7 +196,7 @@ func TestNewFactory(t *testing.T) {
 func TestFactoryCreateInvalidType(t *testing.T) {
 	factory := NewFactory()
 	cfg := Config{Type: "invalid"}
-	
+
 	_, err := factory.Create(cfg)
 	if err == nil {
 		t.Error("Create() with invalid type should return error")
@@ -206,7 +206,7 @@ func TestFactoryCreateInvalidType(t *testing.T) {
 func TestFactoryCreateEmptyType(t *testing.T) {
 	factory := NewFactory()
 	cfg := Config{Type: ""}
-	
+
 	_, err := factory.Create(cfg)
 	if err == nil {
 		t.Error("Create() with empty type should return error")
@@ -219,7 +219,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	// Test YAML
 	yamlFile := filepath.Join(tmpDir, "save_test.yaml")
 	cfg := Config{
-		Type:  TypeMySQL,
+		Type: TypeMySQL,
 		MySQL: mysql.Config{
 			Host: "testhost",
 			Port: 3307,
@@ -241,7 +241,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	// Test JSON
 	jsonFile := filepath.Join(tmpDir, "save_test.json")
 	cfg2 := Config{
-		Type:  TypeRedis,
+		Type: TypeRedis,
 		Redis: redis.Config{
 			Host: "redishost",
 			Port: 6380,

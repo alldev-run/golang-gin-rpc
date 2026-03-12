@@ -15,20 +15,20 @@ import (
 
 // Config holds Elasticsearch connection configuration.
 type Config struct {
-	Addresses []string      `yaml:"addresses" json:"addresses"`
-	Username  string        `yaml:"username" json:"username"`
-	Password  string        `yaml:"password" json:"password"`
-	APIKey    string        `yaml:"api_key" json:"api_key"`
-	CloudID   string        `yaml:"cloud_id" json:"cloud_id"`
-	Timeout   time.Duration `yaml:"timeout" json:"timeout"`
-	MaxRetries int          `yaml:"max_retries" json:"max_retries"`
+	Addresses  []string      `yaml:"addresses" json:"addresses"`
+	Username   string        `yaml:"username" json:"username"`
+	Password   string        `yaml:"password" json:"password"`
+	APIKey     string        `yaml:"api_key" json:"api_key"`
+	CloudID    string        `yaml:"cloud_id" json:"cloud_id"`
+	Timeout    time.Duration `yaml:"timeout" json:"timeout"`
+	MaxRetries int           `yaml:"max_retries" json:"max_retries"`
 }
 
 // DefaultConfig returns default Elasticsearch configuration.
 func DefaultConfig() Config {
 	return Config{
-		Addresses: []string{"http://localhost:9200"},
-		Timeout:   30 * time.Second,
+		Addresses:  []string{"http://localhost:9200"},
+		Timeout:    30 * time.Second,
 		MaxRetries: 3,
 	}
 }

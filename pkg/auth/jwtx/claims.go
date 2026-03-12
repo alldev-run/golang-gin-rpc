@@ -16,8 +16,8 @@ const (
 
 // Claims represents the custom JWT claims containing user and token metadata.
 type Claims struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
+	UserID   string            `json:"user_id"`
+	Username string            `json:"username"`
 
 	DeviceID string `json:"device_id"`
 	TokenID  string `json:"token_id"`
@@ -28,4 +28,7 @@ type Claims struct {
 
 	IssuedAt time.Time `json:"issued_at"`
 	ExpireAt time.Time `json:"expire_at"`
+
+	// Payload contains additional metadata
+	Payload map[string]string `json:"payload,omitempty"`
 }

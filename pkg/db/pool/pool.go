@@ -24,14 +24,14 @@ const (
 
 // PooledClient wraps a db.Client with pool metadata.
 type PooledClient struct {
-	client     db.Client
-	config     db.Config
-	state      int32 // atomic State
-	lastUsed   int64 // atomic unix timestamp
-	createdAt  int64 // atomic unix timestamp
-	useCount   int64 // atomic usage counter
-	failCount  int32 // atomic consecutive failure counter
-	id         string
+	client    db.Client
+	config    db.Config
+	state     int32 // atomic State
+	lastUsed  int64 // atomic unix timestamp
+	createdAt int64 // atomic unix timestamp
+	useCount  int64 // atomic usage counter
+	failCount int32 // atomic consecutive failure counter
+	id        string
 }
 
 // IsConnected returns true if the client is connected.
@@ -99,13 +99,13 @@ func DefaultConfig() Config {
 
 // Pool manages a pool of database connections.
 type Pool struct {
-	config      Config
-	factory     *db.Factory
-	clients     map[string]*PooledClient // key: connection name
-	mutex       sync.RWMutex
-	sem         chan struct{}           // Semaphore for limiting concurrent creates
-	healthStop  chan struct{}
-	wg          sync.WaitGroup
+	config     Config
+	factory    *db.Factory
+	clients    map[string]*PooledClient // key: connection name
+	mutex      sync.RWMutex
+	sem        chan struct{} // Semaphore for limiting concurrent creates
+	healthStop chan struct{}
+	wg         sync.WaitGroup
 }
 
 // New creates a new connection pool.

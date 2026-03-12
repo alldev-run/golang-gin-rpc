@@ -61,11 +61,11 @@ func init() {
 
 // Validator provides SQL injection prevention capabilities
 type Validator struct {
-	strictMode      bool
-	maxLength       int
-	allowedChars    *regexp.Regexp
-	forbiddenWords  []string
-	blockPatterns   []*regexp.Regexp
+	strictMode     bool
+	maxLength      int
+	allowedChars   *regexp.Regexp
+	forbiddenWords []string
+	blockPatterns  []*regexp.Regexp
 }
 
 // Config holds validator configuration

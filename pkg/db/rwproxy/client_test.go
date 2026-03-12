@@ -53,7 +53,7 @@ func TestSelectReplica(t *testing.T) {
 		Replicas: []*sql.DB{},
 		Strategy: LBStrategyRoundRobin,
 	})
-	
+
 	if db := client.selectReplica(); db != nil {
 		t.Error("selectReplica() should return nil with no replicas")
 	}
@@ -64,7 +64,7 @@ func TestSelectReplica(t *testing.T) {
 		Replicas: []*sql.DB{nil, nil}, // nil pointers just for testing logic
 		Strategy: LBStrategyRoundRobin,
 	})
-	
+
 	replica := client2.selectReplica()
 	// Should return one of the replicas (even if nil in this test)
 	_ = replica
@@ -74,16 +74,16 @@ func TestForceMaster(t *testing.T) {
 	client := New(Config{
 		ForceMaster: false,
 	})
-	
+
 	if client.IsMasterForced() {
 		t.Error("IsMasterForced() should be false initially")
 	}
-	
+
 	client.ForceMaster(true)
 	if !client.IsMasterForced() {
 		t.Error("IsMasterForced() should be true after ForceMaster(true)")
 	}
-	
+
 	client.ForceMaster(false)
 	if client.IsMasterForced() {
 		t.Error("IsMasterForced() should be false after ForceMaster(false)")
@@ -94,7 +94,7 @@ func TestGetReplicaCount(t *testing.T) {
 	client := New(Config{
 		Replicas: []*sql.DB{nil, nil, nil},
 	})
-	
+
 	if count := client.GetReplicaCount(); count != 3 {
 		t.Errorf("GetReplicaCount() = %d, want 3", count)
 	}
@@ -104,16 +104,16 @@ func TestRemoveReplica(t *testing.T) {
 	client := New(Config{
 		Replicas: []*sql.DB{nil, nil, nil},
 	})
-	
+
 	// Remove middle replica
 	if err := client.RemoveReplica(1); err != nil {
 		t.Errorf("RemoveReplica(1) error = %v", err)
 	}
-	
+
 	if count := client.GetReplicaCount(); count != 2 {
 		t.Errorf("GetReplicaCount() after remove = %d, want 2", count)
 	}
-	
+
 	// Try to remove invalid index
 	if err := client.RemoveReplica(10); err == nil {
 		t.Error("RemoveReplica(10) should return error for invalid index")
@@ -122,11 +122,11 @@ func TestRemoveReplica(t *testing.T) {
 
 func TestAddReplica(t *testing.T) {
 	client := New(Config{})
-	
+
 	if client.GetReplicaCount() != 0 {
 		t.Error("Initial replica count should be 0")
 	}
-	
+
 	client.AddReplica(nil)
 	if client.GetReplicaCount() != 1 {
 		t.Errorf("GetReplicaCount() after AddReplica = %d, want 1", client.GetReplicaCount())
@@ -163,7 +163,7 @@ func TestStats(t *testing.T) {
 	client := New(Config{
 		Replicas: []*sql.DB{},
 	})
-	
+
 	stats := client.Stats()
 	if stats.Master != (sql.DBStats{}) {
 		t.Log("Master stats available (may have mocked DB)")

@@ -112,7 +112,7 @@ func TestDetectInjectionUnionSelect(t *testing.T) {
 	for _, tt := range tests {
 		result := DetectInjection(tt.input)
 		if result.IsInjected != tt.expected {
-			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v", 
+			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v",
 				tt.input, result.IsInjected, tt.expected)
 		}
 	}
@@ -132,7 +132,7 @@ func TestDetectInjectionOrAttack(t *testing.T) {
 	for _, tt := range tests {
 		result := DetectInjection(tt.input)
 		if result.IsInjected != tt.expected {
-			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v", 
+			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v",
 				tt.input, result.IsInjected, tt.expected)
 		}
 	}
@@ -152,7 +152,7 @@ func TestDetectInjectionTimeBased(t *testing.T) {
 	for _, tt := range tests {
 		result := DetectInjection(tt.input)
 		if result.IsInjected != tt.expected {
-			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v", 
+			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v",
 				tt.input, result.IsInjected, tt.expected)
 		}
 	}
@@ -172,7 +172,7 @@ func TestDetectInjectionStackedQuery(t *testing.T) {
 	for _, tt := range tests {
 		result := DetectInjection(tt.input)
 		if result.IsInjected != tt.expected {
-			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v", 
+			t.Errorf("DetectInjection(%q).IsInjected = %v, want %v",
 				tt.input, result.IsInjected, tt.expected)
 		}
 	}
@@ -184,7 +184,7 @@ func TestDetectInjectionSeverity(t *testing.T) {
 		expectedSeverity string
 	}{
 		{"UNION SELECT * FROM passwords", "critical"},
-		{"' OR '1'='1", "medium"},  // Detected as boolean_based or comment
+		{"' OR '1'='1", "medium"}, // Detected as boolean_based or comment
 		{"AND 1=1", "medium"},
 		{"-- comment", "medium"},
 		{"safe input", ""},
@@ -193,7 +193,7 @@ func TestDetectInjectionSeverity(t *testing.T) {
 	for _, tt := range tests {
 		result := DetectInjection(tt.input)
 		if result.Severity != tt.expectedSeverity {
-			t.Errorf("DetectInjection(%q).Severity = %q, want %q", 
+			t.Errorf("DetectInjection(%q).Severity = %q, want %q",
 				tt.input, result.Severity, tt.expectedSeverity)
 		}
 	}
@@ -206,17 +206,17 @@ func TestSanitizeInput(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"' OR '1'='1", "'' OR ''1''=''1"},       // Quote escaping
-		{"test/*comment*/here", "testcommenthere"},       // Comment removal (content preserved)
-		{"data--comment", "datacomment"},                 // Comment removal (content preserved)
-		{"  spaced  ", "spaced"},                  // Trimming
-		{"\x00null\x00byte", "nullbyte"},          // Null byte removal
+		{"' OR '1'='1", "'' OR ''1''=''1"},         // Quote escaping
+		{"test/*comment*/here", "testcommenthere"}, // Comment removal (content preserved)
+		{"data--comment", "datacomment"},           // Comment removal (content preserved)
+		{"  spaced  ", "spaced"},                   // Trimming
+		{"\x00null\x00byte", "nullbyte"},           // Null byte removal
 	}
 
 	for _, tt := range tests {
 		result := v.SanitizeInput(tt.input)
 		if result != tt.expected {
-			t.Errorf("SanitizeInput(%q) = %q, want %q", 
+			t.Errorf("SanitizeInput(%q) = %q, want %q",
 				tt.input, result, tt.expected)
 		}
 	}
@@ -238,7 +238,7 @@ func TestQuickCheck(t *testing.T) {
 	for _, tt := range tests {
 		result := QuickCheck(tt.input)
 		if result != tt.expected {
-			t.Errorf("QuickCheck(%q) = %v, want %v", 
+			t.Errorf("QuickCheck(%q) = %v, want %v",
 				tt.input, result, tt.expected)
 		}
 	}
@@ -258,7 +258,7 @@ func TestQuoteEscape(t *testing.T) {
 	for _, tt := range tests {
 		result := QuoteEscape(tt.input)
 		if result != tt.expected {
-			t.Errorf("QuoteEscape(%q) = %q, want %q", 
+			t.Errorf("QuoteEscape(%q) = %q, want %q",
 				tt.input, result, tt.expected)
 		}
 	}
@@ -273,7 +273,7 @@ func TestSafeString(t *testing.T) {
 		{"user_name", true},
 		{"table123", true},
 		{"_private", true},
-		{"123table", false}, // Can't start with digit
+		{"123table", false},   // Can't start with digit
 		{"table-name", false}, // Hyphen not allowed
 		{"", false},           // Empty
 		{"SELECT", false},     // SQL keyword
@@ -284,7 +284,7 @@ func TestSafeString(t *testing.T) {
 	for _, tt := range tests {
 		result := SafeString(tt.input)
 		if result != tt.expected {
-			t.Errorf("SafeString(%q) = %v, want %v", 
+			t.Errorf("SafeString(%q) = %v, want %v",
 				tt.input, result, tt.expected)
 		}
 	}
@@ -310,12 +310,12 @@ func TestSafeInt64(t *testing.T) {
 	for _, tt := range tests {
 		val, ok := SafeInt64(tt.input)
 		if ok != tt.expectedOK {
-			t.Errorf("SafeInt64(%q) ok = %v, want %v", 
+			t.Errorf("SafeInt64(%q) ok = %v, want %v",
 				tt.input, ok, tt.expectedOK)
 			continue
 		}
 		if ok && val != tt.expectedVal {
-			t.Errorf("SafeInt64(%q) = %d, want %d", 
+			t.Errorf("SafeInt64(%q) = %d, want %d",
 				tt.input, val, tt.expectedVal)
 		}
 	}
@@ -323,9 +323,9 @@ func TestSafeInt64(t *testing.T) {
 
 func TestParameterizedQuery(t *testing.T) {
 	pq := NewParameterizedQuery("SELECT * FROM users WHERE id = ? AND name = ?")
-	
+
 	pq.AddParam(123).AddParam("john")
-	
+
 	query, params := pq.Build()
 	if query != "SELECT * FROM users WHERE id = ? AND name = ?" {
 		t.Errorf("Unexpected query: %s", query)
@@ -356,7 +356,7 @@ func TestCleanLikePattern(t *testing.T) {
 	for _, tt := range tests {
 		result := CleanLikePattern(tt.input)
 		if result != tt.expected {
-			t.Errorf("CleanLikePattern(%q) = %q, want %q", 
+			t.Errorf("CleanLikePattern(%q) = %q, want %q",
 				tt.input, result, tt.expected)
 		}
 	}
@@ -456,7 +456,7 @@ func TestComplexInjectionPatterns(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := DetectInjection(tt.input)
 			if result.IsInjected != tt.expected {
-				t.Errorf("DetectInjection(%q) = %v, want %v", 
+				t.Errorf("DetectInjection(%q) = %v, want %v",
 					tt.input, result.IsInjected, tt.expected)
 			}
 		})
@@ -466,7 +466,7 @@ func TestComplexInjectionPatterns(t *testing.T) {
 // Benchmark tests
 func BenchmarkDetectInjection(b *testing.B) {
 	input := "' UNION SELECT * FROM users WHERE '1'='1"
-	
+
 	for i := 0; i < b.N; i++ {
 		DetectInjection(input)
 	}
@@ -475,7 +475,7 @@ func BenchmarkDetectInjection(b *testing.B) {
 func BenchmarkValidateInput(b *testing.B) {
 	v := New(DefaultConfig())
 	input := "normal_user_input_123"
-	
+
 	for i := 0; i < b.N; i++ {
 		v.ValidateInput(input)
 	}
@@ -483,7 +483,7 @@ func BenchmarkValidateInput(b *testing.B) {
 
 func BenchmarkQuickCheck(b *testing.B) {
 	input := "' or 1=1 --"
-	
+
 	for i := 0; i < b.N; i++ {
 		QuickCheck(input)
 	}

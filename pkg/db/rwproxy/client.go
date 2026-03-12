@@ -18,8 +18,8 @@ type QueryType int
 
 const (
 	QueryUnknown QueryType = iota
-	QueryWrite   // INSERT, UPDATE, DELETE, etc.
-	QueryRead    // SELECT
+	QueryWrite             // INSERT, UPDATE, DELETE, etc.
+	QueryRead              // SELECT
 )
 
 // LBStrategy represents the load balancing strategy for replicas.
@@ -32,11 +32,11 @@ const (
 
 // Config holds the read-write split configuration.
 type Config struct {
-	Master         *sql.DB      // Master database for writes
-	Replicas       []*sql.DB    // Replica databases for reads
-	Strategy       LBStrategy   // Load balancing strategy
-	MaxReplicaLag  int          // Max acceptable replication lag (seconds, 0 = no check)
-	ForceMaster    bool         // Force all queries to master (for maintenance)
+	Master        *sql.DB    // Master database for writes
+	Replicas      []*sql.DB  // Replica databases for reads
+	Strategy      LBStrategy // Load balancing strategy
+	MaxReplicaLag int        // Max acceptable replication lag (seconds, 0 = no check)
+	ForceMaster   bool       // Force all queries to master (for maintenance)
 }
 
 // Client is a read-write splitting SQL client.
@@ -68,19 +68,19 @@ func New(config Config) *Client {
 // Close closes all database connections.
 func (c *Client) Close() error {
 	var errs []error
-	
+
 	if c.config.Master != nil {
 		if err := c.config.Master.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to close master: %w", err))
 		}
 	}
-	
+
 	for i, replica := range c.config.Replicas {
 		if err := replica.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to close replica %d: %w", i, err))
 		}
 	}
-	
+
 	if len(errs) > 0 {
 		return errs[0] // Return first error
 	}
@@ -90,14 +90,14 @@ func (c *Client) Close() error {
 // getQueryType determines if a query is read or write.
 func (c *Client) getQueryType(query string) QueryType {
 	trimmed := strings.TrimSpace(query)
-	
+
 	if c.queryChecker.writePattern.MatchString(trimmed) {
 		return QueryWrite
 	}
 	if c.queryChecker.readPattern.MatchString(trimmed) {
 		return QueryRead
 	}
-	
+
 	return QueryUnknown
 }
 
@@ -106,11 +106,11 @@ func (c *Client) selectReplica() *sql.DB {
 	if len(c.config.Replicas) == 0 {
 		return nil
 	}
-	
+
 	if c.config.ForceMaster {
 		return nil
 	}
-	
+
 	switch c.config.Strategy {
 	case LBStrategyRandom:
 		// Simple implementation - can be enhanced with actual random
@@ -130,12 +130,12 @@ func (c *Client) getDB(queryType QueryType) *sql.DB {
 	if queryType == QueryWrite || c.config.ForceMaster {
 		return c.config.Master
 	}
-	
+
 	// For reads, try to use a replica
 	if db := c.selectReplica(); db != nil {
 		return db
 	}
-	
+
 	// Fallback to master if no replicas available
 	return c.config.Master
 }
@@ -217,7 +217,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	var errs []error
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	
+
 	// Ping master
 	wg.Add(1)
 	go func() {
@@ -230,7 +230,7 @@ func (c *Client) Ping(ctx context.Context) error {
 			}
 		}
 	}()
-	
+
 	// Ping replicas
 	for i, replica := range c.config.Replicas {
 		wg.Add(1)
@@ -245,9 +245,9 @@ func (c *Client) Ping(ctx context.Context) error {
 			}
 		}(i, replica)
 	}
-	
+
 	wg.Wait()
-	
+
 	if len(errs) > 0 {
 		return fmt.Errorf("ping errors: %v", errs)
 	}
@@ -257,17 +257,17 @@ func (c *Client) Ping(ctx context.Context) error {
 // Stats returns aggregated statistics from master and all replicas.
 func (c *Client) Stats() DBStats {
 	var stats DBStats
-	
+
 	if c.config.Master != nil {
 		stats.Master = c.config.Master.Stats()
 	}
-	
+
 	for _, replica := range c.config.Replicas {
 		if replica != nil {
 			stats.Replicas = append(stats.Replicas, replica.Stats())
 		}
 	}
-	
+
 	return stats
 }
 
@@ -299,7 +299,7 @@ func (c *Client) RemoveReplica(index int) error {
 	if index < 0 || index >= len(c.config.Replicas) {
 		return fmt.Errorf("invalid replica index: %d", index)
 	}
-	
+
 	c.config.Replicas = append(
 		c.config.Replicas[:index],
 		c.config.Replicas[index+1:]...,

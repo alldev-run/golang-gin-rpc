@@ -35,9 +35,9 @@ func New(n uint64, p float64) *BloomFilter {
 	words := (size + 63) / 64
 
 	return &BloomFilter{
-		bits:    make([]uint64, words),
-		size:    words * 64,
-		hashes:  hashes,
+		bits:   make([]uint64, words),
+		size:   words * 64,
+		hashes: hashes,
 	}
 }
 

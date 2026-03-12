@@ -49,9 +49,9 @@ func TestFormatDuration(t *testing.T) {
 	}{
 		{50 * time.Nanosecond, "50ns"},
 		{500 * time.Microsecond, "500.00µs"},
-		{1500 * time.Microsecond, "1.50ms"},  // 1500µs = 1.5ms
+		{1500 * time.Microsecond, "1.50ms"}, // 1500µs = 1.5ms
 		{5 * time.Millisecond, "5.00ms"},
-		{1500 * time.Millisecond, "1.50s"},   // 1500ms = 1.5s
+		{1500 * time.Millisecond, "1.50s"}, // 1500ms = 1.5s
 		{5 * time.Second, "5.00s"},
 	}
 

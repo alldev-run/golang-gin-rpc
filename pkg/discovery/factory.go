@@ -73,7 +73,7 @@ func (c *consulAdapter) GetService(ctx context.Context, serviceName string) ([]*
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var instances []*ServiceInstance
 	for _, inst := range consulInstances {
 		instances = append(instances, &ServiceInstance{
@@ -119,7 +119,7 @@ func (e *etcdAdapter) GetService(ctx context.Context, serviceName string) ([]*Se
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var instances []*ServiceInstance
 	for _, inst := range etcdInstances {
 		instances = append(instances, &ServiceInstance{

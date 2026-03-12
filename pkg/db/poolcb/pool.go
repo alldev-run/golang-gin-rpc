@@ -16,8 +16,8 @@ import (
 
 // Config holds the combined pool and circuit breaker configuration.
 type Config struct {
-	PoolConfig      pool.Config
-	BreakerConfig   circuitbreaker.Config
+	PoolConfig    pool.Config
+	BreakerConfig circuitbreaker.Config
 }
 
 // DefaultConfig returns default configuration.

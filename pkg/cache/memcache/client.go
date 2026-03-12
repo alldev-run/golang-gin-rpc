@@ -12,9 +12,9 @@ import (
 
 // Config holds Memcached connection configuration.
 type Config struct {
-	Hosts        []string      `yaml:"hosts" json:"hosts"`             // List of memcached servers
+	Hosts        []string      `yaml:"hosts" json:"hosts"` // List of memcached servers
 	MaxIdleConns int           `yaml:"max_idle_conns" json:"max_idle_conns"`
-	Timeout      time.Duration `yaml:"timeout" json:"timeout"`         // Connection timeout
+	Timeout      time.Duration `yaml:"timeout" json:"timeout"` // Connection timeout
 }
 
 // DefaultConfig returns default Memcached configuration.

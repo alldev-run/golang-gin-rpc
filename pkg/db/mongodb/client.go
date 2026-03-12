@@ -14,11 +14,11 @@ import (
 
 // Config holds MongoDB connection configuration.
 type Config struct {
-	URI             string        `yaml:"uri" json:"uri"`                           // MongoDB connection URI
-	Database        string        `yaml:"database" json:"database"`                 // Default database name
-	ConnectTimeout  time.Duration `yaml:"connect_timeout" json:"connect_timeout"`   // Connection timeout
-	MaxPoolSize     uint64        `yaml:"max_pool_size" json:"max_pool_size"`       // Max connection pool size
-	MinPoolSize     uint64        `yaml:"min_pool_size" json:"min_pool_size"`       // Min connection pool size
+	URI             string        `yaml:"uri" json:"uri"`                               // MongoDB connection URI
+	Database        string        `yaml:"database" json:"database"`                     // Default database name
+	ConnectTimeout  time.Duration `yaml:"connect_timeout" json:"connect_timeout"`       // Connection timeout
+	MaxPoolSize     uint64        `yaml:"max_pool_size" json:"max_pool_size"`           // Max connection pool size
+	MinPoolSize     uint64        `yaml:"min_pool_size" json:"min_pool_size"`           // Min connection pool size
 	MaxConnIdleTime time.Duration `yaml:"max_conn_idle_time" json:"max_conn_idle_time"` // Max connection idle time
 }
 

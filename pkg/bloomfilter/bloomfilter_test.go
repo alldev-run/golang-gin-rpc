@@ -294,8 +294,8 @@ func TestMetrics(t *testing.T) {
 		p        float64
 		wantSize uint64
 	}{
-		{1000, 0.01, 1},      // size should be > 0
-		{10000, 0.001, 1},    // size should be > 0
+		{1000, 0.01, 1},   // size should be > 0
+		{10000, 0.001, 1}, // size should be > 0
 	}
 
 	for _, tt := range tests {
