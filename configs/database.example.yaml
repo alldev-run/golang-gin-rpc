@@ -1,0 +1,73 @@
+# Database Configuration Example
+# This file demonstrates all supported database types and their configurations
+
+# MySQL Configuration
+mysql_primary:
+  type: mysql
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "myapp"
+    username: "root"
+    password: "secret"
+    charset: "utf8mb4"
+    max_open_conns: 25
+    max_idle_conns: 10
+    conn_max_lifetime: "1h"
+
+# Redis Configuration
+redis_cache:
+  type: redis
+  redis:
+    host: "localhost"
+    port: 6379
+    password: ""
+    database: 0
+    pool_size: 10
+    min_idle_conns: 2
+    max_retries: 3
+    dial_timeout: "5s"
+    read_timeout: "3s"
+    write_timeout: "3s"
+    pool_timeout: "4s"
+
+# PostgreSQL Configuration
+postgres_main:
+  type: postgres
+  postgres:
+    host: "localhost"
+    port: 5432
+    database: "myapp"
+    username: "postgres"
+    password: "secret"
+    ssl_mode: "disable"
+    max_open_conns: 25
+    max_idle_conns: 10
+    conn_max_lifetime: "1h"
+
+# ClickHouse Configuration
+clickhouse_analytics:
+  type: clickhouse
+  clickhouse:
+    hosts:
+      - "localhost:9000"
+    database: "analytics"
+    username: "default"
+    password: ""
+    max_open_conns: 10
+    max_idle_conns: 5
+    conn_max_lifetime: "1h"
+    dial_timeout: "5s"
+
+# Elasticsearch Configuration
+elasticsearch_search:
+  type: elasticsearch
+  elasticsearch:
+    addresses:
+      - "http://localhost:9200"
+    username: "elastic"
+    password: "changeme"
+    # api_key: "your-api-key"
+    # cloud_id: "your-cloud-id"
+    timeout: "30s"
+    max_retries: 3
