@@ -13,6 +13,7 @@ import (
 	"golang-gin-rpc/pkg/db"
 	"golang-gin-rpc/pkg/db/mysql"
 	"golang-gin-rpc/pkg/discovery"
+	"golang-gin-rpc/pkg/gateway"
 	"golang-gin-rpc/pkg/health"
 	"golang-gin-rpc/pkg/logger"
 	"golang-gin-rpc/pkg/metrics"
@@ -71,6 +72,8 @@ type Config struct {
 	Auth auth.AuthConfig `yaml:"auth"`
 
 	Tracing tracing.Config `yaml:"tracing"`
+
+	Gateway gateway.Config `yaml:"gateway"`
 }
 
 // LoadConfig loads configuration from file
@@ -92,6 +95,7 @@ func LoadConfig(configPath string) (*Config, error) {
 	config.Metrics.Path = "/metrics"
 	config.Auth.Enabled = false
 	config.Tracing.Enabled = false
+	config.Gateway = *gateway.DefaultConfig()
 
 	// Load config file if exists
 	if _, err := os.Stat(configPath); err == nil {
@@ -119,6 +123,7 @@ type Bootstrap struct {
 	metricsCollector *metrics.MetricsCollector
 	authManager      *auth.AuthManager
 	tracer           *tracing.Tracer
+	gateway          *gateway.Gateway
 }
 
 // NewBootstrap creates a new bootstrap instance
@@ -185,6 +190,10 @@ func (b *Bootstrap) InitializeAll() error {
 
 	if err := b.InitializeDiscovery(); err != nil {
 		return fmt.Errorf("failed to initialize discovery: %w", err)
+	}
+
+	if err := b.InitializeGateway(); err != nil {
+		return fmt.Errorf("failed to initialize gateway: %w", err)
 	}
 
 	logger.Info("All components initialized successfully")
@@ -397,6 +406,27 @@ func (b *Bootstrap) InitializeTracing() error {
 	return nil
 }
 
+// InitializeGateway initializes the HTTP gateway
+func (b *Bootstrap) InitializeGateway() error {
+	// Create gateway instance
+	b.gateway = gateway.NewGateway(&b.config.Gateway)
+
+	// Initialize gateway
+	if err := b.gateway.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize gateway: %w", err)
+	}
+
+	// Start gateway
+	if err := b.gateway.Start(); err != nil {
+		return fmt.Errorf("failed to start gateway: %w", err)
+	}
+
+	logger.Info("Gateway initialized successfully",
+		logger.String("host", b.config.Gateway.Host),
+		logger.Int("port", b.config.Gateway.Port))
+	return nil
+}
+
 // GetConfig returns the configuration
 func (b *Bootstrap) GetConfig() *Config {
 	return b.config
@@ -447,6 +477,11 @@ func (b *Bootstrap) GetTracer() *tracing.Tracer {
 	return b.tracer
 }
 
+// GetGateway returns the gateway instance
+func (b *Bootstrap) GetGateway() *gateway.Gateway {
+	return b.gateway
+}
+
 // Close closes all resources
 func (b *Bootstrap) Close() error {
 	var errors []error
@@ -490,6 +525,12 @@ func (b *Bootstrap) Close() error {
 		ctx := context.Background()
 		if err := b.tracer.Shutdown(ctx); err != nil {
 			errors = append(errors, fmt.Errorf("tracer close error: %w", err))
+		}
+	}
+
+	if b.gateway != nil {
+		if err := b.gateway.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("gateway close error: %w", err))
 		}
 	}
 
