@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"github.com/google/uuid"
@@ -38,12 +40,12 @@ func (m *HTTPMiddleware) Wrap(handlerName string, handler http.Handler) http.Han
 		}
 		
 		ctx, span := m.tracer.StartSpan(ctx, spanName, trace.WithAttributes(
-			trace.String("http.method", r.Method),
-			trace.String("http.url", r.URL.String()),
-			trace.String("http.host", r.Host),
-			trace.String("http.scheme", r.URL.Scheme),
-			trace.String("http.user_agent", r.UserAgent()),
-			trace.String("http.remote_addr", r.RemoteAddr),
+			attribute.String("http.method", r.Method),
+			attribute.String("http.url", r.URL.String()),
+			attribute.String("http.host", r.Host),
+			attribute.String("http.scheme", r.URL.Scheme),
+			attribute.String("http.user_agent", r.UserAgent()),
+			attribute.String("http.remote_addr", r.RemoteAddr),
 		))
 		
 		defer span.End()
@@ -53,7 +55,7 @@ func (m *HTTPMiddleware) Wrap(handlerName string, handler http.Handler) http.Han
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
-		span.SetAttributes(trace.String("http.request_id", requestID))
+		span.SetAttributes(attribute.String("http.request_id", requestID))
 
 		// Inject tracing context into response headers
 		w.Header().Set("X-Trace-ID", span.SpanContext().TraceID().String())
@@ -68,21 +70,15 @@ func (m *HTTPMiddleware) Wrap(handlerName string, handler http.Handler) http.Han
 
 		// Set response attributes
 		span.SetAttributes(
-			trace.Int("http.status_code", wrapped.statusCode),
-			trace.String("http.status_text", http.StatusText(wrapped.statusCode)),
+			attribute.Int("http.status_code", wrapped.statusCode),
+			attribute.String("http.status_text", http.StatusText(wrapped.statusCode)),
 		)
 
 		// Set error status if response indicates error
 		if wrapped.statusCode >= 400 {
-			span.SetStatus(trace.Status{
-				Code:        trace.StatusCodeError,
-				Description: http.StatusText(wrapped.statusCode),
-			})
+			span.SetStatus(codes.Error, http.StatusText(wrapped.statusCode))
 		} else {
-			span.SetStatus(trace.Status{
-				Code:        trace.StatusCodeOk,
-				Description: "OK",
-			})
+			span.SetStatus(codes.Ok, "OK")
 		}
 	})
 }

@@ -302,6 +302,9 @@ type TracerProvider struct {
 	config   Config
 }
 
+// Tracer is an alias for TracerProvider for backward compatibility
+type Tracer = TracerProvider
+
 // NewTracerProvider creates a new tracer provider based on configuration
 func NewTracerProvider(config Config) (*TracerProvider, error) {
 	// Validate configuration
@@ -337,6 +340,11 @@ func NewTracerProvider(config Config) (*TracerProvider, error) {
 	default:
 		return nil, fmt.Errorf("unsupported tracer type: %s", tracerType.DisplayName())
 	}
+}
+
+// NewTracer creates a new tracer for backward compatibility
+func NewTracer(config Config) (*Tracer, error) {
+	return NewTracerProvider(config)
 }
 
 // newZipkinTracerProvider creates a Zipkin tracer provider

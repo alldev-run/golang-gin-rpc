@@ -3,10 +3,9 @@ package tracing
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -39,9 +38,9 @@ func (i *GRPCInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		// Start span
 		spanName := fmt.Sprintf("grpc.%s", info.FullMethod)
 		ctx, span := i.tracer.StartSpan(ctx, spanName, trace.WithAttributes(
-			trace.String("grpc.method", info.FullMethod),
-			trace.String("grpc.service", extractServiceName(info.FullMethod)),
-			trace.String("grpc.type", "unary"),
+			attribute.String("grpc.method", info.FullMethod),
+			attribute.String("grpc.service", extractServiceName(info.FullMethod)),
+			attribute.String("grpc.type", "unary"),
 		))
 		defer span.End()
 
@@ -53,19 +52,19 @@ func (i *GRPCInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			st, ok := status.FromError(err)
 			if ok {
 				span.SetAttributes(
-					trace.String("grpc.status_code", st.Code().String()),
-					trace.String("grpc.status_message", st.Message()),
+					attribute.String("grpc.status_code", st.Code().String()),
+					attribute.String("grpc.status_message", st.Message()),
 				)
 			} else {
 				span.SetAttributes(
-					trace.String("grpc.status_code", "Unknown"),
-					trace.String("error", err.Error()),
+					attribute.String("grpc.status_code", "Unknown"),
+					attribute.String("error", err.Error()),
 				)
 			}
 			SetSpanError(span, err)
 		} else {
 			span.SetAttributes(
-				trace.String("grpc.status_code", "OK"),
+				attribute.String("grpc.status_code", "OK"),
 			)
 			SetSpanOK(span)
 		}
@@ -92,9 +91,9 @@ func (i *GRPCInterceptor) StreamServerInterceptor() grpc.StreamServerInterceptor
 		// Start span
 		spanName := fmt.Sprintf("grpc.%s", info.FullMethod)
 		ctx, span := i.tracer.StartSpan(ctx, spanName, trace.WithAttributes(
-			trace.String("grpc.method", info.FullMethod),
-			trace.String("grpc.service", extractServiceName(info.FullMethod)),
-			trace.String("grpc.type", "stream"),
+			attribute.String("grpc.method", info.FullMethod),
+			attribute.String("grpc.service", extractServiceName(info.FullMethod)),
+			attribute.String("grpc.type", "stream"),
 		))
 		defer span.End()
 
@@ -112,19 +111,19 @@ func (i *GRPCInterceptor) StreamServerInterceptor() grpc.StreamServerInterceptor
 			st, ok := status.FromError(err)
 			if ok {
 				span.SetAttributes(
-					trace.String("grpc.status_code", st.Code().String()),
-					trace.String("grpc.status_message", st.Message()),
+					attribute.String("grpc.status_code", st.Code().String()),
+					attribute.String("grpc.status_message", st.Message()),
 				)
 			} else {
 				span.SetAttributes(
-					trace.String("grpc.status_code", "Unknown"),
-					trace.String("error", err.Error()),
+					attribute.String("grpc.status_code", "Unknown"),
+					attribute.String("error", err.Error()),
 				)
 			}
 			SetSpanError(span, err)
 		} else {
 			span.SetAttributes(
-				trace.String("grpc.status_code", "OK"),
+				attribute.String("grpc.status_code", "OK"),
 			)
 			SetSpanOK(span)
 		}
@@ -143,10 +142,10 @@ func (i *GRPCInterceptor) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 		// Start span
 		spanName := fmt.Sprintf("grpc.%s", method)
 		ctx, span := i.tracer.StartSpan(ctx, spanName, trace.WithAttributes(
-			trace.String("grpc.method", method),
-			trace.String("grpc.service", extractServiceName(method)),
-			trace.String("grpc.type", "unary_client"),
-			trace.String("grpc.target", cc.Target()),
+			attribute.String("grpc.method", method),
+			attribute.String("grpc.service", extractServiceName(method)),
+			attribute.String("grpc.type", "unary_client"),
+			attribute.String("grpc.target", cc.Target()),
 		))
 		defer span.End()
 
@@ -163,19 +162,19 @@ func (i *GRPCInterceptor) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 			st, ok := status.FromError(err)
 			if ok {
 				span.SetAttributes(
-					trace.String("grpc.status_code", st.Code().String()),
-					trace.String("grpc.status_message", st.Message()),
+					attribute.String("grpc.status_code", st.Code().String()),
+					attribute.String("grpc.status_message", st.Message()),
 				)
 			} else {
 				span.SetAttributes(
-					trace.String("grpc.status_code", "Unknown"),
-					trace.String("error", err.Error()),
+					attribute.String("grpc.status_code", "Unknown"),
+					attribute.String("error", err.Error()),
 				)
 			}
 			SetSpanError(span, err)
 		} else {
 			span.SetAttributes(
-				trace.String("grpc.status_code", "OK"),
+				attribute.String("grpc.status_code", "OK"),
 			)
 			SetSpanOK(span)
 		}
@@ -194,10 +193,10 @@ func (i *GRPCInterceptor) StreamClientInterceptor() grpc.StreamClientInterceptor
 		// Start span
 		spanName := fmt.Sprintf("grpc.%s", method)
 		ctx, span := i.tracer.StartSpan(ctx, spanName, trace.WithAttributes(
-			trace.String("grpc.method", method),
-			trace.String("grpc.service", extractServiceName(method)),
-			trace.String("grpc.type", "stream_client"),
-			trace.String("grpc.target", cc.Target()),
+			attribute.String("grpc.method", method),
+			attribute.String("grpc.service", extractServiceName(method)),
+			attribute.String("grpc.type", "stream_client"),
+			attribute.String("grpc.target", cc.Target()),
 		))
 		defer span.End()
 
@@ -214,19 +213,19 @@ func (i *GRPCInterceptor) StreamClientInterceptor() grpc.StreamClientInterceptor
 			st, ok := status.FromError(err)
 			if ok {
 				span.SetAttributes(
-					trace.String("grpc.status_code", st.Code().String()),
-					trace.String("grpc.status_message", st.Message()),
+					attribute.String("grpc.status_code", st.Code().String()),
+					attribute.String("grpc.status_message", st.Message()),
 				)
 			} else {
 				span.SetAttributes(
-					trace.String("grpc.status_code", "Unknown"),
-					trace.String("error", err.Error()),
+					attribute.String("grpc.status_code", "Unknown"),
+					attribute.String("error", err.Error()),
 				)
 			}
 			SetSpanError(span, err)
 		} else {
 			span.SetAttributes(
-				trace.String("grpc.status_code", "OK"),
+				attribute.String("grpc.status_code", "OK"),
 			)
 			SetSpanOK(span)
 		}

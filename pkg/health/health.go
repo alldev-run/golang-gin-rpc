@@ -56,6 +56,11 @@ type HealthChecker interface {
 	Check(ctx context.Context) *CheckResult
 }
 
+// HealthConfig holds configuration for the health service
+type HealthConfig struct {
+	Enabled bool `yaml:"enabled" json:"enabled"`
+}
+
 // HealthCheckConfig holds configuration for health checks
 type HealthCheckConfig struct {
 	Timeout         time.Duration `yaml:"timeout" json:"timeout"`
