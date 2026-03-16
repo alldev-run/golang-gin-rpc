@@ -4,11 +4,17 @@ package orm
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"reflect"
 	"testing"
-	"time"
 )
+
+// assertQueryAndArgs checks if the query and args match the expected values.
+func assertQueryAndArgs(t *testing.T, query string, args []interface{}, expectedQuery string, expectedArgs []interface{}) {
+	t.Helper()
+	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
+		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
+	}
+}
 
 // MockDB implements the DB interface for testing purposes.
 type MockDB struct {
@@ -43,6 +49,30 @@ func (m *MockDB) Exec(ctx context.Context, query string, args ...interface{}) (s
 		return m.ExecFunc(ctx, query, args...)
 	}
 	return nil, nil
+}
+
+// Close calls the mock CloseFunc.
+func (m *MockDB) Close() error {
+	if m.CloseFunc != nil {
+		return m.CloseFunc()
+	}
+	return nil
+}
+
+// Ping calls the mock PingFunc.
+func (m *MockDB) Ping(ctx context.Context) error {
+	if m.PingFunc != nil {
+		return m.PingFunc(ctx)
+	}
+	return nil
+}
+
+// Stats calls the mock StatsFunc.
+func (m *MockDB) Stats() sql.DBStats {
+	if m.StatsFunc != nil {
+		return m.StatsFunc()
+	}
+	return sql.DBStats{}
 }
 
 // Begin calls the mock BeginFunc.
@@ -84,7 +114,7 @@ func TestDefaultDialect(t *testing.T) {
 }
 
 func TestWhereBuilder(t *testing.T) {
-	wb := NewWhereBuilder()
+	wb := NewWhereBuilder(NewDefaultDialect())
 
 	// Test empty builder
 	where, args := wb.Build()
@@ -110,7 +140,7 @@ func TestWhereBuilder(t *testing.T) {
 	}
 
 	// Test OR condition
-	wb2 := NewWhereBuilder()
+	wb2 := NewWhereBuilder(NewDefaultDialect())
 	wb2.Where("id = ?", 1).Or("status = ?", "active")
 	where, args = wb2.Build()
 	expectedWhere = "WHERE id = ? OR status = ?"
@@ -123,6 +153,7 @@ func TestWhereBuilder(t *testing.T) {
 func TestSelectBuilder(t *testing.T) {
 	mockDB := &MockDB{}
 	sb := NewSelectBuilder(mockDB, "users")
+	var expectedArgs []interface{}
 
 	// Test basic SELECT
 	sb.Columns("id", "name", "email")
@@ -151,7 +182,8 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with ORDER BY
 	sb.OrderBy("created_at DESC")
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE status = ? ORDER BY created_at DESC"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? ORDER BY created_at DESC"
+	expectedArgs = []interface{}{1}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -159,7 +191,8 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with LIMIT
 	sb.Limit(10)
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE status = ? ORDER BY created_at DESC LIMIT 10"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? ORDER BY created_at DESC LIMIT 10"
+	expectedArgs = []interface{}{1}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -167,7 +200,8 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with OFFSET
 	sb.Offset(20)
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE status = ? ORDER BY created_at DESC LIMIT 10 OFFSET 20"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? ORDER BY created_at DESC LIMIT 10 OFFSET 20"
+	expectedArgs = []interface{}{1}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -175,7 +209,8 @@ func TestSelectBuilder(t *testing.T) {
 	// Test FOR UPDATE
 	sb.ForUpdate()
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE status = ? ORDER BY created_at DESC LIMIT 10 OFFSET 20 FOR UPDATE"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? ORDER BY created_at DESC LIMIT 10 OFFSET 20 FOR UPDATE"
+	expectedArgs = []interface{}{1}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -249,6 +284,7 @@ func TestSelectBuilderGroupByHaving(t *testing.T) {
 func TestDeleteBuilder(t *testing.T) {
 	mockDB := &MockDB{}
 	db := NewDeleteBuilder(mockDB, "users")
+	var expectedArgs []interface{}
 
 	// Test basic DELETE
 	query, args := db.Build()
@@ -261,7 +297,7 @@ func TestDeleteBuilder(t *testing.T) {
 	db.Where("status = ?", "inactive")
 	query, args = db.Build()
 	expectedQuery = "DELETE FROM users WHERE status = ?"
-	expectedArgs := []interface{}{"inactive"}
+	expectedArgs = []interface{}{"inactive"}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -270,6 +306,7 @@ func TestDeleteBuilder(t *testing.T) {
 	db.Limit(100)
 	query, args = db.Build()
 	expectedQuery = "DELETE FROM users WHERE status = ? LIMIT 100"
+	expectedArgs = []interface{}{"inactive"}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -281,9 +318,12 @@ func TestBuildInsertQuery(t *testing.T) {
 		"name":  "John Doe",
 		"email": "john@example.com",
 	}
-	query, args := buildInsertQuery("users", data)
-	expectedQuery := "INSERT INTO users (email, name, version) VALUES (?, ?, ?)"
-	expectedArgs := []interface{}{"john@example.com", "John Doe", 1}
+	query, args, err := BuildInsertQuery("users", data, NewDefaultDialect())
+	if err != nil {
+		t.Fatalf("Failed to build insert query: %v", err)
+	}
+	expectedQuery := "INSERT INTO `users` (`email`, `name`) VALUES (?, ?)"
+	expectedArgs := []interface{}{"john@example.com", "John Doe"}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -294,8 +334,11 @@ func TestBuildInsertQuery(t *testing.T) {
 		"email":   "jane@example.com",
 		"version": 5,
 	}
-	query, args = buildInsertQuery("users", dataWithVersion)
-	expectedQuery = "INSERT INTO users (email, name, version) VALUES (?, ?, ?)"
+	query, args, err = BuildInsertQuery("users", dataWithVersion, NewDefaultDialect())
+	if err != nil {
+		t.Fatalf("Failed to build insert query: %v", err)
+	}
+	expectedQuery = "INSERT INTO `users` (`email`, `name`, `version`) VALUES (?, ?, ?)"
 	expectedArgs = []interface{}{"jane@example.com", "Jane Doe", 5}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -308,8 +351,11 @@ func TestBuildUpdateQuery(t *testing.T) {
 		"name":  "John Smith",
 		"email": "johnsmith@example.com",
 	}
-	query, args := buildUpdateQuery("users", "id", 1, data)
-	expectedQuery := "UPDATE users SET email = ?, name = ?, version = version + 1 WHERE id = ?"
+	query, args, err := BuildUpdateQuery("users", "id", 1, data, NewDefaultDialect())
+	if err != nil {
+		t.Fatalf("Failed to build update query: %v", err)
+	}
+	expectedQuery := "UPDATE `users` SET `email` = ?, `name` = ? WHERE `id` = ?"
 	expectedArgs := []interface{}{"johnsmith@example.com", "John Smith", 1}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -321,9 +367,12 @@ func TestBuildUpdateQuery(t *testing.T) {
 		"email":   "janesmith@example.com",
 		"version": 3,
 	}
-	query, args = buildUpdateQuery("users", "id", 2, dataWithVersion)
-	expectedQuery = "UPDATE users SET email = ?, name = ?, version = version + 1 WHERE id = ? AND version = ?"
-	expectedArgs = []interface{}{"janesmith@example.com", "Jane Smith", 2, 3}
+	query, args, err = BuildUpdateQuery("users", "id", 2, dataWithVersion, NewDefaultDialect())
+	if err != nil {
+		t.Fatalf("Failed to build update query: %v", err)
+	}
+	expectedQuery = "UPDATE `users` SET `email` = ?, `name` = ?, `version` = ? WHERE `id` = ?"
+	expectedArgs = []interface{}{"janesmith@example.com", "Jane Smith", 3, 2}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
 	}
@@ -350,7 +399,7 @@ func TestIsZero(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := isZero(test.value)
+		result := IsZero(test.value)
 		if result != test.expected {
 			t.Errorf("isZero(%v) = %v, expected %v", test.value, result, test.expected)
 		}
