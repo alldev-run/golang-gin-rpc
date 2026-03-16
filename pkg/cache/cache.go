@@ -3,6 +3,8 @@ package cache
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"sync"
 	"time"
 
 	"golang-gin-rpc/pkg/cache/redis"
@@ -39,6 +41,18 @@ func (r *redisAdapter) Clear(ctx context.Context) error {
 
 func (r *redisAdapter) Close() error {
 	return r.client.Close()
+}
+
+func (r *redisAdapter) GetWithLock(ctx context.Context, key string) (interface{}, error) {
+	return r.Get(ctx, key)
+}
+
+func (r *redisAdapter) SetWithRandomTTL(ctx context.Context, key string, value interface{}, baseTTL time.Duration) error {
+	return r.Set(ctx, key, value, baseTTL)
+}
+
+func (r *redisAdapter) GetStats() CacheStats {
+	return CacheStats{} // Basic implementation
 }
 
 // memcacheAdapter adapts memcache.Client to Cache interface
@@ -101,7 +115,19 @@ func (m *memcacheAdapter) Close() error {
 	return m.client.Close()
 }
 
-// Cache defines the cache interface
+func (m *memcacheAdapter) GetWithLock(ctx context.Context, key string) (interface{}, error) {
+	return m.Get(ctx, key)
+}
+
+func (m *memcacheAdapter) SetWithRandomTTL(ctx context.Context, key string, value interface{}, baseTTL time.Duration) error {
+	return m.Set(ctx, key, value, baseTTL)
+}
+
+func (m *memcacheAdapter) GetStats() CacheStats {
+	return CacheStats{} // Basic implementation
+}
+
+// Cache defines the cache interface with enterprise features
 type Cache interface {
 	Get(ctx context.Context, key string) (interface{}, error)
 	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
@@ -109,6 +135,228 @@ type Cache interface {
 	Exists(ctx context.Context, key string) (bool, error)
 	Clear(ctx context.Context) error
 	Close() error
+	// Enterprise features
+	GetWithLock(ctx context.Context, key string) (interface{}, error)
+	SetWithRandomTTL(ctx context.Context, key string, value interface{}, baseTTL time.Duration) error
+	GetStats() CacheStats
+}
+
+// CacheStats provides cache statistics
+type CacheStats struct {
+	Hits        uint64
+	Misses      uint64
+	Sets        uint64
+	Deletes     uint64
+	Errors      uint64	
+	LastAccess  time.Time
+}
+
+// BreakdownCache prevents cache breakdown with singleflight
+type BreakdownCache struct {
+	cache    Cache
+	groups   map[string]*singleGroup
+	mu       sync.RWMutex
+	stats    CacheStats
+	statsMu  sync.RWMutex
+}
+
+// singleGroup prevents duplicate requests for the same key
+type singleGroup struct {
+	mu sync.Mutex
+	m  map[string]*call // key -> in-flight call
+}
+
+type call struct {
+	wg  sync.WaitGroup
+	val interface{}
+	err error
+}
+
+// NewBreakdownCache creates a cache with breakdown protection
+func NewBreakdownCache(baseCache Cache) *BreakdownCache {
+	return &BreakdownCache{
+		cache:  baseCache,
+		groups: make(map[string]*singleGroup),
+	}
+}
+
+// GetWithLock prevents cache breakdown using singleflight pattern
+func (bc *BreakdownCache) GetWithLock(ctx context.Context, key string) (interface{}, error) {
+	// Try to get from cache first
+	val, err := bc.cache.Get(ctx, key)
+	if err == nil && val != nil {
+		bc.recordHit()
+		return val, nil
+	}
+	
+	bc.recordMiss()
+	
+	// Use singleflight to prevent duplicate requests
+	g := bc.groupForKey(key)
+	c, ok := g.loadOrStore(key)
+	if ok {
+		// Wait for the in-flight request to complete
+		c.wg.Wait()
+		return c.val, c.err
+	}
+	
+	// This goroutine is responsible for loading the value
+	c.wg.Add(1)
+	defer func() {
+		c.wg.Done()
+		g.delete(key)
+	}()
+	
+	// Try cache again in case it was populated while we were waiting
+	val, err = bc.cache.Get(ctx, key)
+	if err == nil && val != nil {
+		c.val = val
+		return val, nil
+	}
+	
+	// Return nil to let caller handle cache miss
+	c.err = fmt.Errorf("cache miss")
+	return nil, c.err
+}
+
+// SetWithRandomTTL prevents cache avalanche by adding random jitter
+func (bc *BreakdownCache) SetWithRandomTTL(ctx context.Context, key string, value interface{}, baseTTL time.Duration) error {
+	// Add random jitter to prevent avalanche (±25% of base TTL)
+	jitter := time.Duration(rand.Float64() * 0.5 - 0.25) * baseTTL
+	finalTTL := baseTTL + jitter
+	
+	err := bc.cache.Set(ctx, key, value, finalTTL)
+	if err != nil {
+		bc.recordError()
+		return err
+	}
+	
+	bc.recordSet()
+	return nil
+}
+
+// groupForKey gets or creates a singleGroup for a key
+func (bc *BreakdownCache) groupForKey(key string) *singleGroup {
+	hash := simpleHash(key) % 32 // Use 32 groups to reduce contention
+	groupKey := fmt.Sprintf("group_%d", hash)
+	
+	bc.mu.RLock()
+	g, exists := bc.groups[groupKey]
+	bc.mu.RUnlock()
+	
+	if !exists {
+		bc.mu.Lock()
+		defer bc.mu.Unlock()
+		
+		// Double-check after acquiring write lock
+		if g, exists = bc.groups[groupKey]; !exists {
+			g = &singleGroup{m: make(map[string]*call)}
+			bc.groups[groupKey] = g
+		}
+	}
+	
+	return g
+}
+
+// loadOrStore loads or stores a call for the given key
+func (g *singleGroup) loadOrStore(key string) (*call, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	
+	if c, ok := g.m[key]; ok {
+		return c, true
+	}
+	
+	c := &call{}
+	g.m[key] = c
+	return c, false
+}
+
+// delete removes a call from the group
+func (g *singleGroup) delete(key string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.m, key)
+}
+
+// Stats recording methods
+func (bc *BreakdownCache) recordHit() {
+	bc.statsMu.Lock()
+	bc.stats.Hits++
+	bc.stats.LastAccess = time.Now()
+	bc.statsMu.Unlock()
+}
+
+func (bc *BreakdownCache) recordMiss() {
+	bc.statsMu.Lock()
+	bc.stats.Misses++
+	bc.stats.LastAccess = time.Now()
+	bc.statsMu.Unlock()
+}
+
+func (bc *BreakdownCache) recordSet() {
+	bc.statsMu.Lock()
+	bc.stats.Sets++
+	bc.stats.LastAccess = time.Now()
+	bc.statsMu.Unlock()
+}
+
+func (bc *BreakdownCache) recordError() {
+	bc.statsMu.Lock()
+	bc.stats.Errors++
+	bc.stats.LastAccess = time.Now()
+	bc.statsMu.Unlock()
+}
+
+// GetStats returns cache statistics
+func (bc *BreakdownCache) GetStats() CacheStats {
+	bc.statsMu.RLock()
+	defer bc.statsMu.RUnlock()
+	return bc.stats
+}
+
+// Forward standard cache methods
+func (bc *BreakdownCache) Get(ctx context.Context, key string) (interface{}, error) {
+	return bc.cache.Get(ctx, key)
+}
+
+func (bc *BreakdownCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	return bc.cache.Set(ctx, key, value, ttl)
+}
+
+func (bc *BreakdownCache) Delete(ctx context.Context, key string) error {
+	err := bc.cache.Delete(ctx, key)
+	if err == nil {
+		bc.statsMu.Lock()
+		bc.stats.Deletes++
+		bc.stats.LastAccess = time.Now()
+		bc.statsMu.Unlock()
+	}
+	return err
+}
+
+func (bc *BreakdownCache) Exists(ctx context.Context, key string) (bool, error) {
+	return bc.cache.Exists(ctx, key)
+}
+
+func (bc *BreakdownCache) Clear(ctx context.Context) error {
+	return bc.cache.Clear(ctx)
+}
+
+func (bc *BreakdownCache) Close() error {
+	return bc.cache.Close()
+}
+
+// simpleHash creates a simple hash for key distribution
+func simpleHash(key string) int {
+	hash := 0
+	for _, c := range key {
+		hash = hash*31 + int(c)
+	}
+	if hash < 0 {
+		hash = -hash
+	}
+	return hash
 }
 
 // RedisConfig holds Redis configuration
@@ -167,6 +415,18 @@ func (f *failoverAdapter) Clear(ctx context.Context) error {
 
 func (f *failoverAdapter) Close() error {
 	return f.cache.Close()
+}
+
+func (f *failoverAdapter) GetWithLock(ctx context.Context, key string) (interface{}, error) {
+	return f.Get(ctx, key)
+}
+
+func (f *failoverAdapter) SetWithRandomTTL(ctx context.Context, key string, value interface{}, baseTTL time.Duration) error {
+	return f.Set(ctx, key, value, baseTTL)
+}
+
+func (f *failoverAdapter) GetStats() CacheStats {
+	return CacheStats{} // Basic implementation
 }
 
 // FailoverConfig holds failover cache configuration

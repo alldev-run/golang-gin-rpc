@@ -1,4 +1,4 @@
-// Package metrics provides Prometheus metrics collection
+// Package metrics provides Prometheus metrics collection with enterprise features
 package metrics
 
 import (
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 
 	"golang-gin-rpc/pkg/logger"
@@ -15,11 +16,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// MetricsCollector collects and exposes application metrics
+// MetricsCollector collects and exposes application metrics with enterprise features
 type MetricsCollector struct {
 	// HTTP metrics
 	httpRequestsTotal   *prometheus.CounterVec
 	httpRequestDuration *prometheus.HistogramVec
+	httpRequestSize     *prometheus.HistogramVec
+	httpResponseSize    *prometheus.HistogramVec
 
 	// RPC metrics
 	rpcRequestsTotal   *prometheus.CounterVec
@@ -28,12 +31,16 @@ type MetricsCollector struct {
 
 	// Database metrics
 	dbConnectionsActive *prometheus.GaugeVec
+	dbConnectionsIdle   *prometheus.GaugeVec
 	dbQueryDuration     *prometheus.HistogramVec
 	dbErrorsTotal       *prometheus.CounterVec
+	dbTransactionCount  *prometheus.CounterVec
 
 	// Cache metrics
 	cacheOperationsTotal *prometheus.CounterVec
 	cacheHitRatio        *prometheus.GaugeVec
+	cacheSize            *prometheus.GaugeVec
+	cacheEvictions       *prometheus.CounterVec
 
 	// Service discovery metrics
 	discoveryServicesTotal   *prometheus.GaugeVec
@@ -43,6 +50,25 @@ type MetricsCollector struct {
 	activeConnections *prometheus.GaugeVec
 	memoryUsage       *prometheus.GaugeVec
 	goroutineCount    *prometheus.GaugeVec
+
+	// Business metrics
+	businessRevenue     *prometheus.CounterVec
+	businessOrdersTotal  *prometheus.CounterVec
+	businessUsersActive  *prometheus.GaugeVec
+
+	// Error metrics
+	errorTotal          *prometheus.CounterVec
+	errorRate           *prometheus.GaugeVec
+	panicTotal          *prometheus.CounterVec
+
+	// Security metrics
+	authAttemptsTotal   *prometheus.CounterVec
+	authFailuresTotal   *prometheus.CounterVec
+	rateLimitHitsTotal  *prometheus.CounterVec
+
+	// Custom metrics registry
+	customMetrics map[string]prometheus.Metric
+	customMetricsMu sync.RWMutex
 }
 
 // NewMetricsCollector creates a new metrics collector
