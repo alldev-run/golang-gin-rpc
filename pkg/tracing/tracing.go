@@ -4,10 +4,14 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -340,7 +344,7 @@ func newZipkinTracerProvider(config Config) (*TracerProvider, error) {
 	// Create Zipkin exporter
 	exporter, err := zipkin.New(
 		config.GetURL(),
-		zipkin.WithLogger(logger.RawLogger()),
+		zipkin.WithLogger(log.New(os.Stdout, "zipkin: ", log.LstdFlags)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Zipkin exporter: %w", err)
@@ -349,9 +353,9 @@ func newZipkinTracerProvider(config Config) (*TracerProvider, error) {
 	// Create resource
 	res, err := resource.New(context.Background(),
 		resource.WithAttributes(
-			resource.WithServiceName(config.ServiceName),
-			resource.WithServiceVersion(config.ServiceVersion),
-			resource.WithDeploymentEnvironment(config.Environment),
+			attribute.String("service.name", config.ServiceName),
+			attribute.String("service.version", config.ServiceVersion),
+			attribute.String("deployment.environment", config.Environment),
 		),
 	)
 	if err != nil {
@@ -422,7 +426,7 @@ func ValidateConfig(config Config) error {
 // Tracer returns a tracer instance
 func (tp *TracerProvider) Tracer(name string) trace.Tracer {
 	if tp.provider == nil {
-		return trace.NewNoOpTracerProvider().Tracer(name)
+		return trace.NewNoopTracerProvider().Tracer(name)
 	}
 	return tp.provider.Tracer(name)
 }
@@ -514,17 +518,17 @@ func SetSpanAttributes(span trace.Span, attributes map[string]interface{}) {
 	for key, value := range attributes {
 		switch v := value.(type) {
 		case string:
-			span.SetAttributes(trace.String(key, v))
+			span.SetAttributes(attribute.String(key, v))
 		case int:
-			span.SetAttributes(trace.Int(key, v))
+			span.SetAttributes(attribute.Int(key, v))
 		case int64:
-			span.SetAttributes(trace.Int64(key, v))
+			span.SetAttributes(attribute.Int64(key, v))
 		case float64:
-			span.SetAttributes(trace.Float64(key, v))
+			span.SetAttributes(attribute.Float64(key, v))
 		case bool:
-			span.SetAttributes(trace.Bool(key, v))
+			span.SetAttributes(attribute.Bool(key, v))
 		default:
-			span.SetAttributes(trace.String(key, fmt.Sprintf("%v", v)))
+			span.SetAttributes(attribute.String(key, fmt.Sprintf("%v", v)))
 		}
 	}
 }
@@ -535,11 +539,8 @@ func SetSpanError(span trace.Span, err error) {
 		return
 	}
 	
-	span.SetAttributes(trace.String("error", err.Error()))
-	span.SetStatus(trace.Status{
-		Code:        trace.StatusCodeError,
-		Description: err.Error(),
-	})
+	span.SetAttributes(attribute.String("error", err.Error()))
+	span.SetStatus(codes.Error, err.Error())
 }
 
 // SetSpanOK sets success status on a span
@@ -548,8 +549,5 @@ func SetSpanOK(span trace.Span) {
 		return
 	}
 	
-	span.SetStatus(trace.Status{
-		Code:        trace.StatusCodeOk,
-		Description: "OK",
-	})
+	span.SetStatus(codes.Ok, "OK")
 }
