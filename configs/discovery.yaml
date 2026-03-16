@@ -1,0 +1,17 @@
+# Service Discovery Configuration
+
+discovery:
+  enabled: true
+  registry_type: "consul"  # consul, etcd
+  registry_address: "localhost:8500"
+  timeout: 30s
+  health_check_interval: 30s
+  auto_register: true
+  service_name: "golang-gin-rpc"
+  service_address: "localhost"
+  service_port: 8080
+  service_tags:
+    - "go"
+    - "rpc"
+    - "api"
+    - "microservice"

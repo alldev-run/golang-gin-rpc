@@ -1,0 +1,29 @@
+# RPC Configuration
+
+rpc:
+  servers:
+    grpc:
+      type: "grpc"
+      host: "localhost"
+      port: 50051
+      network: "tcp"
+      timeout: 30
+      max_msg_size: 4194304  # 4MB
+      enable_tls: false
+      cert_file: ""
+      key_file: ""
+      reflection: true
+    
+    jsonrpc:
+      type: "jsonrpc"
+      host: "localhost"
+      port: 8080
+      network: "tcp"
+      timeout: 30
+      max_msg_size: 4194304  # 4MB
+      enable_tls: false
+      cert_file: ""
+      key_file: ""
+  
+  timeout: 30s
+  graceful_shutdown_timeout: 10s

@@ -27,6 +27,16 @@ func main() {
 		log.Fatalf("Failed to initialize cache: %v", err)
 	}
 
+	// Initialize RPC services
+	if err := boot.InitializeRPC(); err != nil {
+		log.Fatalf("Failed to initialize RPC services: %v", err)
+	}
+
+	// Initialize service discovery
+	if err := boot.InitializeDiscovery(); err != nil {
+		log.Fatalf("Failed to initialize service discovery: %v", err)
+	}
+
 	// Get configuration
 	config := boot.GetConfig()
 

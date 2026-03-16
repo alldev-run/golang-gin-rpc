@@ -51,3 +51,49 @@ logger:
   level: "info"  # debug, info, warn, error
   env: "dev"      # dev, prod, test
   log_path: "./logs/app.log"
+
+# RPC Configuration
+rpc:
+  servers:
+    grpc:
+      type: "grpc"
+      host: "localhost"
+      port: 50051
+      network: "tcp"
+      timeout: 30
+      max_msg_size: 4194304  # 4MB
+      enable_tls: false
+      cert_file: ""
+      key_file: ""
+      reflection: true
+    
+    jsonrpc:
+      type: "jsonrpc"
+      host: "localhost"
+      port: 8081
+      network: "tcp"
+      timeout: 30
+      max_msg_size: 4194304  # 4MB
+      enable_tls: false
+      cert_file: ""
+      key_file: ""
+  
+  timeout: 30s
+  graceful_shutdown_timeout: 10s
+
+# Service Discovery Configuration
+discovery:
+  enabled: false
+  registry_type: "consul"  # consul, etcd
+  registry_address: "localhost:8500"
+  timeout: 30s
+  health_check_interval: 30s
+  auto_register: true
+  service_name: "golang-gin-rpc"
+  service_address: "localhost"
+  service_port: 8080
+  service_tags:
+    - "go"
+    - "rpc"
+    - "api"
+    - "microservice"

@@ -13,6 +13,8 @@ import (
 	"golang-gin-rpc/pkg/logger"
 	"golang-gin-rpc/pkg/db/mysql"
 	"golang-gin-rpc/pkg/cache/redis"
+	"golang-gin-rpc/pkg/rpc"
+	"golang-gin-rpc/pkg/discovery"
 )
 
 // DatabaseConfig holds database configuration
@@ -43,6 +45,10 @@ type Config struct {
 		Env     string `yaml:"env"`
 		LogPath string `yaml:"log_path"`
 	} `yaml:"logger"`
+	
+	RPC rpc.ManagerConfig `yaml:"rpc"`
+	
+	Discovery discovery.ManagerConfig `yaml:"discovery"`
 }
 
 // LoadConfig loads configuration from file
@@ -74,9 +80,11 @@ func LoadConfig(configPath string) (*Config, error) {
 
 // Bootstrap handles application initialization
 type Bootstrap struct {
-	config *Config
-	db     *db.Factory
-	cache  cache.Cache
+	config      *Config
+	db          *db.Factory
+	cache       cache.Cache
+	rpcManager  *rpc.Manager
+	discoveryManager *discovery.ServiceDiscoveryManager
 }
 
 // NewBootstrap creates a new bootstrap instance
@@ -159,6 +167,43 @@ func (b *Bootstrap) InitializeCache() error {
 	return nil
 }
 
+// InitializeRPC initializes RPC services
+func (b *Bootstrap) InitializeRPC() error {
+	// Create RPC manager
+	b.rpcManager = rpc.NewManager(b.config.RPC)
+	
+	// Log RPC configuration
+	logger.Info("Initializing RPC services", 
+		zap.Int("servers", len(b.config.RPC.Servers)))
+	
+	// Start RPC manager
+	if err := b.rpcManager.Start(); err != nil {
+		return fmt.Errorf("failed to start RPC manager: %w", err)
+	}
+	
+	logger.Info("RPC services initialized successfully")
+	return nil
+}
+
+// InitializeDiscovery initializes service discovery
+func (b *Bootstrap) InitializeDiscovery() error {
+	// Create discovery manager
+	manager, err := discovery.NewServiceDiscoveryManager(b.config.Discovery)
+	if err != nil {
+		return fmt.Errorf("failed to create discovery manager: %w", err)
+	}
+	
+	// Start discovery manager
+	if err := manager.Start(); err != nil {
+		return fmt.Errorf("failed to start discovery manager: %w", err)
+	}
+	
+	b.discoveryManager = manager
+	
+	logger.Info("Service discovery initialized successfully")
+	return nil
+}
+
 // GetConfig returns the configuration
 func (b *Bootstrap) GetConfig() *Config {
 	return b.config
@@ -179,6 +224,16 @@ func (b *Bootstrap) GetCache() cache.Cache {
 	return b.cache
 }
 
+// GetRPCManager returns the RPC manager
+func (b *Bootstrap) GetRPCManager() *rpc.Manager {
+	return b.rpcManager
+}
+
+// GetDiscoveryManager returns the discovery manager
+func (b *Bootstrap) GetDiscoveryManager() *discovery.ServiceDiscoveryManager {
+	return b.discoveryManager
+}
+
 // Close closes all resources
 func (b *Bootstrap) Close() error {
 	var errors []error
@@ -190,8 +245,20 @@ func (b *Bootstrap) Close() error {
 	}
 	
 	if b.db != nil {
-	// Database factory doesn't need explicit close
-	// Clients are managed individually
+		// Database factory doesn't need explicit close
+		// Clients are managed individually
+	}
+	
+	if b.rpcManager != nil {
+		if err := b.rpcManager.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("rpc manager close error: %w", err))
+		}
+	}
+	
+	if b.discoveryManager != nil {
+		if err := b.discoveryManager.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("discovery manager close error: %w", err))
+		}
 	}
 	
 	if len(errors) > 0 {
