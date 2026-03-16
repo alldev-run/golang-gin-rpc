@@ -9,9 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
 )
 
 // generateTransactionID generates a unique transaction ID.
@@ -380,52 +377,40 @@ func NewDefaultTransactionMonitor(config TransactionConfig) *DefaultTransactionM
 // OnTransactionStart is called when a transaction starts.
 func (dtm *DefaultTransactionMonitor) OnTransactionStart(txID string, config TransactionConfig) {
 	if dtm.config.EnableMetrics {
-		logger.Debug("Transaction started",
-			zap.String("transaction_id", txID),
-			zap.String("isolation_level", config.IsolationLevel.String()),
-			zap.Bool("read_only", config.ReadOnly),
-			zap.Duration("timeout", config.Timeout))
+		logDebugf("Transaction started: tx_id=%s, isolation=%s, read_only=%v, timeout=%v",
+			txID, config.IsolationLevel.String(), config.ReadOnly, config.Timeout)
 	}
 }
 
 // OnTransactionCommit is called when a transaction commits.
 func (dtm *DefaultTransactionMonitor) OnTransactionCommit(txID string, result *TransactionResult) {
 	if dtm.config.EnableMetrics {
-		logger.Info("Transaction committed",
-			zap.String("transaction_id", txID),
-			zap.Duration("duration", result.Duration),
-			zap.Int("retries", result.Retries))
+		logInfof("Transaction committed: tx_id=%s, duration=%v, retries=%d",
+			txID, result.Duration, result.Retries)
 	}
 }
 
 // OnTransactionRollback is called when a transaction rolls back.
 func (dtm *DefaultTransactionMonitor) OnTransactionRollback(txID string, result *TransactionResult) {
 	if dtm.config.EnableMetrics {
-		logger.Warn("Transaction rolled back",
-			zap.String("transaction_id", txID),
-			zap.Duration("duration", result.Duration),
-			zap.Int("retries", result.Retries),
-			zap.String("error", result.Error.Error()))
+		logWarnf("Transaction rolled back: tx_id=%s, duration=%v, retries=%d, error=%s",
+			txID, result.Duration, result.Retries, result.Error.Error())
 	}
 }
 
 // OnTransactionRetry is called when a transaction is retried.
 func (dtm *DefaultTransactionMonitor) OnTransactionRetry(txID string, attempt int, err error) {
 	if dtm.config.EnableMetrics {
-		logger.Debug("Transaction retry",
-			zap.String("transaction_id", txID),
-			zap.Int("attempt", attempt),
-			zap.String("error", err.Error()))
+		logDebugf("Transaction retry: tx_id=%s, attempt=%d, error=%s",
+			txID, attempt, err.Error())
 	}
 }
 
 // OnSlowQuery is called when a slow query is detected.
 func (dtm *DefaultTransactionMonitor) OnSlowQuery(txID string, query string, duration time.Duration) {
 	if dtm.config.LogSlowQueries {
-		logger.Warn("Slow query detected",
-			zap.String("transaction_id", txID),
-			zap.String("query", query),
-			zap.Duration("duration", duration))
+		logWarnf("Slow query detected: tx_id=%s, query=%s, duration=%v",
+			txID, query, duration)
 	}
 }
 
@@ -491,21 +476,21 @@ func NewHTTPCoordinator(baseURL string) *HTTPCoordinator {
 func (hc *HTTPCoordinator) BeginTransaction(ctx context.Context, txID string) error {
 	// Placeholder implementation
 	// In a real implementation, this would make an HTTP request to the coordinator
-	logger.Debug("Beginning distributed transaction", zap.String("transaction_id", txID))
+	logDebugf("Beginning distributed transaction: tx_id=%s", txID)
 	return nil
 }
 
 // CommitTransaction commits a distributed transaction.
 func (hc *HTTPCoordinator) CommitTransaction(ctx context.Context, txID string) error {
 	// Placeholder implementation
-	logger.Debug("Committing distributed transaction", zap.String("transaction_id", txID))
+	logDebugf("Committing distributed transaction: tx_id=%s", txID)
 	return nil
 }
 
 // RollbackTransaction rolls back a distributed transaction.
 func (hc *HTTPCoordinator) RollbackTransaction(ctx context.Context, txID string) error {
 	// Placeholder implementation
-	logger.Debug("Rolling back distributed transaction", zap.String("transaction_id", txID))
+	logDebugf("Rolling back distributed transaction: tx_id=%s", txID)
 	return nil
 }
 
@@ -573,7 +558,7 @@ func (ms *MockSpan) SetBaggageItem(key, value string) {
 
 // Finish finishes the span.
 func (ms *MockSpan) Finish() {
-	logger.Debug("Span finished", zap.String("operation", ms.operationName), zap.Any("tags", ms.tags))
+	logDebugf("Span finished: operation=%s, tags=%+v", ms.operationName, ms.tags)
 }
 
 // Context returns the span context.

@@ -8,9 +8,41 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.uber.org/zap"
 	"golang-gin-rpc/pkg/logger"
 )
+
+// log helpers to avoid direct zap dependency
+func logDebug(msg string) {
+	logger.Debug(msg)
+}
+
+func logInfo(msg string) {
+	logger.Info(msg)
+}
+
+func logWarn(msg string) {
+	logger.Warn(msg)
+}
+
+func logError(msg string) {
+	logger.Error(msg)
+}
+
+func logDebugf(msg string, args ...interface{}) {
+	logger.Debug(fmt.Sprintf(msg, args...))
+}
+
+func logInfof(msg string, args ...interface{}) {
+	logger.Info(fmt.Sprintf(msg, args...))
+}
+
+func logWarnf(msg string, args ...interface{}) {
+	logger.Warn(fmt.Sprintf(msg, args...))
+}
+
+func logErrorf(msg string, args ...interface{}) {
+	logger.Error(fmt.Sprintf(msg, args...))
+}
 
 // TransactionConfig holds configuration for transaction operations.
 type TransactionConfig struct {
@@ -512,10 +544,8 @@ func (tm *TransactionManager) WithNestedTransaction(ctx context.Context, orm *OR
 		
 		// Log slow operations
 		if tm.config.LogSlowQueries && time.Since(startTime) > tm.config.SlowQueryThreshold {
-			logger.Warn("Slow nested transaction rollback",
-				zap.String("savepoint", savepointName),
-				zap.Duration("duration", time.Since(startTime)),
-				zap.String("error", err.Error()))
+			logWarnf("Slow nested transaction rollback: savepoint=%s, duration=%v, error=%s",
+				savepointName, time.Since(startTime), err.Error())
 		}
 		
 		return err
@@ -528,9 +558,8 @@ func (tm *TransactionManager) WithNestedTransaction(ctx context.Context, orm *OR
 
 	// Log slow operations
 	if tm.config.LogSlowQueries && time.Since(startTime) > tm.config.SlowQueryThreshold {
-		logger.Info("Slow nested transaction",
-			zap.String("savepoint", savepointName),
-			zap.Duration("duration", time.Since(startTime)))
+		logInfof("Slow nested transaction: savepoint=%s, duration=%v",
+			savepointName, time.Since(startTime))
 	}
 
 	return nil
