@@ -1,0 +1,36 @@
+# Prometheus Configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Golang RPC Service
+  - job_name: 'golang-gin-rpc'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    scrape_timeout: 5s
+
+  # Consul metrics
+  - job_name: 'consul'
+    static_configs:
+      - targets: ['localhost:8500']
+    metrics_path: '/v1/agent/metrics'
+    params:
+      format: ['prometheus']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
