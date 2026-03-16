@@ -1,15 +1,35 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"golang-gin-rpc/internal/app"
 	"golang-gin-rpc/internal/bootstrap"
 	"golang-gin-rpc/internal/router"
+	"golang-gin-rpc/pkg/tracing"
 )
 
 func main() {
+	// Initialize tracing first
+	if err := tracing.InitFromFile("./configs/tracing.yaml"); err != nil {
+		log.Printf("Failed to initialize tracing: %v", err)
+		// Continue without tracing
+	}
+	
+	// Ensure tracing is shutdown gracefully
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tracing.ShutdownGlobalTracer(ctx); err != nil {
+			log.Printf("Failed to shutdown tracer: %v", err)
+		}
+	}()
+
 	// Initialize bootstrap
 	boot, err := bootstrap.NewBootstrap("./configs/config.yaml")
 	if err != nil {
@@ -54,11 +74,34 @@ func main() {
 	router := router.NewRouter(application)
 	router.RegisterRoutes()
 
-	// Start application
-	if err := application.Start(); err != nil {
-		log.Fatalf("Failed to start application: %v", err)
+	// Setup graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle signals
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start application in goroutine
+	go func() {
+		if err := application.Start(); err != nil {
+			log.Fatalf("Failed to start application: %v", err)
+		}
+	}()
+
+	// Wait for signal
+	<-sigCh
+	log.Println("Shutting down application...")
+
+	// Shutdown application
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+	
+	if err := application.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Error during shutdown: %v", err)
 	}
 
-	// Wait for shutdown
-	application.WaitForShutdown()
+	// Cancel main context
+	cancel()
+	log.Println("Application shutdown complete")
 }

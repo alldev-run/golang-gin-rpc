@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    environment:
+      - STORAGE_TYPE=mem
+    networks:
+      - tracing
+
+  # 可选：使用 Elasticsearch 作为存储
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    networks:
+      - tracing
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  # 使用 Elasticsearch 存储的 Zipkin
+  zipkin-with-storage:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin-with-storage
+    ports:
+      - "9412:9411"
+    environment:
+      - STORAGE_TYPE=elasticsearch
+      - ES_HOSTS=elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - tracing
+    profiles:
+      - with-storage
+
+networks:
+  tracing:
+    driver: bridge
+
+volumes:
+  elasticsearch_data:

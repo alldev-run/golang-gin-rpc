@@ -52,6 +52,63 @@ logger:
   env: "dev"      # dev, prod, test
   log_path: "./logs/app.log"
 
+# Tracing Configuration
+tracing:
+  zipkin:
+    type: "zipkin"
+    service_name: "golang-gin-rpc"
+    service_version: "1.0.0"
+    environment: "development"
+    enabled: false
+    host: "localhost"
+    port: 9411
+    endpoint: "/api/v2/spans"
+    username: ""
+    password: ""
+    sample_rate: 1.0
+    batch_timeout: "5s"
+    max_export_batch_size: 512
+    options:
+      timeout: "10s"
+      max_attempts: 3
+  
+  jaeger:
+    type: "jaeger"
+    service_name: "golang-gin-rpc"
+    service_version: "1.0.0"
+    environment: "development"
+    enabled: false
+    host: "localhost"
+    port: 14268
+    endpoint: "/api/traces"
+    username: ""
+    password: ""
+    sample_rate: 1.0
+    batch_timeout: "5s"
+    max_export_batch_size: 512
+    options:
+      timeout: "10s"
+      max_attempts: 3
+  
+  otlp:
+    type: "otlp"
+    service_name: "golang-gin-rpc"
+    service_version: "1.0.0"
+    environment: "development"
+    enabled: false
+    host: "localhost"
+    port: 4317
+    endpoint: ""
+    username: ""
+    password: ""
+    sample_rate: 1.0
+    batch_timeout: "5s"
+    max_export_batch_size: 512
+    options:
+      timeout: "10s"
+      max_attempts: 3
+      insecure: true
+
 # RPC Configuration
 rpc:
   servers:
@@ -97,3 +154,31 @@ discovery:
     - "rpc"
     - "api"
     - "microservice"
+
+# Messaging Configuration
+messaging:
+  rabbitmq:
+    type: "rabbitmq"
+    host: "localhost"
+    port: 5672
+    username: "guest"
+    password: "guest"
+    database: "/"
+    options:
+      exchange_type: "fanout"
+      durable: true
+      auto_delete: false
+  
+  kafka:
+    type: "kafka"
+    host: "localhost"
+    port: 9092
+    username: ""
+    password: ""
+    database: ""
+    options:
+      batch_size: 100
+      linger_ms: 10
+      compression_type: "gzip"
+      acks: "all"
+      retries: 3
