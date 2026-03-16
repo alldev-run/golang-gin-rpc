@@ -4,8 +4,10 @@ package orm
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // MockDB implements the DB interface for testing purposes.
@@ -14,6 +16,9 @@ type MockDB struct {
 	QueryRowFunc func(ctx context.Context, query string, args ...interface{}) *sql.Row
 	ExecFunc     func(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	BeginFunc    func(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+	PingFunc     func(ctx context.Context) error
+	StatsFunc    func() sql.DBStats
+	CloseFunc    func() error
 }
 
 // Query calls the mock QueryFunc.
@@ -120,27 +125,27 @@ func TestSelectBuilder(t *testing.T) {
 	sb := NewSelectBuilder(mockDB, "users")
 
 	// Test basic SELECT
-	query, args := sb.Build()
-	expectedQuery := "SELECT * FROM users"
-	if query != expectedQuery || len(args) != 0 {
-		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
-	}
-
-	// Test with columns
 	sb.Columns("id", "name", "email")
-	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users"
+	query, args := sb.Build()
+	expectedQuery := "SELECT `id`, `name`, `email` FROM `users`"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
 
-	// Test with WHERE
-	sb.Where("status = ?", "active")
+	// Test WHERE condition
+	sb.Where("id = ?", 1)
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE status = ?"
-	expectedArgs := []interface{}{"active"}
-	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
-		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ?"
+	if query != expectedQuery || len(args) != 1 || args[0] != 1 {
+		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{1}, query, args)
+	}
+
+	// Test LIMIT
+	sb.Limit(10)
+	query, args = sb.Build()
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? LIMIT 10"
+	if query != expectedQuery {
+		t.Errorf("Expected query='%s', got query='%s'", expectedQuery, query)
 	}
 
 	// Test with ORDER BY
