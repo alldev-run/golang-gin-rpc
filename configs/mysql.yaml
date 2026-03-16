@@ -1,0 +1,36 @@
+# MySQL 数据库配置示例
+
+# 基础配置
+host: localhost
+port: 3306
+database: golang_rpc
+username: root
+password: your_password_here
+charset: utf8mb4
+
+# 连接池配置
+max_open_conns: 25        # 最大打开连接数
+max_idle_conns: 10        # 最大空闲连接数
+conn_max_lifetime: 3600s  # 连接最大生存时间（1小时）
+conn_max_idle_time: 1800s # 连接最大空闲时间（30分钟）
+
+# 可选：SSL配置
+# ssl_mode: required
+# ssl_ca: /path/to/ca.pem
+# ssl_cert: /path/to/cert.pem
+# ssl_key: /path/to/key.pem
+
+# 可选：超时配置
+# read_timeout: 30s
+# write_timeout: 30s
+# connect_timeout: 10s
+
+# 可选：字符集和时区
+# collation: utf8mb4_unicode_ci
+# loc: Local
+
+# 可选：连接参数
+# parseTime: true
+# allowCleartextPasswords: false
+# allowNativePasswords: false
+# rejectReadOnly: false

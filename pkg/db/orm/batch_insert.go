@@ -59,7 +59,7 @@ func BatchInsert(ctx context.Context, db DB, table string, data []map[string]int
 	// Start transaction if requested
 	if config.UseTransaction {
 		var err error
-		tx, err = db.(*DBWrapper).db.BeginTx(ctx, nil)
+		tx, err = db.(*DBWrapper).DB.BeginTx(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func BatchInsertWithReturning(ctx context.Context, db DB, table string, data []m
 	// Start transaction if requested
 	if config.UseTransaction {
 		var err error
-		tx, err = db.(*DBWrapper).db.BeginTx(ctx, nil)
+		tx, err = db.(*DBWrapper).DB.BeginTx(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -172,7 +172,7 @@ func BatchInsertWithReturning(ctx context.Context, db DB, table string, data []m
 	// Note: Transaction will be committed when rows are closed
 	// This is handled by the caller
 
-	return rows.(*sql.Rows), nil
+	return rows, nil
 }
 
 // validateBatchData ensures all data entries have consistent structure.
