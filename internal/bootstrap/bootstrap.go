@@ -19,7 +19,6 @@ import (
 	"golang-gin-rpc/pkg/rpc"
 	"golang-gin-rpc/pkg/tracing"
 
-	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -217,9 +216,9 @@ func (b *Bootstrap) InitializeDatabases() error {
 		// Test connection
 		ctx := context.Background()
 		if err := client.Ping(ctx); err != nil {
-			logger.Warn("Database %s connection failed", zap.String("name", name), zap.Error(err))
+			logger.Warn("Database %s connection failed", logger.String("name", name), logger.Error(err))
 		} else {
-			logger.Info("Database %s connected successfully", zap.String("name", name))
+			logger.Info("Database %s connected successfully", logger.String("name", name))
 		}
 	}
 
@@ -239,7 +238,7 @@ func (b *Bootstrap) InitializeCache() error {
 		b.cache = cacheInstance
 		logger.Info("Redis cache initialized")
 	default:
-		logger.Warn("Cache type %s not supported, skipping cache initialization", zap.String("type", b.config.Cache.Type))
+		logger.Warn("Cache type %s not supported, skipping cache initialization", logger.String("type", b.config.Cache.Type))
 	}
 
 	return nil
@@ -252,7 +251,7 @@ func (b *Bootstrap) InitializeRPC() error {
 
 	// Log RPC configuration
 	logger.Info("Initializing RPC services",
-		zap.Int("servers", len(b.config.RPC.Servers)))
+		logger.Int("servers", len(b.config.RPC.Servers)))
 
 	// Start RPC manager
 	if err := b.rpcManager.Start(); err != nil {
@@ -291,7 +290,7 @@ func (b *Bootstrap) InitializeErrors() error {
 	}
 
 	if b.config.Errors.MaxErrorDepth > 0 {
-		logger.Info("Error depth limit set", zap.Int("depth", b.config.Errors.MaxErrorDepth))
+		logger.Info("Error depth limit set", logger.Int("depth", b.config.Errors.MaxErrorDepth))
 	}
 
 	logger.Info("Error handling initialized successfully")
@@ -355,13 +354,13 @@ func (b *Bootstrap) InitializeMetrics() error {
 	// Start metrics server in background
 	go func() {
 		if err := metricsCollector.StartMetricsServer(b.config.Metrics.Address); err != nil {
-			logger.Error("Failed to start metrics server", zap.Error(err))
+			logger.Errorf("Failed to start metrics server", logger.Error(err))
 		}
 	}()
 
 	logger.Info("Metrics collection initialized successfully",
-		zap.String("address", b.config.Metrics.Address),
-		zap.String("path", b.config.Metrics.Path))
+		logger.String("address", b.config.Metrics.Address),
+		logger.String("path", b.config.Metrics.Path))
 
 	return nil
 }
@@ -404,7 +403,7 @@ func (b *Bootstrap) GetConfig() *Config {
 }
 
 // GetLogger returns the global logger
-func (b *Bootstrap) GetLogger() *zap.Logger {
+func (b *Bootstrap) GetLogger() interface{} {
 	return logger.L()
 }
 
