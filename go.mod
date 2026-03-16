@@ -4,7 +4,6 @@ go 1.25.7
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
-	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.9.3

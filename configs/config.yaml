@@ -1,0 +1,53 @@
+# Application Configuration
+server:
+  host: "localhost"
+  port: "8080"
+  mode: "debug"  # debug, release, test
+
+# Database Configuration
+database:
+  mysql_primary:
+    type: "mysql"
+    mysql:
+      host: "localhost"
+      port: 3306
+      database: "myapp"
+      username: "root"
+      password: "secret"
+      charset: "utf8mb4"
+      max_open_conns: 25
+      max_idle_conns: 10
+      conn_max_lifetime: "1h"
+      conn_max_idle_time: "30m"
+
+  redis_cache:
+    type: "redis"
+    redis:
+      host: "localhost"
+      port: 6379
+      password: ""
+      database: 0
+      pool_size: 10
+      min_idle_conns: 2
+      max_retries: 3
+      dial_timeout: "5s"
+      read_timeout: "3s"
+      write_timeout: "3s"
+      pool_timeout: "4s"
+
+# Cache Configuration
+cache:
+  type: "redis"
+  redis:
+    host: "localhost"
+    port: 6379
+    password: ""
+    database: 0
+    pool_size: 10
+    min_idle_conns: 2
+
+# Logger Configuration
+logger:
+  level: "info"  # debug, info, warn, error
+  env: "dev"      # dev, prod, test
+  log_path: "./logs/app.log"
