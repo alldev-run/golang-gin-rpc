@@ -51,6 +51,32 @@ import (
     "golang-gin-rpc/pkg/db"
     "golang-gin-rpc/pkg/db/poolcb"
 )
+```
+
+### MySQL Helper Methods
+
+The MySQL client also provides helper methods for common write operations:
+
+- `InsertGetID` - run an INSERT and return the last inserted ID
+- `Update` - run an UPDATE and return affected rows
+- `SetFieldByID` - update a single field by primary key
+- `Save` - insert or update based on whether the ID is zero. Supports optimistic locking with version field.
+- `NewDeleteBuilder` - fluent builder for DELETE queries
+
+```go
+id, err := client.InsertGetID(ctx, "INSERT INTO users (name,email) VALUES (?, ?)", "alice", "alice@example.com")
+_, err = client.Update(ctx, "UPDATE users SET email = ? WHERE id = ?", "alice@new.com", id)
+_, err = client.SetFieldByID(ctx, "users", "id", id, "status", "active")
+_, err = client.Save(ctx, "users", "id", id, map[string]interface{}{"status": "active"})
+
+// Optimistic locking with version
+_, err = client.Save(ctx, "users", "id", id, map[string]interface{}{"status": "active", "version": 1})
+
+// DELETE queries
+result, err := client.NewDeleteBuilder("users").Where("status = ?", "inactive").Exec(ctx)
+```
+
+## Connection Pooling
 
 // Load configuration
 cfg := poolcb.Config{

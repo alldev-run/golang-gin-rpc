@@ -6,7 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
+
+	"golang-gin-rpc/pkg/db/orm"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -22,6 +26,7 @@ type Config struct {
 	MaxOpenConns    int           `yaml:"max_open_conns" json:"max_open_conns"`
 	MaxIdleConns    int           `yaml:"max_idle_conns" json:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime" json:"conn_max_lifetime"`
+	ConnMaxIdleTime time.Duration `yaml:"conn_max_idle_time" json:"conn_max_idle_time"`
 }
 
 // DefaultConfig returns default MySQL configuration.
@@ -33,13 +38,15 @@ func DefaultConfig() Config {
 		MaxOpenConns:    25,
 		MaxIdleConns:    10,
 		ConnMaxLifetime: time.Hour,
+		ConnMaxIdleTime: 30 * time.Minute,
 	}
 }
 
 // Client wraps sql.DB with additional functionality.
 type Client struct {
-	db     *sql.DB
-	config Config
+	db                  *sql.DB
+	config              Config
+	defaultVersionField string
 }
 
 // New creates a new MySQL client from config.
@@ -62,6 +69,7 @@ func New(config Config) (*Client, error) {
 	db.SetMaxOpenConns(config.MaxOpenConns)
 	db.SetMaxIdleConns(config.MaxIdleConns)
 	db.SetConnMaxLifetime(config.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(config.ConnMaxIdleTime)
 
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -72,8 +80,9 @@ func New(config Config) (*Client, error) {
 	}
 
 	return &Client{
-		db:     db,
-		config: config,
+		db:                  db,
+		config:              config,
+		defaultVersionField: "version",
 	}, nil
 }
 
@@ -112,6 +121,134 @@ func (c *Client) Exec(ctx context.Context, query string, args ...any) (sql.Resul
 	return c.db.ExecContext(ctx, query, args...)
 }
 
+// InsertGetID executes an INSERT statement and returns the last inserted ID.
+func (c *Client) InsertGetID(ctx context.Context, query string, args ...any) (int64, error) {
+	res, err := c.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// Update executes an UPDATE statement and returns the number of rows affected.
+func (c *Client) Update(ctx context.Context, query string, args ...any) (int64, error) {
+	res, err := c.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// SetFieldByID updates a single field on a row identified by an ID column.
+func (c *Client) SetFieldByID(ctx context.Context, table, idColumn string, id interface{}, field string, value interface{}) (int64, error) {
+	query := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?", table, field, idColumn)
+	res, err := c.Exec(ctx, query, value, id)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// Save inserts or updates a row based on whether the provided id is zero.
+// If id is zero or nil, it performs an INSERT and returns the new row ID.
+// Otherwise, it performs an UPDATE and returns the number of affected rows.
+func (c *Client) Save(ctx context.Context, table, idColumn string, id interface{}, data map[string]interface{}) (int64, error) {
+	if isZero(id) {
+		query, args := c.buildInsertQuery(table, data)
+		return c.InsertGetID(ctx, query, args...)
+	}
+	query, args := c.buildUpdateQuery(table, idColumn, id, data)
+	return c.Update(ctx, query, args...)
+}
+
+func isZero(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+	switch val := v.(type) {
+	case int, int8, int16, int32, int64:
+		return val == 0
+	case uint, uint8, uint16, uint32, uint64:
+		return val == 0
+	case float32, float64:
+		return val == 0
+	case string:
+		return val == ""
+	case bool:
+		return !val
+	default:
+		return false
+	}
+}
+
+func (c *Client) buildInsertQuery(table string, data map[string]interface{}) (string, []interface{}) {
+	if _, ok := data[c.defaultVersionField]; !ok {
+		data[c.defaultVersionField] = 1
+	}
+
+	if len(data) == 0 {
+		return "", nil
+	}
+
+	cols := make([]string, 0, len(data))
+	for k := range data {
+		cols = append(cols, k)
+	}
+	sort.Strings(cols)
+
+	placeholders := make([]string, len(cols))
+	args := make([]interface{}, len(cols))
+	for i, col := range cols {
+		placeholders[i] = "?"
+		args[i] = data[col]
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+	return query, args
+}
+
+func (c *Client) buildUpdateQuery(table, idColumn string, id interface{}, data map[string]interface{}) (string, []interface{}) {
+	hasVersion := false
+	var oldVersion interface{}
+	if v, ok := data[c.defaultVersionField]; ok {
+		hasVersion = true
+		oldVersion = v
+		delete(data, c.defaultVersionField)
+	}
+
+	if len(data) == 0 {
+		return "", nil
+	}
+
+	cols := make([]string, 0, len(data))
+	for k := range data {
+		if k == idColumn {
+			continue
+		}
+		cols = append(cols, k)
+	}
+	sort.Strings(cols)
+
+	setStmts := make([]string, 0, len(cols))
+	args := make([]interface{}, 0, len(cols)+1)
+	for _, col := range cols {
+		if col == c.defaultVersionField {
+			setStmts = append(setStmts, c.defaultVersionField+" = "+c.defaultVersionField+" + 1")
+		} else {
+			setStmts = append(setStmts, fmt.Sprintf("%s = ?", col))
+			args = append(args, data[col])
+		}
+	}
+	args = append(args, id)
+
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = ?", table, strings.Join(setStmts, ", "), idColumn)
+	if hasVersion {
+		query += " AND " + c.defaultVersionField + " = ?"
+		args = append(args, oldVersion)
+	}
+	return query, args
+}
+
 // Begin starts a new transaction.
 func (c *Client) Begin(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return c.db.BeginTx(ctx, opts)
@@ -142,4 +279,44 @@ func (c *Client) Transaction(ctx context.Context, fn func(*sql.Tx) error) error 
 // Prepare creates a prepared statement.
 func (c *Client) Prepare(ctx context.Context, query string) (*sql.Stmt, error) {
 	return c.db.PrepareContext(ctx, query)
+}
+
+// NewSelectBuilder creates a new SELECT query builder.
+func (c *Client) NewSelectBuilder(table string) *orm.SelectBuilder {
+	return orm.NewSelectBuilder(c, table)
+}
+
+// Count returns a new SelectBuilder configured for COUNT queries.
+func (c *Client) Count(table string) *orm.SelectBuilder {
+	return orm.NewSelectBuilder(c, table).Columns("COUNT(*)")
+}
+
+// CountColumn returns a new SelectBuilder configured for COUNT(column) queries.
+func (c *Client) CountColumn(table, column string) *orm.SelectBuilder {
+	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("COUNT(%s)", column))
+}
+
+// Sum returns a new SelectBuilder configured for SUM queries.
+func (c *Client) Sum(table, column string) *orm.SelectBuilder {
+	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("SUM(%s)", column))
+}
+
+// Avg returns a new SelectBuilder configured for AVG queries.
+func (c *Client) Avg(table, column string) *orm.SelectBuilder {
+	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("AVG(%s)", column))
+}
+
+// Max returns a new SelectBuilder configured for MAX queries.
+func (c *Client) Max(table, column string) *orm.SelectBuilder {
+	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("MAX(%s)", column))
+}
+
+// Min returns a new SelectBuilder configured for MIN queries.
+func (c *Client) Min(table, column string) *orm.SelectBuilder {
+	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("MIN(%s)", column))
+}
+
+// NewDeleteBuilder creates a new DELETE query builder.
+func (c *Client) NewDeleteBuilder(table string) *orm.DeleteBuilder {
+	return orm.NewDeleteBuilder(c, table)
 }

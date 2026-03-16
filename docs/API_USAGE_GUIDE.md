@@ -110,6 +110,51 @@ esClient, _ := factory.Create(db.Config{
 
 ## Connection Pooling
 
+### Insert / Update Helpers (MySQL)
+
+The MySQL client provides convenience helpers for common write operations.
+
+```go
+// Insert and get inserted ID
+id, err := client.InsertGetID(ctx, "INSERT INTO users (name, email) VALUES (?, ?)", "Alice", "alice@example.com")
+
+// Update and get rows affected
+affected, err := client.Update(ctx, "UPDATE users SET email = ? WHERE id = ?", "alice@new.com", id)
+
+// Set a single field by ID
+affected, err = client.SetFieldByID(ctx, "users", "id", id, "email", "alice@new.com")
+
+// Save (insert or update based on ID)
+newID, err := client.Save(ctx, "users", "id", 0, map[string]interface{}{
+    "name": "Bob",
+    "email": "bob@example.com",
+})
+if err != nil {
+    return err
+}
+
+// Update existing row
+affected, err = client.Save(ctx, "users", "id", newID, map[string]interface{}{
+    "email": "bob@new.com",
+})
+
+// Save with optimistic locking (version field for concurrency control)
+affected, err = client.Save(ctx, "users", "id", newID, map[string]interface{}{
+    "email": "bob@new.com",
+    "version": 1, // current version value
+})
+
+// DELETE queries using DeleteBuilder
+result, err := client.NewDeleteBuilder("users").
+    Where("status = ?", "inactive").
+    And("created_at < ?", time.Now().Add(-30*24*time.Hour)).
+    Exec(ctx)
+
+affected, err := result.RowsAffected()
+```
+
+## Connection Pooling
+
 ### Basic Pool Usage
 
 ```go
