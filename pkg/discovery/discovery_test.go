@@ -93,6 +93,25 @@ func TestNewDiscovery(t *testing.T) {
 		}
 	}
 
+	// Test zookeeper discovery
+	zookeeperConfig := Config{
+		Type:    RegistryTypeZk,
+		Address: "127.0.0.1:2181",
+		Timeout: 5 * time.Second,
+		Options: map[string]interface{}{
+			"base_path": "/services",
+		},
+	}
+
+	discovery, err = NewDiscovery(zookeeperConfig)
+	if err != nil {
+		t.Logf("zookeeper not available, skipping test: %v", err)
+	} else {
+		if discovery == nil {
+			t.Error("Expected discovery instance, got nil")
+		}
+	}
+
 	// Test invalid type
 	invalidConfig := Config{
 		Type:    "invalid",
@@ -332,6 +351,12 @@ func TestEtcdAdapter(t *testing.T) {
 	// - Get service
 	// - Deregister service
 	t.Log("etcd adapter structure test passed")
+}
+
+func TestZookeeperAdapter(t *testing.T) {
+	adapter := &zookeeperAdapter{registry: nil}
+	var _ Discovery = adapter
+	t.Log("zookeeper adapter structure test passed")
 }
 
 func TestConcurrentDiscoveryOperations(t *testing.T) {
