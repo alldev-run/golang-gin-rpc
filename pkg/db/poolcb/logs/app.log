@@ -28,3 +28,6 @@
 {"level":"\u001b[33mWARN\u001b[0m","ts":"2026-03-17T16:27:11+08:00","caller":"circuitbreaker/breaker.go:285","msg":"circuit breaker manually opened","name":"default"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T16:27:11+08:00","caller":"circuitbreaker/breaker.go:295","msg":"circuit breaker manually closed","name":"default"}
 {"level":"\u001b[33mWARN\u001b[0m","ts":"2026-03-17T16:27:11+08:00","caller":"circuitbreaker/breaker.go:285","msg":"circuit breaker manually opened","name":"test"}
+{"level":"\u001b[33mWARN\u001b[0m","ts":"2026-03-17T17:55:24+08:00","caller":"circuitbreaker/breaker.go:285","msg":"circuit breaker manually opened","name":"default"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:24+08:00","caller":"circuitbreaker/breaker.go:295","msg":"circuit breaker manually closed","name":"default"}
+{"level":"\u001b[33mWARN\u001b[0m","ts":"2026-03-17T17:55:24+08:00","caller":"circuitbreaker/breaker.go:285","msg":"circuit breaker manually opened","name":"test"}

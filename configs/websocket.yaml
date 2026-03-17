@@ -1,0 +1,82 @@
+node:
+  enabled: true
+  node_id: "ws-node-1"
+  name: "websocket-node-1"
+  host: "0.0.0.0"
+  port: 18080
+  path: "/ws"
+  read_timeout: 30s
+  write_timeout: 30s
+  heartbeat_timeout: 90s
+  idle_timeout: 2m
+  require_auth: true
+
+server:
+  addr: ":18080"
+  path: "/ws"
+  read_timeout: 30s
+  write_timeout: 30s
+  heartbeat_timeout: 90s
+  idle_timeout: 2m
+  require_auth: true
+
+client:
+  url: "ws://127.0.0.1:18080/ws"
+  origin: "http://127.0.0.1:18080"
+  handshake_timeout: 10s
+  read_timeout: 30s
+  write_timeout: 30s
+  auto_reconnect: true
+  reconnect_interval: 3s
+  max_reconnect_attempts: 10
+  max_reconnect_interval: 30s
+  reconnect_multiplier: 2
+  reconnect_jitter: 0.2
+  heartbeat_interval: 15s
+  heartbeat_message: "heartbeat"
+
+cluster:
+  enabled: true
+  node_id: "ws-node-1"
+  topic: "websocket.cluster.events"
+  options:
+    group_broadcast: true
+    user_broadcast: true
+    client_broadcast: true
+    connection_targeting: true
+  transport:
+    enabled: true
+    type: "rabbitmq"
+    topic: "websocket.cluster.events"
+    messaging:
+      type: "rabbitmq"
+      host: "127.0.0.1"
+      port: 5672
+      username: "guest"
+      password: "guest"
+      database: "/"
+      timeout: 30s
+      connection_timeout: 10s
+      read_timeout: 30s
+      write_timeout: 30s
+      max_retries: 3
+      retry_delay: 5s
+      pool_size: 10
+      idle_timeout: 60s
+      heartbeat: 30s
+      prefetch_count: 10
+      default_exchange: "websocket.cluster.events"
+      default_queue: "websocket.cluster.events"
+      default_routing_key: "websocket.cluster.events"
+      delivery_mode: "persistent"
+      persistent: true
+      auto_reconnect: true
+      reconnect_delay: 5s
+      max_reconnect_attempts: 5
+      enabled: true
+      options:
+        exchange_durable: true
+        queue_durable: true
+    options:
+      consumer_group: "websocket-cluster"
+      fanout: true
