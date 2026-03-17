@@ -1067,3 +1067,107 @@
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:10:23+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:10:23+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
 {"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:10:23+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:41+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":0,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":2,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":8080"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"grpc","type":"grpc","address":"localhost:50051"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:185","msg":"Registered RPC service","name":"test-service"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"grpc","error":"grpc: the server has been stopped","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":2,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"grpc","type":"grpc","address":"localhost:50051"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":8080"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:140","msg":"Added RPC server","name":"test-server","type":"jsonrpc","address":"localhost:9090"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:163","msg":"Removed RPC server","name":"test-server"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":0,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":0,"services":0}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"grpc","error":"grpc: the server has been stopped","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:185","msg":"Registered RPC service","name":"test-service"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:185","msg":"Registered RPC service","name":"test-service"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:206","msg":"Unregistered RPC service","name":"test-service"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":1,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":0"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":1,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":0"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:15:43+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:06+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":0,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":2,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":8080"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"grpc","type":"grpc","address":"localhost:50051"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:185","msg":"Registered RPC service","name":"test-service"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"grpc","error":"failed to listen on localhost:50051: listen tcp 127.0.0.1:50051: bind: address already in use","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":2,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"grpc","type":"grpc","address":"localhost:50051"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"grpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":8080"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:140","msg":"Added RPC server","name":"test-server","type":"jsonrpc","address":"localhost:9090"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:163","msg":"Removed RPC server","name":"test-server"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":0,"services":0}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"grpc","error":"grpc: the server has been stopped","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":0,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:185","msg":"Registered RPC service","name":"test-service"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:185","msg":"Registered RPC service","name":"test-service"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:206","msg":"Unregistered RPC service","name":"test-service"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":1,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":0"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:320","msg":"RPC manager started","servers":1,"services":0}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:300","msg":"Starting RPC server","name":"jsonrpc","type":"jsonrpc","address":":0"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:336","msg":"Stopping RPC manager..."}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:354","msg":"Stopping RPC server","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:364","msg":"RPC server stopped successfully","name":"jsonrpc"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:377","msg":"All RPC servers stopped gracefully"}
+{"level":"\u001b[31mERROR\u001b[0m","ts":"2026-03-17T15:16:07+08:00","caller":"rpc/manager.go:306","msg":"Failed to start RPC server","name":"jsonrpc","error":"http: Server closed","stacktrace":"alldev-gin-rpc/pkg/rpc.(*Manager).Start.func1\n\t/Users/johnjames/Workspace/golang/golang-gin-rpc/pkg/rpc/manager.go:306"}

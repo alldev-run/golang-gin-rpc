@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -357,6 +358,131 @@ func TestJSONRPCClient_RefreshBaseURLViaDiscovery(t *testing.T) {
 	}
 	if client.baseURL != "http://10.0.0.22:8088" {
 		t.Fatalf("unexpected jsonrpc baseURL: %s", client.baseURL)
+	}
+}
+
+func TestGRPCClient_ResolveTargetViaDiscovery_RoundRobin(t *testing.T) {
+	client := NewGRPCClient(ClientConfig{
+		Type:        ClientTypeGRPC,
+		ServiceName: "orders-grpc",
+		LoadBalance: "round_robin",
+	})
+	client.SetDiscoveryResolver(&mockDiscoveryResolver{
+		instances: []*discovery.ServiceInstance{
+			{Name: "orders-grpc", Address: "10.0.0.21", Port: 9001},
+			{Name: "orders-grpc", Address: "10.0.0.22", Port: 9002},
+		},
+	})
+
+	first, err := client.resolveGRPCTarget(context.Background())
+	if err != nil {
+		t.Fatalf("expected first resolution to succeed, got %v", err)
+	}
+	second, err := client.resolveGRPCTarget(context.Background())
+	if err != nil {
+		t.Fatalf("expected second resolution to succeed, got %v", err)
+	}
+	if first == second {
+		t.Fatalf("expected round robin to rotate targets, got %s and %s", first, second)
+	}
+}
+
+func TestGRPCClient_AuthUnaryClientInterceptor_AddsMetadata(t *testing.T) {
+	client := NewGRPCClient(ClientConfig{
+		Type:       ClientTypeGRPC,
+		APIKey:     "secret-key",
+		AuthHeader: "x-api-key",
+	})
+
+	err := client.authUnaryClientInterceptor()(context.Background(), "/svc.Method", "req", nil, nil,
+		func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+			md, ok := metadata.FromOutgoingContext(ctx)
+			if !ok {
+				t.Fatal("expected outgoing metadata")
+			}
+			if values := md.Get("x-api-key"); len(values) != 1 || values[0] != "secret-key" {
+				t.Fatalf("unexpected metadata values: %v", values)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("expected interceptor to succeed, got %v", err)
+	}
+}
+
+func TestJSONRPCClient_Call_UsesConfiguredAuthHeaderAndRetry(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if got := r.Header.Get("X-Custom-Key"); got != "secret-key" {
+			t.Fatalf("unexpected auth header: %q", got)
+		}
+		if attempts == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`temporary error`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","result":{"ok":true},"id":1}`))
+	}))
+	defer server.Close()
+
+	client := NewJSONRPCClient(ClientConfig{
+		Type:         ClientTypeJSONRPC,
+		Host:         strings.TrimPrefix(server.URL, "http://"),
+		Port:         80,
+		APIKey:       "secret-key",
+		AuthHeader:   "X-Custom-Key",
+		RetryCount:   2,
+		RetryBackoff: time.Millisecond,
+	})
+	client.baseURL = server.URL
+
+	var result map[string]bool
+	if err := client.Call(context.Background(), "test.method", map[string]string{"x": "y"}, &result); err != nil {
+		t.Fatalf("expected call to succeed after retry, got %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
+	}
+	if !result["ok"] {
+		t.Fatalf("unexpected result payload: %#v", result)
+	}
+}
+
+func TestJSONRPCClient_DoJSONRPCRequestWithRetry_FailsAfterExhaustingRetries(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`bad gateway`))
+	}))
+	defer server.Close()
+
+	client := NewJSONRPCClient(ClientConfig{
+		Type:         ClientTypeJSONRPC,
+		RetryCount:   2,
+		RetryBackoff: time.Millisecond,
+	})
+	req, err := http.NewRequest(http.MethodPost, server.URL, bytes.NewReader([]byte(`{}`)))
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	if req.GetBody == nil {
+		payload := []byte(`{}`)
+		req.Body = io.NopCloser(bytes.NewReader(payload))
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(payload)), nil
+		}
+	}
+
+	_, err = client.doJSONRPCRequestWithRetry(req)
+	if err == nil {
+		t.Fatal("expected retry request to fail")
+	}
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
 	}
 }
 

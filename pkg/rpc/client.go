@@ -7,7 +7,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"alldev-gin-rpc/pkg/discovery"
@@ -16,6 +18,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // ClientType represents the type of RPC client
@@ -35,6 +38,11 @@ type ClientConfig struct {
 	EnableTLS   bool          `yaml:"enable_tls" json:"enable_tls"`
 	MaxMsgSize  int           `yaml:"max_msg_size" json:"max_msg_size"`
 	ServiceName string        `yaml:"service_name" json:"service_name"`
+	APIKey      string        `yaml:"api_key" json:"api_key"`
+	AuthHeader  string        `yaml:"auth_header" json:"auth_header"`
+	LoadBalance string        `yaml:"load_balance" json:"load_balance"`
+	RetryCount  int           `yaml:"retry_count" json:"retry_count"`
+	RetryBackoff time.Duration `yaml:"retry_backoff" json:"retry_backoff"`
 }
 
 type discoveryServiceResolver interface {
@@ -49,6 +57,10 @@ func DefaultClientConfig() ClientConfig {
 		Port:       50051,
 		Timeout:    30 * time.Second,
 		MaxMsgSize: 4 * 1024 * 1024,
+		AuthHeader: "X-API-Key",
+		LoadBalance: "round_robin",
+		RetryCount:  1,
+		RetryBackoff: 100 * time.Millisecond,
 	}
 }
 
@@ -68,6 +80,7 @@ type GRPCClient struct {
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
 	discovery   discoveryServiceResolver
+	targetSelector *clientTargetSelector
 }
 
 // JSONRPCClient wraps JSON-RPC client
@@ -78,6 +91,13 @@ type JSONRPCClient struct {
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
 	discovery   discoveryServiceResolver
+	targetSelector *clientTargetSelector
+}
+
+type clientTargetSelector struct {
+	strategy string
+	counter  uint64
+	rng      *rand.Rand
 }
 
 // NewClient creates a new RPC client based on configuration
@@ -100,6 +120,7 @@ func NewGRPCClient(config ClientConfig) *GRPCClient {
 	return &GRPCClient{
 		config:      config,
 		rateLimiter: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+		targetSelector: newClientTargetSelector(config.LoadBalance),
 	}
 }
 
@@ -126,6 +147,9 @@ func (c *GRPCClient) Connect() error {
 				grpc.MaxCallSendMsgSize(c.config.MaxMsgSize),
 			),
 		)
+	}
+	if c.config.APIKey != "" {
+		opts = append(opts, grpc.WithUnaryInterceptor(c.authUnaryClientInterceptor()))
 	}
 
 	conn, err := grpc.Dial(addr, opts...)
@@ -210,6 +234,7 @@ func NewJSONRPCClient(config ClientConfig) *JSONRPCClient {
 		config:      config,
 		baseURL:     baseURL,
 		rateLimiter: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+		targetSelector: newClientTargetSelector(config.LoadBalance),
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
@@ -324,7 +349,15 @@ func (c *JSONRPCClient) Call(ctx context.Context, method string, params interfac
 
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(httpReq)
+	if c.config.APIKey != "" {
+		headerName := c.config.AuthHeader
+		if headerName == "" {
+			headerName = "X-API-Key"
+		}
+		httpReq.Header.Set(headerName, c.config.APIKey)
+	}
+
+	resp, err := c.doJSONRPCRequestWithRetry(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
@@ -383,7 +416,11 @@ func (c *GRPCClient) resolveGRPCTarget(ctx context.Context) (string, error) {
 		if len(instances) == 0 {
 			return "", fmt.Errorf("no instances found for grpc service: %s", c.config.ServiceName)
 		}
-		return fmt.Sprintf("%s:%d", instances[0].Address, instances[0].Port), nil
+		targets := make([]string, 0, len(instances))
+		for _, instance := range instances {
+			targets = append(targets, fmt.Sprintf("%s:%d", instance.Address, instance.Port))
+		}
+		return c.targetSelector.Select(targets)
 	}
 	return fmt.Sprintf("%s:%d", c.config.Host, c.config.Port), nil
 }
@@ -405,6 +442,88 @@ func (c *JSONRPCClient) refreshJSONRPCBaseURL(ctx context.Context) error {
 	if c.config.EnableTLS {
 		scheme = "https"
 	}
-	c.baseURL = fmt.Sprintf("%s://%s:%d", scheme, instances[0].Address, instances[0].Port)
+	targets := make([]string, 0, len(instances))
+	for _, instance := range instances {
+		targets = append(targets, fmt.Sprintf("%s://%s:%d", scheme, instance.Address, instance.Port))
+	}
+	selected, err := c.targetSelector.Select(targets)
+	if err != nil {
+		return err
+	}
+	c.baseURL = selected
 	return nil
+}
+
+func newClientTargetSelector(strategy string) *clientTargetSelector {
+	if strategy == "" {
+		strategy = "round_robin"
+	}
+	return &clientTargetSelector{
+		strategy: strategy,
+		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func (s *clientTargetSelector) Select(targets []string) (string, error) {
+	if len(targets) == 0 {
+		return "", fmt.Errorf("no targets available")
+	}
+
+	switch s.strategy {
+	case "random":
+		return targets[s.rng.Intn(len(targets))], nil
+	case "round_robin":
+		fallthrough
+	default:
+		index := atomic.AddUint64(&s.counter, 1) - 1
+		return targets[index%uint64(len(targets))], nil
+	}
+}
+
+func (c *GRPCClient) authUnaryClientInterceptor() grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		headerName := c.config.AuthHeader
+		if headerName == "" {
+			headerName = "x-api-key"
+		}
+		ctx = metadata.AppendToOutgoingContext(ctx, headerName, c.config.APIKey)
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+func (c *JSONRPCClient) doJSONRPCRequestWithRetry(req *http.Request) (*http.Response, error) {
+	attempts := c.config.RetryCount
+	if attempts <= 0 {
+		attempts = 1
+	}
+	backoff := c.config.RetryBackoff
+	if backoff <= 0 {
+		backoff = 100 * time.Millisecond
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		cloned := req.Clone(req.Context())
+		if req.GetBody != nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			cloned.Body = body
+		}
+		resp, err := c.httpClient.Do(cloned)
+		if err == nil && resp.StatusCode < http.StatusInternalServerError {
+			return resp, nil
+		}
+		if err == nil {
+			lastErr = fmt.Errorf("server returned status %d", resp.StatusCode)
+			_ = resp.Body.Close()
+		} else {
+			lastErr = err
+		}
+		if attempt < attempts-1 {
+			time.Sleep(backoff * time.Duration(attempt+1))
+		}
+	}
+	return nil, lastErr
 }
