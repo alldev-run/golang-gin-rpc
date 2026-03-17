@@ -64,3 +64,9 @@
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:27+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:27+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:27+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"INFO","ts":"2026-03-17T18:50:03+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"INFO","ts":"2026-03-17T18:50:03+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"INFO","ts":"2026-03-17T18:50:03+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"INFO","ts":"2026-03-17T18:50:03+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"INFO","ts":"2026-03-17T18:50:03+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}
+{"level":"INFO","ts":"2026-03-17T18:50:03+08:00","caller":"tracing/tracing.go:285","msg":"Tracing is disabled"}

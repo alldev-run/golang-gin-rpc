@@ -44,23 +44,17 @@ func Init(cfg Config) {
 		}
 
 		// 编码器配置
-		encoderConfig := zap.NewProductionEncoderConfig()
+		baseEncoderConfig := zap.NewProductionEncoderConfig()
 		if cfg.TimeFormat != "" {
-			encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+			baseEncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 				enc.AppendString(t.Format(cfg.TimeFormat))
 			}
 		} else {
-			encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+			baseEncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 		}
-		
-		if cfg.EnableConsoleColors && cfg.Output != LogOutputFile {
-			encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-		} else {
-			encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-		}
-		
+		baseEncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 		if cfg.EnableCaller {
-			encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+			baseEncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
 		}
 
 		// 输出目标
@@ -68,11 +62,15 @@ func Init(cfg Config) {
 
 		// 控制台输出
 		if cfg.Output == LogOutputStdout || cfg.Output == LogOutputStderr {
+			consoleEncoderConfig := baseEncoderConfig
+			if cfg.Format != LogFormatJSON && cfg.EnableConsoleColors {
+				consoleEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+			}
 			var encoder zapcore.Encoder
 			if cfg.Format == LogFormatJSON {
-				encoder = zapcore.NewJSONEncoder(encoderConfig)
+				encoder = zapcore.NewJSONEncoder(consoleEncoderConfig)
 			} else {
-				encoder = zapcore.NewConsoleEncoder(encoderConfig)
+				encoder = zapcore.NewConsoleEncoder(consoleEncoderConfig)
 			}
 			
 			var writer zapcore.WriteSyncer
@@ -87,6 +85,7 @@ func Init(cfg Config) {
 
 		// 文件输出
 		if cfg.Output == LogOutputFile || cfg.LogPath != "" {
+			fileEncoderConfig := baseEncoderConfig
 			fileWriter := &lumberjack.Logger{
 				Filename:   cfg.LogPath,
 				MaxSize:    cfg.MaxSize,
@@ -97,7 +96,7 @@ func Init(cfg Config) {
 			}
 
 			// 生产环境用 JSON 格式写文件
-			fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
+			fileEncoder := zapcore.NewJSONEncoder(fileEncoderConfig)
 			cores = append(cores, zapcore.NewCore(
 				fileEncoder,
 				zapcore.AddSync(fileWriter),
