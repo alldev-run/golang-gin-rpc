@@ -5,20 +5,48 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 
-// Client wraps redis.Client with additional functionality.
+// Client wraps redis.Client with additional functionality and multi-instance support.
 type Client struct {
-	rdb    *redis.Client
-	config Config
+	config  Config
+	rdb     *redis.Client        // single instance or sentinel client
+	cluster *redis.ClusterClient // cluster mode client
+	nodes   []*redis.Client      // master-slave nodes
 }
 
-// New creates a new Redis client from config.
+// New creates a new Redis client based on config mode.
 func New(config Config) (*Client, error) {
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid redis config: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	switch config.Mode {
+	case ModeSingle, "":
+		return newSingleClient(ctx, config)
+	case ModeCluster:
+		return newClusterClient(ctx, config)
+	case ModeSentinel:
+		return newSentinelClient(ctx, config)
+	case ModeMasterSlave:
+		return newMasterSlaveClient(ctx, config)
+	case ModeMulti:
+		return newMultiClient(ctx, config)
+	default:
+		return nil, fmt.Errorf("unsupported redis mode: %s", config.Mode)
+	}
+}
+
+// newSingleClient creates a single Redis instance client.
+func newSingleClient(ctx context.Context, config Config) (*Client, error) {
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 
 	rdb := redis.NewClient(&redis.Options{
@@ -34,10 +62,6 @@ func New(config Config) (*Client, error) {
 		PoolTimeout:  config.PoolTimeout,
 	})
 
-	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to ping redis: %w", err)
 	}
@@ -48,166 +72,461 @@ func New(config Config) (*Client, error) {
 	}, nil
 }
 
-// RDB returns the underlying redis.Client instance.
-func (c *Client) RDB() *redis.Client {
-	return c.rdb
+// newClusterClient creates a Redis Cluster client.
+func newClusterClient(ctx context.Context, config Config) (*Client, error) {
+	addrs := make([]string, len(config.Nodes))
+	for i, node := range config.Nodes {
+		addrs[i] = fmt.Sprintf("%s:%d", node.Host, node.Port)
+	}
+
+	cluster := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:          addrs,
+		Password:       config.Password,
+		MaxRedirects:   config.Cluster.MaxRedirects,
+		ReadOnly:       config.Cluster.ReadOnly,
+		RouteByLatency: config.Cluster.RouteByLatency,
+		RouteRandomly:  config.Cluster.RouteRandomly,
+		PoolSize:       config.PoolSize,
+		MinIdleConns:   config.MinIdleConns,
+		MaxRetries:     config.MaxRetries,
+		DialTimeout:    config.DialTimeout,
+		ReadTimeout:    config.ReadTimeout,
+		WriteTimeout:   config.WriteTimeout,
+		PoolTimeout:    config.PoolTimeout,
+	})
+
+	if err := cluster.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to ping redis cluster: %w", err)
+	}
+
+	return &Client{
+		cluster: cluster,
+		config:  config,
+	}, nil
 }
 
-// Close closes the Redis connection.
+// newSentinelClient creates a Redis Sentinel client for HA.
+func newSentinelClient(ctx context.Context, config Config) (*Client, error) {
+	rdb := redis.NewFailoverClient(&redis.FailoverOptions{
+		MasterName:       config.Sentinel.MasterName,
+		SentinelAddrs:    config.Sentinel.SentinelAddrs,
+		SentinelPassword: config.Sentinel.SentinelPassword,
+		Password:         config.Password,
+		DB:               config.Database,
+		PoolSize:         config.PoolSize,
+		MinIdleConns:     config.MinIdleConns,
+		MaxRetries:       config.MaxRetries,
+		DialTimeout:      config.DialTimeout,
+		ReadTimeout:      config.ReadTimeout,
+		WriteTimeout:     config.WriteTimeout,
+		PoolTimeout:      config.PoolTimeout,
+	})
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to ping redis sentinel: %w", err)
+	}
+
+	return &Client{
+		rdb:    rdb,
+		config: config,
+	}, nil
+}
+
+// newMasterSlaveClient creates a master-slave client with read/write splitting.
+func newMasterSlaveClient(ctx context.Context, config Config) (*Client, error) {
+	nodes := make([]*redis.Client, len(config.Nodes))
+	for i, node := range config.Nodes {
+		addr := fmt.Sprintf("%s:%d", node.Host, node.Port)
+		client := redis.NewClient(&redis.Options{
+			Addr:         addr,
+			Password:     node.Password,
+			DB:           node.Database,
+			PoolSize:     config.PoolSize,
+			MinIdleConns: config.MinIdleConns,
+			MaxRetries:   config.MaxRetries,
+			DialTimeout:  config.DialTimeout,
+			ReadTimeout:  config.ReadTimeout,
+			WriteTimeout: config.WriteTimeout,
+			PoolTimeout:  config.PoolTimeout,
+		})
+		nodes[i] = client
+	}
+
+	// Test all connections
+	for i, client := range nodes {
+		if err := client.Ping(ctx).Err(); err != nil {
+			return nil, fmt.Errorf("failed to ping redis node %d: %w", i, err)
+		}
+	}
+
+	return &Client{
+		nodes:  nodes,
+		config: config,
+	}, nil
+}
+
+// newMultiClient creates a multi-instance client with sharding support.
+func newMultiClient(ctx context.Context, config Config) (*Client, error) {
+	nodes := make([]*redis.Client, len(config.Nodes))
+	for i, node := range config.Nodes {
+		addr := fmt.Sprintf("%s:%d", node.Host, node.Port)
+		client := redis.NewClient(&redis.Options{
+			Addr:         addr,
+			Password:     node.Password,
+			DB:           node.Database,
+			PoolSize:     config.PoolSize,
+			MinIdleConns: config.MinIdleConns,
+			MaxRetries:   config.MaxRetries,
+			DialTimeout:  config.DialTimeout,
+			ReadTimeout:  config.ReadTimeout,
+			WriteTimeout: config.WriteTimeout,
+			PoolTimeout:  config.PoolTimeout,
+		})
+		nodes[i] = client
+	}
+
+	// Test all connections
+	for i, client := range nodes {
+		if err := client.Ping(ctx).Err(); err != nil {
+			return nil, fmt.Errorf("failed to ping redis node %d: %w", i, err)
+		}
+	}
+
+	return &Client{
+		nodes:  nodes,
+		config: config,
+	}, nil
+}
+
+// getNodeForKey returns the appropriate node index for a given key using sharding strategy.
+func (c *Client) getNodeForKey(key string) int {
+	if c.config.Mode != ModeMulti || len(c.nodes) == 0 {
+		return 0
+	}
+
+	strategy := c.config.Multi.ShardingStrategy
+	
+	// Check key prefix routes first
+	if len(c.config.Multi.KeyPrefixRoutes) > 0 {
+		for prefix, nodeIdx := range c.config.Multi.KeyPrefixRoutes {
+			if strings.HasPrefix(key, prefix) {
+				if nodeIdx >= 0 && nodeIdx < len(c.nodes) {
+					return nodeIdx
+				}
+				return c.config.Multi.DefaultNode
+			}
+		}
+	}
+	
+	// Use sharding strategy
+	switch strategy {
+	case "hash":
+		// Simple hash-based sharding
+		hash := 0
+		for _, ch := range key {
+			hash = (hash*31 + int(ch)) % len(c.nodes)
+		}
+		return hash
+	case "range":
+		// For range-based, use default (should be configured with specific logic)
+		return c.config.Multi.DefaultNode
+	default:
+		// Default to configured default node
+		return c.config.Multi.DefaultNode
+	}
+}
+
+// getClientForKey returns the appropriate client for a given key.
+func (c *Client) getClientForKey(key string) redis.Cmdable {
+	if c.rdb != nil {
+		return c.rdb
+	}
+	if c.cluster != nil {
+		return c.cluster
+	}
+	if len(c.nodes) > 0 {
+		if c.config.Mode == ModeMulti {
+			return c.nodes[c.getNodeForKey(key)]
+		}
+		return c.nodes[0]
+	}
+	return nil
+}
+
+// RDB returns the underlying redis.Client instance (for single/sentinel mode).
+func (c *Client) RDB() *redis.Client {
+	if c.rdb != nil {
+		return c.rdb
+	}
+	// For cluster mode, return nil or create a proxy
+	return nil
+}
+
+// Cluster returns the underlying redis.ClusterClient instance (for cluster mode).
+func (c *Client) Cluster() *redis.ClusterClient {
+	return c.cluster
+}
+
+// Close closes all Redis connections.
 func (c *Client) Close() error {
-	return c.rdb.Close()
+	if c.rdb != nil {
+		return c.rdb.Close()
+	}
+	if c.cluster != nil {
+		return c.cluster.Close()
+	}
+	for _, node := range c.nodes {
+		if err := node.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Ping checks the Redis connection health.
 func (c *Client) Ping(ctx context.Context) error {
-	return c.rdb.Ping(ctx).Err()
+	if c.rdb != nil {
+		return c.rdb.Ping(ctx).Err()
+	}
+	if c.cluster != nil {
+		return c.cluster.Ping(ctx).Err()
+	}
+	// For master-slave, ping all nodes
+	for i, node := range c.nodes {
+		if err := node.Ping(ctx).Err(); err != nil {
+			return fmt.Errorf("failed to ping node %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// getClient returns the appropriate client for the operation.
+func (c *Client) getClient(write bool) redis.Cmdable {
+	if c.rdb != nil {
+		return c.rdb
+	}
+	if c.cluster != nil {
+		return c.cluster
+	}
+	// For master-slave, select based on operation type
+	if len(c.nodes) > 0 {
+		if write {
+			// Find master node
+			for _, node := range c.nodes {
+				if node != nil {
+					return node
+				}
+			}
+		}
+		// For reads, use first available node (could implement load balancing)
+		return c.nodes[0]
+	}
+	return nil
 }
 
 // ==================== String Operations ====================
 
 // Get retrieves a string value by key.
 func (c *Client) Get(ctx context.Context, key string) (string, error) {
-	return c.rdb.Get(ctx, key).Result()
+	return c.getClientForKey(key).Get(ctx, key).Result()
 }
 
 // Set stores a string value with optional expiration.
 func (c *Client) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
-	return c.rdb.Set(ctx, key, value, expiration).Err()
+	return c.getClientForKey(key).Set(ctx, key, value, expiration).Err()
 }
 
 // SetNX sets value only if key doesn't exist (SET if Not eXists).
 func (c *Client) SetNX(ctx context.Context, key string, value any, expiration time.Duration) (bool, error) {
-	return c.rdb.SetNX(ctx, key, value, expiration).Result()
+	return c.getClientForKey(key).SetNX(ctx, key, value, expiration).Result()
 }
 
 // Del deletes one or more keys.
 func (c *Client) Del(ctx context.Context, keys ...string) error {
-	return c.rdb.Del(ctx, keys...).Err()
+	// For multiple keys, use the client for the first key
+	if len(keys) > 0 {
+		return c.getClientForKey(keys[0]).Del(ctx, keys...).Err()
+	}
+	return nil
 }
 
 // Exists checks if keys exist.
 func (c *Client) Exists(ctx context.Context, keys ...string) (int64, error) {
-	return c.rdb.Exists(ctx, keys...).Result()
+	if len(keys) > 0 {
+		return c.getClientForKey(keys[0]).Exists(ctx, keys...).Result()
+	}
+	return 0, nil
 }
 
 // Expire sets expiration on a key.
 func (c *Client) Expire(ctx context.Context, key string, expiration time.Duration) (bool, error) {
-	return c.rdb.Expire(ctx, key, expiration).Result()
+	return c.getClientForKey(key).Expire(ctx, key, expiration).Result()
 }
 
 // TTL returns remaining time to live of a key.
 func (c *Client) TTL(ctx context.Context, key string) (time.Duration, error) {
-	return c.rdb.TTL(ctx, key).Result()
+	return c.getClientForKey(key).TTL(ctx, key).Result()
 }
 
 // ==================== Hash Operations ====================
 
 // HGet retrieves a field value from a hash.
 func (c *Client) HGet(ctx context.Context, key, field string) (string, error) {
-	return c.rdb.HGet(ctx, key, field).Result()
+	return c.getClientForKey(key).HGet(ctx, key, field).Result()
 }
 
 // HSet sets field-value pairs in a hash.
 func (c *Client) HSet(ctx context.Context, key string, values ...any) error {
-	return c.rdb.HSet(ctx, key, values...).Err()
+	return c.getClientForKey(key).HSet(ctx, key, values...).Err()
 }
 
 // HGetAll retrieves all fields and values from a hash.
 func (c *Client) HGetAll(ctx context.Context, key string) (map[string]string, error) {
-	return c.rdb.HGetAll(ctx, key).Result()
+	return c.getClientForKey(key).HGetAll(ctx, key).Result()
 }
 
 // HDel deletes fields from a hash.
 func (c *Client) HDel(ctx context.Context, key string, fields ...string) error {
-	return c.rdb.HDel(ctx, key, fields...).Err()
+	return c.getClientForKey(key).HDel(ctx, key, fields...).Err()
 }
 
 // ==================== List Operations ====================
 
 // LPush pushes values to the left of a list.
 func (c *Client) LPush(ctx context.Context, key string, values ...any) error {
-	return c.rdb.LPush(ctx, key, values...).Err()
+	return c.getClientForKey(key).LPush(ctx, key, values...).Err()
 }
 
 // RPush pushes values to the right of a list.
 func (c *Client) RPush(ctx context.Context, key string, values ...any) error {
-	return c.rdb.RPush(ctx, key, values...).Err()
+	return c.getClientForKey(key).RPush(ctx, key, values...).Err()
 }
 
 // LPop pops a value from the left of a list.
 func (c *Client) LPop(ctx context.Context, key string) (string, error) {
-	return c.rdb.LPop(ctx, key).Result()
+	return c.getClientForKey(key).LPop(ctx, key).Result()
 }
 
 // RPop pops a value from the right of a list.
 func (c *Client) RPop(ctx context.Context, key string) (string, error) {
-	return c.rdb.RPop(ctx, key).Result()
+	return c.getClientForKey(key).RPop(ctx, key).Result()
 }
 
 // LRange returns a range of elements from a list.
 func (c *Client) LRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
-	return c.rdb.LRange(ctx, key, start, stop).Result()
+	return c.getClientForKey(key).LRange(ctx, key, start, stop).Result()
 }
 
 // LLen returns the length of a list.
 func (c *Client) LLen(ctx context.Context, key string) (int64, error) {
-	return c.rdb.LLen(ctx, key).Result()
+	return c.getClientForKey(key).LLen(ctx, key).Result()
 }
 
 // ==================== Set Operations ====================
 
 // SAdd adds members to a set.
 func (c *Client) SAdd(ctx context.Context, key string, members ...any) error {
-	return c.rdb.SAdd(ctx, key, members...).Err()
+	return c.getClientForKey(key).SAdd(ctx, key, members...).Err()
 }
 
 // SRem removes members from a set.
 func (c *Client) SRem(ctx context.Context, key string, members ...any) error {
-	return c.rdb.SRem(ctx, key, members...).Err()
+	return c.getClientForKey(key).SRem(ctx, key, members...).Err()
 }
 
 // SIsMember checks if a member exists in a set.
 func (c *Client) SIsMember(ctx context.Context, key string, member any) (bool, error) {
-	return c.rdb.SIsMember(ctx, key, member).Result()
+	return c.getClientForKey(key).SIsMember(ctx, key, member).Result()
 }
 
 // SMembers returns all members of a set.
 func (c *Client) SMembers(ctx context.Context, key string) ([]string, error) {
-	return c.rdb.SMembers(ctx, key).Result()
+	return c.getClientForKey(key).SMembers(ctx, key).Result()
 }
 
 // ==================== Distributed Lock ====================
 
 // Lock attempts to acquire a distributed lock.
 func (c *Client) Lock(ctx context.Context, key string, expiration time.Duration) (bool, error) {
-	return c.rdb.SetNX(ctx, key, "1", expiration).Result()
+	return c.getClientForKey(key).SetNX(ctx, key, "1", expiration).Result()
 }
 
 // Unlock releases a distributed lock.
 func (c *Client) Unlock(ctx context.Context, key string) error {
-	return c.rdb.Del(ctx, key).Err()
+	return c.getClientForKey(key).Del(ctx, key).Err()
 }
 
 // ==================== Pub/Sub ====================
 
 // Publish publishes a message to a channel.
 func (c *Client) Publish(ctx context.Context, channel string, message any) error {
-	return c.rdb.Publish(ctx, channel, message).Err()
+	return c.getClientForKey(channel).Publish(ctx, channel, message).Err()
 }
 
 // Subscribe subscribes to one or more channels.
+// Note: For cluster mode, this uses the first available node.
 func (c *Client) Subscribe(ctx context.Context, channels ...string) *redis.PubSub {
-	return c.rdb.Subscribe(ctx, channels...)
+	if c.rdb != nil {
+		return c.rdb.Subscribe(ctx, channels...)
+	}
+	if c.cluster != nil {
+		// For cluster, subscribe to the first node
+		return c.cluster.Subscribe(ctx, channels...)
+	}
+	if len(c.nodes) > 0 {
+		return c.nodes[0].Subscribe(ctx, channels...)
+	}
+	return nil
 }
 
 // ==================== Pipeline ====================
 
 // Pipeline returns a new pipeline for batch operations.
+// Note: For cluster/master-slave mode, this uses the write client.
 func (c *Client) Pipeline() redis.Pipeliner {
-	return c.rdb.Pipeline()
+	return c.getClient(true).Pipeline()
 }
 
 // TxPipeline returns a new transactional pipeline.
+// Note: For cluster/master-slave mode, this uses the write client.
 func (c *Client) TxPipeline() redis.Pipeliner {
-	return c.rdb.TxPipeline()
+	return c.getClient(true).TxPipeline()
+}
+
+// ==================== Lua Scripting ====================
+
+// Eval executes a Lua script with keys and arguments.
+func (c *Client) Eval(ctx context.Context, script string, keys []string, args ...any) (any, error) {
+	return c.getClientForKey(keys[0]).Eval(ctx, script, keys, args...).Result()
+}
+
+// EvalSha executes a cached Lua script by its SHA1 digest.
+func (c *Client) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) (any, error) {
+	return c.getClientForKey(keys[0]).EvalSha(ctx, sha1, keys, args...).Result()
+}
+
+// ScriptLoad loads a script into the script cache.
+func (c *Client) ScriptLoad(ctx context.Context, script string, key string) (string, error) {
+	return c.getClientForKey(key).ScriptLoad(ctx, script).Result()
+}
+
+// ScriptExists checks if scripts exist in the script cache.
+func (c *Client) ScriptExists(ctx context.Context, key string, hashes ...string) ([]bool, error) {
+	return c.getClientForKey(key).ScriptExists(ctx, hashes...).Result()
+}
+
+// ==================== Watch Transactions ====================
+
+// Watch watches keys for changes and executes a transaction function.
+// This uses optimistic locking - if any watched key changes, txFunc will be retried.
+func (c *Client) Watch(ctx context.Context, key string, txFunc func(tx *redis.Tx) error) error {
+	if c.rdb != nil {
+		return c.rdb.Watch(ctx, txFunc, key)
+	}
+	// For other modes, use the first node for the key
+	client := c.getClientForKey(key)
+	if rdb, ok := client.(*redis.Client); ok {
+		return rdb.Watch(ctx, txFunc, key)
+	}
+	return fmt.Errorf("watch not supported in cluster mode")
 }

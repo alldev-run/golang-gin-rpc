@@ -15,10 +15,11 @@ mysql_primary:
     max_idle_conns: 10
     conn_max_lifetime: "1h"
 
-# Redis Configuration
+# Redis Configuration - Single Instance Mode (Default)
 redis_cache:
   type: redis
   redis:
+    mode: single  # single, cluster, sentinel, master_slave
     host: "localhost"
     port: 6379
     password: ""
@@ -30,6 +31,124 @@ redis_cache:
     read_timeout: "3s"
     write_timeout: "3s"
     pool_timeout: "4s"
+
+# Redis Cluster Configuration
+redis_cluster:
+  type: redis
+  redis:
+    mode: cluster
+    password: ""
+    database: 0
+    nodes:
+      - host: "127.0.0.1"
+        port: 7000
+      - host: "127.0.0.1"
+        port: 7001
+      - host: "127.0.0.1"
+        port: 7002
+      - host: "127.0.0.1"
+        port: 7003
+      - host: "127.0.0.1"
+        port: 7004
+      - host: "127.0.0.1"
+        port: 7005
+    cluster:
+      max_redirects: 3
+      read_only: true
+      route_by_latency: false
+      route_randomly: false
+    pool_size: 20
+    min_idle_conns: 5
+    max_retries: 3
+    dial_timeout: "5s"
+    read_timeout: "3s"
+    write_timeout: "3s"
+
+# Redis Sentinel Configuration (High Availability)
+redis_sentinel:
+  type: redis
+  redis:
+    mode: sentinel
+    password: ""
+    database: 0
+    sentinel:
+      master_name: "mymaster"
+      sentinel_addrs:
+        - "localhost:26379"
+        - "localhost:26380"
+        - "localhost:26381"
+      sentinel_password: ""
+    pool_size: 10
+    min_idle_conns: 2
+    max_retries: 3
+    dial_timeout: "5s"
+    read_timeout: "3s"
+    write_timeout: "3s"
+
+# Redis Master-Slave Configuration (Read/Write Splitting)
+redis_master_slave:
+  type: redis
+  redis:
+    mode: master_slave
+    password: ""
+    database: 0
+    nodes:
+      - host: "master.redis.local"
+        port: 6379
+        is_master: true
+        weight: 0
+      - host: "slave1.redis.local"
+        port: 6379
+        is_master: false
+        weight: 1
+      - host: "slave2.redis.local"
+        port: 6379
+        is_master: false
+        weight: 1
+    pool_size: 10
+    min_idle_conns: 2
+    max_retries: 3
+    dial_timeout: "5s"
+    read_timeout: "3s"
+    write_timeout: "3s"
+
+# Redis Multi-Instance Configuration (Business Sharding)
+# Routes different business data to different Redis instances
+redis_multi_shard:
+  type: redis
+  redis:
+    mode: multi
+    password: ""
+    database: 0
+    nodes:
+      - host: "redis-users.local"
+        port: 6379
+        password: ""
+        database: 0
+      - host: "redis-orders.local"
+        port: 6379
+        password: ""
+        database: 0
+      - host: "redis-cache.local"
+        port: 6379
+        password: ""
+        database: 0
+    multi:
+      sharding_strategy: "prefix"  # hash, prefix, range
+      key_prefix_routes:
+        "user:": 0      # user data -> instance 0
+        "session:": 0   # session data -> instance 0
+        "order:": 1     # order data -> instance 1
+        "payment:": 1    # payment data -> instance 1
+        "cache:": 2      # cache data -> instance 2
+        "rate_limit:": 2 # rate limit data -> instance 2
+      default_node: 0   # default to instance 0
+    pool_size: 10
+    min_idle_conns: 2
+    max_retries: 3
+    dial_timeout: "5s"
+    read_timeout: "3s"
+    write_timeout: "3s"
 
 # PostgreSQL Configuration
 postgres_main:

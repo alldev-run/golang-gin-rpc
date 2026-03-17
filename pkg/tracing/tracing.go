@@ -11,6 +11,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -361,16 +365,129 @@ func newZipkinTracerProvider(config Config) (*TracerProvider, error) {
 	}, nil
 }
 
-// newJaegerTracerProvider creates a Jaeger tracer provider (placeholder)
+// newJaegerTracerProvider creates a Jaeger tracer provider
 func newJaegerTracerProvider(config Config) (*TracerProvider, error) {
-	// TODO: Implement Jaeger exporter
-	return nil, fmt.Errorf("Jaeger tracer provider is not yet implemented")
+	// Create Jaeger exporter
+	endpoint := jaeger.WithCollectorEndpoint(
+		jaeger.WithEndpoint(fmt.Sprintf("http://%s:%d%s", config.Host, config.Port, config.Endpoint)),
+	)
+	if config.Username != "" && config.Password != "" {
+		endpoint = jaeger.WithCollectorEndpoint(
+			jaeger.WithEndpoint(fmt.Sprintf("http://%s:%d%s", config.Host, config.Port, config.Endpoint)),
+			jaeger.WithUsername(config.Username),
+			jaeger.WithPassword(config.Password),
+		)
+	}
+
+	exporter, err := jaeger.New(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Jaeger exporter: %w", err)
+	}
+
+	// Create resource
+	res, err := resource.New(context.Background(),
+		resource.WithAttributes(
+			attribute.String("service.name", config.ServiceName),
+			attribute.String("service.version", config.ServiceVersion),
+			attribute.String("deployment.environment", config.Environment),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create tracer provider
+	provider := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter,
+			sdktrace.WithBatchTimeout(config.BatchTimeout),
+			sdktrace.WithMaxExportBatchSize(config.MaxExportBatchSize),
+		),
+		sdktrace.WithResource(res),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.SampleRate)),
+	)
+
+	// Set global tracer provider
+	otel.SetTracerProvider(provider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	logger.Info("Jaeger tracing initialized",
+		zap.String("service", config.ServiceName),
+		zap.String("endpoint", fmt.Sprintf("http://%s:%d%s", config.Host, config.Port, config.Endpoint)),
+		zap.Float64("sample_rate", config.SampleRate),
+	)
+
+	return &TracerProvider{
+		provider: provider,
+		config:   config,
+	}, nil
 }
 
-// newOTLPTracerProvider creates an OTLP tracer provider (placeholder)
+// newOTLPTracerProvider creates an OTLP tracer provider
 func newOTLPTracerProvider(config Config) (*TracerProvider, error) {
-	// TODO: Implement OTLP exporter
-	return nil, fmt.Errorf("OTLP tracer provider is not yet implemented")
+	ctx := context.Background()
+
+	// Determine if we should use HTTP or gRPC based on endpoint configuration
+	endpoint := fmt.Sprintf("%s:%d", config.Host, config.Port)
+	
+	var exporter *otlptrace.Exporter
+	var err error
+
+	// Try gRPC first, fallback to HTTP
+	if strings.Contains(config.Endpoint, "http") {
+		// HTTP exporter
+		exporter, err = otlptracehttp.New(ctx,
+			otlptracehttp.WithEndpoint(endpoint),
+			otlptracehttp.WithURLPath(config.Endpoint),
+		)
+	} else {
+		// gRPC exporter (default)
+		exporter, err = otlptracegrpc.New(ctx,
+			otlptracegrpc.WithEndpoint(endpoint),
+			otlptracegrpc.WithInsecure(),
+		)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
+	}
+
+	// Create resource
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			attribute.String("service.name", config.ServiceName),
+			attribute.String("service.version", config.ServiceVersion),
+			attribute.String("deployment.environment", config.Environment),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create tracer provider
+	provider := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter,
+			sdktrace.WithBatchTimeout(config.BatchTimeout),
+			sdktrace.WithMaxExportBatchSize(config.MaxExportBatchSize),
+		),
+		sdktrace.WithResource(res),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.SampleRate)),
+	)
+
+	// Set global tracer provider
+	otel.SetTracerProvider(provider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	logger.Info("OTLP tracing initialized",
+		zap.String("service", config.ServiceName),
+		zap.String("endpoint", endpoint),
+		zap.String("path", config.Endpoint),
+		zap.Float64("sample_rate", config.SampleRate),
+	)
+
+	return &TracerProvider{
+		provider: provider,
+		config:   config,
+	}, nil
 }
 
 // CreateTracerProviderByType creates a tracer provider using TracerType enum

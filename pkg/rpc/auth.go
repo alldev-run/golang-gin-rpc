@@ -124,6 +124,20 @@ func (a *RPCAuth) HasAPIKey(key string) bool {
 	return exists
 }
 
+// ShouldSkipAuth checks if a method should skip authentication (public method)
+func (a *RPCAuth) ShouldSkipAuth(methodName string) bool {
+	return a.shouldSkipMethod(methodName)
+}
+
+// IsAuthenticated checks if the context has valid authentication
+func (a *RPCAuth) IsAuthenticated(ctx context.Context) bool {
+	apiKey, err := extractAPIKeyFromContext(ctx)
+	if err != nil {
+		return false
+	}
+	return a.validateAPIKey(apiKey)
+}
+
 // Context keys for authentication
 type contextKey string
 

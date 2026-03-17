@@ -2,6 +2,8 @@
 package failover
 
 import (
+	"alldev-gin-rpc/pkg/cache/memcache"
+	"alldev-gin-rpc/pkg/cache/redis"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -374,128 +376,174 @@ func (f *FileStorage) cleanup() {
 	}
 }
 
-// RedisStorage provides Redis-based storage implementation.
+// RedisStorage provides Redis-based storage implementation using existing redis client.
 type RedisStorage struct {
-	// This is a placeholder for Redis storage
-	// Implementation would depend on Redis client library
-	host      string
-	port      int
-	password  string
-	database  int
+	client    *redis.Client
 	keyPrefix string
-	timeout   time.Duration
 }
 
-// NewRedisStorage creates a new Redis storage.
+// NewRedisStorage creates a new Redis storage using existing redis client.
 func NewRedisStorage(config RedisStorageConfig) (*RedisStorage, error) {
+	redisConfig := redis.Config{
+		Host:         config.Host,
+		Port:         config.Port,
+		Password:     config.Password,
+		Database:     config.Database,
+		KeyPrefix:    config.KeyPrefix,
+		Timeout:      config.Timeout,
+		MaxRetries:   3,
+		PoolSize:     10,
+		MinIdleConns: 2,
+	}
+
+	client, err := redis.New(redisConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create redis client: %w", err)
+	}
+
 	return &RedisStorage{
-		host:      config.Host,
-		port:      config.Port,
-		password:  config.Password,
-		database:  config.Database,
+		client:    client,
 		keyPrefix: config.KeyPrefix,
-		timeout:   config.Timeout,
 	}, nil
 }
 
 // Get retrieves a value from Redis storage.
 func (r *RedisStorage) Get(ctx context.Context, key string) (interface{}, bool) {
-	// Placeholder implementation
-	return nil, false
+	prefixedKey := r.keyPrefix + key
+	val, err := r.client.Get(ctx, prefixedKey)
+	if err != nil {
+		return nil, false
+	}
+	return val, true
 }
 
 // Set stores a value in Redis storage.
 func (r *RedisStorage) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	// Placeholder implementation
-	return fmt.Errorf("redis storage not implemented")
+	prefixedKey := r.keyPrefix + key
+	return r.client.Set(ctx, prefixedKey, value, ttl)
 }
 
 // Delete removes a value from Redis storage.
 func (r *RedisStorage) Delete(ctx context.Context, key string) error {
-	// Placeholder implementation
-	return fmt.Errorf("redis storage not implemented")
+	prefixedKey := r.keyPrefix + key
+	return r.client.Del(ctx, prefixedKey)
 }
 
 // Clear removes all values from Redis storage.
 func (r *RedisStorage) Clear(ctx context.Context) error {
-	// Placeholder implementation
-	return fmt.Errorf("redis storage not implemented")
+	// Get all keys with prefix and delete them
+	keys, err := r.client.RDB().Keys(ctx, r.keyPrefix+"*").Result()
+	if err != nil {
+		return err
+	}
+	if len(keys) > 0 {
+		return r.client.Del(ctx, keys...)
+	}
+	return nil
 }
 
 // Keys returns all keys in Redis storage.
 func (r *RedisStorage) Keys(ctx context.Context) []string {
-	// Placeholder implementation
-	return nil
+	keys, err := r.client.RDB().Keys(ctx, r.keyPrefix+"*").Result()
+	if err != nil {
+		return nil
+	}
+	// Remove prefix from keys
+	for i, key := range keys {
+		keys[i] = strings.TrimPrefix(key, r.keyPrefix)
+	}
+	return keys
 }
 
 // HealthCheck checks the health of Redis storage.
 func (r *RedisStorage) HealthCheck(ctx context.Context) error {
-	// Placeholder implementation
-	return fmt.Errorf("redis storage not implemented")
+	return r.client.Ping(ctx)
 }
 
 // Close closes the Redis storage.
 func (r *RedisStorage) Close() error {
-	// Placeholder implementation
-	return nil
+	return r.client.Close()
 }
 
-// MemcacheStorage provides Memcache-based storage implementation.
+// MemcacheStorage provides Memcache-based storage implementation using the existing memcache client.
 type MemcacheStorage struct {
-	// This is a placeholder for Memcache storage
-	// Implementation would depend on Memcache client library
-	hosts     []string
+	client    *memcache.Client
 	keyPrefix string
-	timeout   time.Duration
 }
 
 // NewMemcacheStorage creates a new Memcache storage.
 func NewMemcacheStorage(config MemcacheStorageConfig) (*MemcacheStorage, error) {
+	client, err := memcache.New(memcache.Config{
+		Hosts:        config.Hosts,
+		Timeout:      config.Timeout,
+		MaxIdleConns: 10,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create memcache client: %w", err)
+	}
+
 	return &MemcacheStorage{
-		hosts:     config.Hosts,
+		client:    client,
 		keyPrefix: config.KeyPrefix,
-		timeout:   config.Timeout,
 	}, nil
 }
 
 // Get retrieves a value from Memcache storage.
 func (m *MemcacheStorage) Get(ctx context.Context, key string) (interface{}, bool) {
-	// Placeholder implementation
-	return nil, false
+	prefixedKey := m.keyPrefix + key
+	item, err := m.client.Get(ctx, prefixedKey)
+	if err != nil {
+		return nil, false
+	}
+	return item.Value, true
 }
 
 // Set stores a value in Memcache storage.
 func (m *MemcacheStorage) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	// Placeholder implementation
-	return fmt.Errorf("memcache storage not implemented")
+	prefixedKey := m.keyPrefix + key
+	
+	// Convert value to bytes
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("failed to marshal value: %w", err)
+	}
+	
+	item := &memcache.Item{
+		Key:        prefixedKey,
+		Value:      data,
+		Expiration: int32(ttl.Seconds()),
+	}
+	
+	return m.client.Set(ctx, item)
 }
 
 // Delete removes a value from Memcache storage.
 func (m *MemcacheStorage) Delete(ctx context.Context, key string) error {
-	// Placeholder implementation
-	return fmt.Errorf("memcache storage not implemented")
+	prefixedKey := m.keyPrefix + key
+	return m.client.Delete(ctx, prefixedKey)
 }
 
-// Clear removes all values from Memcache storage.
+// Clear removes all values with the key prefix from Memcache storage.
+// Note: Memcache doesn't support pattern delete, this will attempt to delete known keys.
 func (m *MemcacheStorage) Clear(ctx context.Context) error {
-	// Placeholder implementation
-	return fmt.Errorf("memcache storage not implemented")
+	// Memcache doesn't have a direct way to clear by prefix
+	// We would need to track keys separately to implement this properly
+	return fmt.Errorf("clear by prefix not supported in memcache, use Delete for specific keys")
 }
 
 // Keys returns all keys in Memcache storage.
+// Note: Memcache doesn't support listing all keys, returns nil.
 func (m *MemcacheStorage) Keys(ctx context.Context) []string {
-	// Placeholder implementation
+	// Memcache doesn't support listing all keys
 	return nil
 }
 
 // HealthCheck checks the health of Memcache storage.
 func (m *MemcacheStorage) HealthCheck(ctx context.Context) error {
-	// Placeholder implementation
-	return fmt.Errorf("memcache storage not implemented")
+	return m.client.Ping(ctx)
 }
 
 // Close closes the Memcache storage.
 func (m *MemcacheStorage) Close() error {
-	// Placeholder implementation
-	return nil
+	return m.client.Close()
 }

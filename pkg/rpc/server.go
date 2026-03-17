@@ -2,6 +2,7 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -236,12 +237,222 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 	// Update request context
 	c.Request = c.Request.WithContext(ctx)
 
-	// TODO: Implement JSON-RPC 2.0 protocol handler
-	c.JSON(http.StatusOK, gin.H{
-		"jsonrpc": "2.0",
-		"result":  "JSON-RPC server is running",
-		"id":      nil,
+	// Parse JSON-RPC request
+	var req JSONRPCRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusOK, JSONRPCResponse{
+			JSONRPC: "2.0",
+			Error: &JSONRPCError{
+				Code:    -32700,
+				Message: "Parse error",
+				Data:    err.Error(),
+			},
+			ID: nil,
+		})
+		return
+	}
+
+	// Validate JSON-RPC version
+	if req.JSONRPC != "2.0" {
+		c.JSON(http.StatusOK, JSONRPCResponse{
+			JSONRPC: "2.0",
+			Error: &JSONRPCError{
+				Code:    -32600,
+				Message: "Invalid Request",
+				Data:    "jsonrpc version must be 2.0",
+			},
+			ID: req.ID,
+		})
+		return
+	}
+
+	// Validate method
+	if req.Method == "" {
+		c.JSON(http.StatusOK, JSONRPCResponse{
+			JSONRPC: "2.0",
+			Error: &JSONRPCError{
+				Code:    -32600,
+				Message: "Invalid Request",
+				Data:    "method is required",
+			},
+			ID: req.ID,
+		})
+		return
+	}
+
+	// Check authentication (skip for system methods)
+	if s.auth.config.Enabled && !s.auth.ShouldSkipAuth(req.Method) {
+		if !s.auth.IsAuthenticated(ctx) {
+			c.JSON(http.StatusOK, JSONRPCResponse{
+				JSONRPC: "2.0",
+				Error: &JSONRPCError{
+					Code:    -32601,
+					Message: "Unauthorized",
+					Data:    "API key is required",
+				},
+				ID: req.ID,
+			})
+			return
+		}
+	}
+
+	// Execute the method
+	result, err := s.executeMethod(ctx, req.Method, req.Params)
+	if err != nil {
+		// Check if it's a method not found error
+		if err == ErrMethodNotFound {
+			c.JSON(http.StatusOK, JSONRPCResponse{
+				JSONRPC: "2.0",
+				Error: &JSONRPCError{
+					Code:    -32601,
+					Message: "Method not found",
+					Data:    req.Method,
+				},
+				ID: req.ID,
+			})
+			return
+		}
+
+		// Internal error
+		c.JSON(http.StatusOK, JSONRPCResponse{
+			JSONRPC: "2.0",
+			Error: &JSONRPCError{
+				Code:    -32603,
+				Message: "Internal error",
+				Data:    err.Error(),
+			},
+			ID: req.ID,
+		})
+		return
+	}
+
+	// Return success response
+	c.JSON(http.StatusOK, JSONRPCResponse{
+		JSONRPC: "2.0",
+		Result:  result,
+		ID:      req.ID,
 	})
+}
+
+// JSON-RPC 2.0 types
+type JSONRPCRequest struct {
+	JSONRPC string      `json:"jsonrpc"`
+	Method  string      `json:"method"`
+	Params  interface{} `json:"params,omitempty"`
+	ID      interface{} `json:"id,omitempty"`
+}
+
+type JSONRPCResponse struct {
+	JSONRPC string         `json:"jsonrpc"`
+	Result  interface{}    `json:"result,omitempty"`
+	Error   *JSONRPCError  `json:"error,omitempty"`
+	ID      interface{}    `json:"id,omitempty"`
+}
+
+type JSONRPCError struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+// Error codes for JSON-RPC 2.0
+const (
+	ParseError     = -32700
+	InvalidRequest = -32600
+	MethodNotFound = -32601
+	InvalidParams  = -32602
+	InternalError  = -32603
+	ServerError    = -32000
+)
+
+// ErrMethodNotFound is returned when a method is not found
+var ErrMethodNotFound = fmt.Errorf("method not found")
+
+// executeMethod executes a registered method
+func (s *JSONRPCServer) executeMethod(ctx context.Context, method string, params interface{}) (interface{}, error) {
+	// Parse method name (format: "service.method")
+	parts := strings.Split(method, ".")
+	if len(parts) != 2 {
+		return nil, ErrMethodNotFound
+	}
+
+	serviceName := parts[0]
+	methodName := parts[1]
+
+	// Find the service
+	service, exists := s.services[serviceName]
+	if !exists {
+		return nil, ErrMethodNotFound
+	}
+
+	// Call the method using reflection
+	return s.callMethod(ctx, service, methodName, params)
+}
+
+// callMethod calls a method on a service using reflection
+func (s *JSONRPCServer) callMethod(ctx context.Context, service interface{}, methodName string, params interface{}) (interface{}, error) {
+	// Get service type
+	v := reflect.ValueOf(service)
+	method := v.MethodByName(methodName)
+
+	if !method.IsValid() {
+		return nil, ErrMethodNotFound
+	}
+
+	// Prepare arguments
+	// Most JSON-RPC methods expect (context, params) or just (params)
+	methodType := method.Type()
+	numArgs := methodType.NumIn()
+	args := make([]reflect.Value, numArgs)
+
+	for i := 0; i < numArgs; i++ {
+		argType := methodType.In(i)
+
+		// Check if first argument is context.Context
+		if i == 0 && argType.Implements(reflect.TypeOf((*context.Context)(nil)).Elem()) {
+			args[i] = reflect.ValueOf(ctx)
+		} else {
+			// Assume params
+			if params != nil {
+				// Convert params to the expected type
+				paramValue := reflect.ValueOf(params)
+				if paramValue.Type().ConvertibleTo(argType) {
+					args[i] = paramValue.Convert(argType)
+				} else {
+					args[i] = reflect.Zero(argType)
+				}
+			} else {
+				args[i] = reflect.Zero(argType)
+			}
+		}
+	}
+
+	// Call the method
+	results := method.Call(args)
+
+	// Handle results
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	if len(results) == 1 {
+		// Single return value - could be error or result
+		if results[0].Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			if !results[0].IsNil() {
+				return nil, results[0].Interface().(error)
+			}
+			return nil, nil
+		}
+		return results[0].Interface(), nil
+	}
+
+	// Two return values: (result, error)
+	result := results[0].Interface()
+	if !results[1].IsNil() {
+		return result, results[1].Interface().(error)
+	}
+
+	return result, nil
 }
 
 // GetServices returns all registered services
