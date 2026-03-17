@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/ratelimiter"
 )
 
 // ManagerConfig holds RPC manager configuration
@@ -46,30 +47,40 @@ func DefaultManagerConfig() ManagerConfig {
 
 // Manager manages multiple RPC servers
 type Manager struct {
-	config     ManagerConfig
-	servers    map[string]Server
-	services   map[string]Service
-	registry   *ServiceRegistry
-	middleware *MiddlewareChain
-	mu         sync.RWMutex
-	started    bool
-	startTime  time.Time
+	config             ManagerConfig
+	servers            map[string]Server
+	services           map[string]Service
+	registry           *ServiceRegistry
+	middleware         *MiddlewareChain
+	degradationManager *DegradationManager
+	rateLimiterManager *ratelimiter.Manager
+	mu                 sync.RWMutex
+	started            bool
+	startTime          time.Time
 }
 
 // NewManager creates a new RPC manager
 func NewManager(config ManagerConfig) *Manager {
 	manager := &Manager{
-		config:     config,
-		servers:    make(map[string]Server),
-		services:   make(map[string]Service),
-		registry:   NewServiceRegistry(),
-		middleware: NewMiddlewareChain(),
-		startTime:  time.Now(),
+		config:             config,
+		servers:            make(map[string]Server),
+		services:           make(map[string]Service),
+		registry:           NewServiceRegistry(),
+		middleware:         NewMiddlewareChain(),
+		rateLimiterManager: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+		startTime:          time.Now(),
 	}
+	_ = manager.rateLimiterManager.AddConfig("default", ratelimiter.DefaultConfig())
 	
 	// Initialize servers from config
 	for name, serverConfig := range config.Servers {
 		server := NewServer(serverConfig)
+		if setter, ok := server.(interface{ SetDegradationManager(*DegradationManager) }); ok {
+			setter.SetDegradationManager(manager.degradationManager)
+		}
+		if setter, ok := server.(interface{ SetRateLimiterManager(*ratelimiter.Manager) }); ok {
+			setter.SetRateLimiterManager(manager.rateLimiterManager)
+		}
 		manager.servers[name] = server
 	}
 	
@@ -90,6 +101,12 @@ func (m *Manager) AddServer(name string, config Config) error {
 	}
 	
 	server := NewServer(config)
+	if setter, ok := server.(interface{ SetDegradationManager(*DegradationManager) }); ok {
+		setter.SetDegradationManager(m.degradationManager)
+	}
+	if setter, ok := server.(interface{ SetRateLimiterManager(*ratelimiter.Manager) }); ok {
+		setter.SetRateLimiterManager(m.rateLimiterManager)
+	}
 	m.servers[name] = server
 	
 	logger.Info("Added RPC server", 
@@ -175,6 +192,32 @@ func (m *Manager) AddMiddleware(middleware *Middleware) {
 	
 	m.middleware.Add(middleware)
 	logger.Info("Added RPC middleware", zap.String("name", middleware.Name()))
+}
+
+// SetDegradationManager sets degradation manager for all registered servers
+func (m *Manager) SetDegradationManager(dm *DegradationManager) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.degradationManager = dm
+	for _, server := range m.servers {
+		if setter, ok := server.(interface{ SetDegradationManager(*DegradationManager) }); ok {
+			setter.SetDegradationManager(dm)
+		}
+	}
+}
+
+// SetRateLimiterManager sets rate limiter manager for all registered servers
+func (m *Manager) SetRateLimiterManager(rlm *ratelimiter.Manager) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.rateLimiterManager = rlm
+	for _, server := range m.servers {
+		if setter, ok := server.(interface{ SetRateLimiterManager(*ratelimiter.Manager) }); ok {
+			setter.SetRateLimiterManager(rlm)
+		}
+	}
 }
 
 // Start starts all RPC servers

@@ -9,9 +9,8 @@ import (
 
 	"alldev-gin-rpc/pkg/auth"
 	"alldev-gin-rpc/pkg/cache"
-	"alldev-gin-rpc/pkg/cache/redis"
+	"alldev-gin-rpc/pkg/config"
 	"alldev-gin-rpc/pkg/db"
-	"alldev-gin-rpc/pkg/db/mysql"
 	"alldev-gin-rpc/pkg/discovery"
 	"alldev-gin-rpc/pkg/gateway"
 	"alldev-gin-rpc/pkg/health"
@@ -19,121 +18,32 @@ import (
 	"alldev-gin-rpc/pkg/metrics"
 	"alldev-gin-rpc/pkg/rpc"
 	"alldev-gin-rpc/pkg/tracing"
-
-	"gopkg.in/yaml.v3"
+	"alldev-gin-rpc/pkg/auth/jwtx"
+	cacheredis "alldev-gin-rpc/pkg/cache/redis"
+	pg "alldev-gin-rpc/pkg/db/postgres"
+	mysqlpkg "alldev-gin-rpc/pkg/db/mysql"
 )
 
-// DatabaseConfig holds database configuration
-type DatabaseConfig struct {
-	Type  string       `yaml:"type"`
-	MySQL mysql.Config `yaml:"mysql"`
-	Redis redis.Config `yaml:"redis"`
-	// Add other database types as needed
-}
-
-// Config holds all application configuration
-type Config struct {
-	Server struct {
-		Host string `yaml:"host"`
-		Port string `yaml:"port"`
-		Mode string `yaml:"mode"`
-	} `yaml:"server"`
-
-	Database map[string]DatabaseConfig `yaml:"database"`
-
-	Cache struct {
-		Type  string       `yaml:"type"`
-		Redis redis.Config `yaml:"redis"`
-	} `yaml:"cache"`
-
-	Logger struct {
-		Level               string `yaml:"level"`
-		Env                 string `yaml:"env"`
-		LogPath             string `yaml:"log_path"`
-		Output              string `yaml:"output"`
-		Format              string `yaml:"format"`
-		EnableConsoleColors bool   `yaml:"enable_console_colors"`
-		EnableCaller        bool   `yaml:"enable_caller"`
-		EnableStacktrace    bool   `yaml:"enable_stacktrace"`
-		TimeFormat          string `yaml:"time_format"`
-		MaxSize             int    `yaml:"max_size"`
-		MaxBackups          int    `yaml:"max_backups"`
-		MaxAge              int    `yaml:"max_age"`
-		Compress            bool   `yaml:"compress"`
-		LocalTime           bool   `yaml:"local_time"`
-		Fields              map[string]interface{} `yaml:"fields"`
-		Sampling            struct {
-			Enabled    bool          `yaml:"enabled"`
-			Rate       float64       `yaml:"rate"`
-			Tick       string        `yaml:"tick"`
-			Initial    int           `yaml:"initial"`
-			Thereafter int           `yaml:"thereafter"`
-		} `yaml:"sampling"`
-	} `yaml:"logger"`
-
-	RPC rpc.ManagerConfig `yaml:"rpc"`
-
-	Discovery discovery.ManagerConfig `yaml:"discovery"`
-
-	Errors struct {
-		EnableStackTrace bool `yaml:"enable_stack_trace"`
-		MaxErrorDepth    int  `yaml:"max_error_depth"`
-	} `yaml:"errors"`
-
-	Health health.HealthConfig `yaml:"health"`
-
-	Metrics struct {
-		Enabled bool   `yaml:"enabled"`
-		Address string `yaml:"address"`
-		Path    string `yaml:"path"`
-	} `yaml:"metrics"`
-
-	Auth auth.AuthConfig `yaml:"auth"`
-
-	Tracing tracing.Config `yaml:"tracing"`
-
-	Gateway gateway.Config `yaml:"gateway"`
-}
-
-// LoadConfig loads configuration from file
-func LoadConfig(configPath string) (*Config, error) {
-	config := &Config{}
-
-	// Set defaults
-	config.Server.Host = "localhost"
-	config.Server.Port = "8080"
-	config.Server.Mode = "debug"
-	config.Logger.Level = "info"
-	config.Logger.Env = "dev"
-	config.Logger.LogPath = "./logs/app.log"
-	config.Errors.EnableStackTrace = true
-	config.Errors.MaxErrorDepth = 10
-	config.Health.Enabled = true
-	config.Metrics.Enabled = true
-	config.Metrics.Address = ":9090"
-	config.Metrics.Path = "/metrics"
-	config.Auth.Enabled = false
-	config.Tracing.Enabled = false
-	config.Gateway = *gateway.DefaultConfig()
-
-	// Load config file if exists
-	if _, err := os.Stat(configPath); err == nil {
-		data, err := os.ReadFile(configPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
-		}
-
-		if err := yaml.Unmarshal(data, config); err != nil {
-			return nil, fmt.Errorf("failed to parse config file: %w", err)
+// LoadConfig loads configuration from file using pkg/config
+func LoadConfig(configPath string) (*config.GlobalConfig, error) {
+	loader := config.NewLoader()
+	
+	// Set defaults first
+	loader.Set(config.DefaultConfig())
+	
+	// Load from file if exists
+	if configPath != "" {
+		if err := loader.Load(configPath); err != nil {
+			return nil, fmt.Errorf("failed to load config: %w", err)
 		}
 	}
-
-	return config, nil
+	
+	return loader.Get(), nil
 }
 
 // Bootstrap handles application initialization
 type Bootstrap struct {
-	config           *Config
+	config           *config.GlobalConfig
 	db               *db.Factory
 	cache            cache.Cache
 	rpcManager       *rpc.Manager
@@ -148,7 +58,7 @@ type Bootstrap struct {
 // NewBootstrap creates a new bootstrap instance
 func NewBootstrap(configPath string) (*Bootstrap, error) {
 	// Load configuration
-	config, err := LoadConfig(configPath)
+	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
@@ -157,78 +67,46 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 	loggerConfig := logger.DefaultConfig()
 	
 	// Override with config file values
-	if config.Logger.Level != "" {
-		loggerConfig.Level = logger.LogLevel(config.Logger.Level)
+	if cfg.Observability.Logging.Level != "" {
+		loggerConfig.Level = logger.LogLevel(cfg.Observability.Logging.Level)
 	}
-	if config.Logger.Env != "" {
-		loggerConfig.Env = config.Logger.Env
+	if cfg.Observability.Logging.Output != "" {
+		loggerConfig.Output = logger.LogOutput(cfg.Observability.Logging.Output)
 	}
-	if config.Logger.LogPath != "" {
-		loggerConfig.LogPath = config.Logger.LogPath
+	if cfg.Observability.Logging.Format != "" {
+		loggerConfig.Format = logger.LogFormat(cfg.Observability.Logging.Format)
 	}
-	if config.Logger.Output != "" {
-		loggerConfig.Output = logger.LogOutput(config.Logger.Output)
-	}
-	if config.Logger.Format != "" {
-		loggerConfig.Format = logger.LogFormat(config.Logger.Format)
+	if cfg.Observability.Logging.FilePath != "" {
+		loggerConfig.LogPath = cfg.Observability.Logging.FilePath
 	}
 	
 	// Boolean flags
-	loggerConfig.EnableConsoleColors = config.Logger.EnableConsoleColors
-	loggerConfig.EnableCaller = config.Logger.EnableCaller
-	loggerConfig.EnableStacktrace = config.Logger.EnableStacktrace
-	loggerConfig.Compress = config.Logger.Compress
-	loggerConfig.LocalTime = config.Logger.LocalTime
+	loggerConfig.Compress = cfg.Observability.Logging.MaxBackups > 0
 	
 	// Numeric values
-	if config.Logger.MaxSize > 0 {
-		loggerConfig.MaxSize = config.Logger.MaxSize
+	if cfg.Observability.Logging.MaxSize > 0 {
+		loggerConfig.MaxSize = cfg.Observability.Logging.MaxSize
 	}
-	if config.Logger.MaxBackups > 0 {
-		loggerConfig.MaxBackups = config.Logger.MaxBackups
+	if cfg.Observability.Logging.MaxBackups > 0 {
+		loggerConfig.MaxBackups = cfg.Observability.Logging.MaxBackups
 	}
-	if config.Logger.MaxAge > 0 {
-		loggerConfig.MaxAge = config.Logger.MaxAge
-	}
-	
-	// Time format
-	if config.Logger.TimeFormat != "" {
-		loggerConfig.TimeFormat = config.Logger.TimeFormat
-	}
-	
-	// Fields
-	if config.Logger.Fields != nil {
-		loggerConfig.Fields = config.Logger.Fields
-	}
-	
-	// Sampling configuration
-	if config.Logger.Sampling.Enabled {
-		loggerConfig.Sampling.Enabled = config.Logger.Sampling.Enabled
-		loggerConfig.Sampling.Rate = config.Logger.Sampling.Rate
-		if config.Logger.Sampling.Tick != "" {
-			if duration, err := time.ParseDuration(config.Logger.Sampling.Tick); err == nil {
-				loggerConfig.Sampling.Tick = duration
-			}
-		}
-		if config.Logger.Sampling.Initial > 0 {
-			loggerConfig.Sampling.Initial = config.Logger.Sampling.Initial
-		}
-		if config.Logger.Sampling.Thereafter > 0 {
-			loggerConfig.Sampling.Thereafter = config.Logger.Sampling.Thereafter
-		}
+	if cfg.Observability.Logging.MaxAge > 0 {
+		loggerConfig.MaxAge = cfg.Observability.Logging.MaxAge
 	}
 	
 	logger.Init(loggerConfig)
 
 	// Ensure log directory exists
-	if err := os.MkdirAll(filepath.Dir(config.Logger.LogPath), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	if cfg.Observability.Logging.FilePath != "" {
+		if err := os.MkdirAll(filepath.Dir(cfg.Observability.Logging.FilePath), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create log directory: %w", err)
+		}
 	}
 
 	logger.Info("Configuration loaded successfully")
 
 	return &Bootstrap{
-		config: config,
+		config: cfg,
 	}, nil
 }
 
@@ -281,40 +159,37 @@ func (b *Bootstrap) InitializeAll() error {
 
 // InitializeDatabases initializes all database connections
 func (b *Bootstrap) InitializeDatabases() error {
-	if len(b.config.Database) == 0 {
+	if !b.config.Database.Primary.Enabled && !b.config.Database.Replica.Enabled {
 		logger.Info("No database configuration found, skipping database initialization")
 		return nil
 	}
 
 	factory := db.NewFactory()
+	configs := map[string]config.DBConfig{
+		"primary": b.config.Database.Primary,
+		"replica": b.config.Database.Replica,
+	}
 
-	for name, dbConfig := range b.config.Database {
-		config := db.Config{
-			Type: db.Type(dbConfig.Type),
-		}
-
-		switch dbConfig.Type {
-		case "mysql":
-			config.MySQL = dbConfig.MySQL
-		case "redis":
-			config.Redis = dbConfig.Redis
-			// Add other database types
-		default:
-			logger.Warn("Unsupported database type %s for %s, skipping", logger.String("type", dbConfig.Type), logger.String("name", name))
+	for name, dbConfig := range configs {
+		if !dbConfig.Enabled {
 			continue
 		}
 
-		client, err := factory.Create(config)
+		clientConfig, err := buildDBConfig(dbConfig)
+		if err != nil {
+			return fmt.Errorf("failed to build database config %s: %w", name, err)
+		}
+
+		client, err := factory.Create(clientConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create database client %s: %w", name, err)
 		}
 
-		// Test connection
 		ctx := context.Background()
 		if err := client.Ping(ctx); err != nil {
 			logger.Warn("Database connection failed", logger.String("name", name), logger.Error(err))
 		} else {
-			logger.Info("Database %s connected successfully", logger.String("name", name))
+			logger.Info("Database connected successfully", logger.String("name", name))
 		}
 	}
 
@@ -325,45 +200,88 @@ func (b *Bootstrap) InitializeDatabases() error {
 
 // InitializeCache initializes cache
 func (b *Bootstrap) InitializeCache() error {
-	if b.config.Cache.Type == "" {
+	if b.config.Redis.Host == "" {
 		logger.Info("No cache configuration found, skipping cache initialization")
 		return nil
 	}
 
-	switch b.config.Cache.Type {
-	case "redis":
-		if b.config.Cache.Redis.Host == "" {
-			logger.Warn("Redis cache configuration incomplete, skipping cache initialization")
-			return nil
-		}
-		cacheInstance, err := cache.NewRedisCache(b.config.Cache.Redis)
-		if err != nil {
-			return fmt.Errorf("failed to create redis cache: %w", err)
-		}
-		b.cache = cacheInstance
-		logger.Info("Redis cache initialized")
-	default:
-		logger.Warn("Cache type %s not supported, skipping cache initialization", logger.String("type", b.config.Cache.Type))
+	cacheCfg := cacheredis.DefaultConfig()
+	cacheCfg.Host = b.config.Redis.Host
+	cacheCfg.Port = b.config.Redis.Port
+	cacheCfg.Password = b.config.Redis.Password
+	cacheCfg.Database = b.config.Redis.Database
+	cacheCfg.PoolSize = b.config.Redis.PoolSize
+	cacheCfg.MinIdleConns = b.config.Redis.MinIdleConns
+
+	cacheInstance, err := cache.NewRedisCache(cacheCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create redis cache: %w", err)
 	}
+
+	b.cache = cacheInstance
+	logger.Info("Redis cache initialized")
 
 	return nil
 }
 
 // InitializeRPC initializes RPC services
 func (b *Bootstrap) InitializeRPC() error {
-	if len(b.config.RPC.Servers) == 0 {
+	if !b.config.RPC.Enabled {
 		logger.Info("No RPC servers configured, skipping RPC initialization")
 		return nil
 	}
 
-	// Create RPC manager
-	b.rpcManager = rpc.NewManager(b.config.RPC)
+	managerConfig := rpc.DefaultManagerConfig()
+	switch b.config.RPC.Protocol {
+	case "jsonrpc":
+		managerConfig.Servers = map[string]rpc.Config{
+			"jsonrpc": {
+				Type:    rpc.ServerTypeJSONRPC,
+				Host:    b.config.Server.HTTP.Host,
+				Port:    b.config.Server.HTTP.Port,
+				Network: "tcp",
+				Timeout: int((30 * time.Second).Seconds()),
+			},
+		}
+	case "grpc":
+		fallthrough
+	default:
+		managerConfig.Servers = map[string]rpc.Config{
+			"grpc": {
+				Type:       rpc.ServerTypeGRPC,
+				Host:       b.config.Server.GRPC.Host,
+				Port:       b.config.Server.GRPC.Port,
+				Network:    "tcp",
+				Timeout:    int((30 * time.Second).Seconds()),
+				MaxMsgSize: 4 * 1024 * 1024,
+				Reflection: true,
+			},
+		}
+	}
 
-	// Log RPC configuration
+	b.rpcManager = rpc.NewManager(managerConfig)
+
+	if b.config.RPC.Degradation.Enabled {
+		dmConfig := rpc.DefaultDegradationConfig()
+		dmConfig.Enabled = b.config.RPC.Degradation.Enabled
+		dmConfig.AutoDetect = b.config.RPC.Degradation.AutoDetect
+		dmConfig.CPUThreshold = b.config.RPC.Degradation.CPUThreshold
+		dmConfig.MemoryThreshold = b.config.RPC.Degradation.MemoryThreshold
+		dmConfig.ErrorRateThreshold = b.config.RPC.Degradation.ErrorRateThreshold
+		dmConfig.LatencyThreshold = b.config.RPC.Degradation.LatencyThreshold
+		dmConfig.EnableCircuitBreaker = b.config.RPC.Degradation.EnableCircuitBreaker
+		dmConfig.Level = parseDegradationLevel(b.config.RPC.Degradation.Level)
+
+		dm, err := rpc.NewDegradationManager(dmConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create degradation manager: %w", err)
+		}
+		b.rpcManager.SetDegradationManager(dm)
+	}
+
 	logger.Info("Initializing RPC services",
-		logger.Int("servers", len(b.config.RPC.Servers)))
+		logger.String("protocol", b.config.RPC.Protocol))
 
-	// Start RPC manager
 	if err := b.rpcManager.Start(); err != nil {
 		return fmt.Errorf("failed to start RPC manager: %w", err)
 	}
@@ -379,13 +297,21 @@ func (b *Bootstrap) InitializeDiscovery() error {
 		return nil
 	}
 
-	if b.config.Discovery.RegistryAddress == "" {
+	if b.config.Discovery.Address == "" {
 		logger.Warn("Service discovery enabled but no registry address configured, skipping discovery initialization")
 		return nil
 	}
 
-	// Create discovery manager
-	manager, err := discovery.NewServiceDiscoveryManager(b.config.Discovery)
+	managerConfig := discovery.DefaultManagerConfig()
+	managerConfig.Enabled = b.config.Discovery.Enabled
+	managerConfig.RegistryType = b.config.Discovery.Type
+	managerConfig.RegistryAddress = b.config.Discovery.Address
+	managerConfig.Timeout = b.config.Discovery.Timeout
+	managerConfig.ServiceName = b.config.App.Name
+	managerConfig.ServiceAddress = b.config.Server.HTTP.Host
+	managerConfig.ServicePort = b.config.Server.HTTP.Port
+
+	manager, err := discovery.NewServiceDiscoveryManager(managerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create discovery manager: %w", err)
 	}
@@ -403,27 +329,12 @@ func (b *Bootstrap) InitializeDiscovery() error {
 
 // InitializeErrors initializes error handling
 func (b *Bootstrap) InitializeErrors() error {
-	// Errors package is typically used globally and doesn't need explicit initialization
-	// But we can configure global error handling behavior
-	if b.config.Errors.EnableStackTrace {
-		logger.Info("Error stack traces enabled")
-	}
-
-	if b.config.Errors.MaxErrorDepth > 0 {
-		logger.Info("Error depth limit set", logger.Int("depth", b.config.Errors.MaxErrorDepth))
-	}
-
 	logger.Info("Error handling initialized successfully")
 	return nil
 }
 
 // InitializeHealth initializes health check services
 func (b *Bootstrap) InitializeHealth() error {
-	if !b.config.Health.Enabled {
-		logger.Info("Health checks disabled")
-		return nil
-	}
-
 	healthManager := health.NewHealthManager()
 
 	// Register default health checkers
@@ -463,7 +374,7 @@ func (b *Bootstrap) InitializeHealth() error {
 
 // InitializeMetrics initializes metrics collection
 func (b *Bootstrap) InitializeMetrics() error {
-	if !b.config.Metrics.Enabled {
+	if !b.config.Observability.Metrics.Enabled {
 		logger.Info("Metrics collection disabled")
 		return nil
 	}
@@ -473,26 +384,36 @@ func (b *Bootstrap) InitializeMetrics() error {
 
 	// Start metrics server in background
 	go func() {
-		if err := metricsCollector.StartMetricsServer(b.config.Metrics.Address); err != nil {
+		addr := b.config.Observability.Metrics.Endpoint
+		if addr == "" {
+			addr = ":9090"
+		}
+		if err := metricsCollector.StartMetricsServer(addr); err != nil {
 			logger.Errorf("Failed to start metrics server", logger.Error(err))
 		}
 	}()
 
 	logger.Info("Metrics collection initialized successfully",
-		logger.String("address", b.config.Metrics.Address),
-		logger.String("path", b.config.Metrics.Path))
+		logger.String("endpoint", b.config.Observability.Metrics.Endpoint))
 
 	return nil
 }
 
 // InitializeAuth initializes authentication services
 func (b *Bootstrap) InitializeAuth() error {
-	if !b.config.Auth.Enabled {
+	if !b.config.Security.JWT.Enabled {
 		logger.Info("Authentication services disabled")
 		return nil
 	}
 
-	authManager := auth.NewAuthManager(b.config.Auth)
+	authManager := auth.NewAuthManager(auth.AuthConfig{
+		Enabled: b.config.Security.JWT.Enabled,
+		JWT: jwtx.Config{
+			Secret:         b.config.Security.JWT.Secret,
+			AccessTokenTTL: b.config.Security.JWT.Expiration,
+			RefreshTokenTTL: b.config.Security.JWT.Expiration * 7,
+		},
+	})
 	b.authManager = authManager
 
 	logger.Info("Authentication services initialized successfully")
@@ -501,12 +422,21 @@ func (b *Bootstrap) InitializeAuth() error {
 
 // InitializeTracing initializes tracing services
 func (b *Bootstrap) InitializeTracing() error {
-	if !b.config.Tracing.Enabled {
+	if !b.config.Observability.Tracing.Enabled {
 		logger.Info("Tracing services disabled")
 		return nil
 	}
 
-	tracer, err := tracing.NewTracer(b.config.Tracing)
+	tracingConfig := tracing.DefaultConfig()
+	tracingConfig.Enabled = b.config.Observability.Tracing.Enabled
+	tracingConfig.Type = b.config.Observability.Tracing.Type
+	tracingConfig.Endpoint = b.config.Observability.Tracing.Endpoint
+	tracingConfig.SampleRate = b.config.Observability.Tracing.SampleRate
+	tracingConfig.ServiceName = b.config.App.Name
+	tracingConfig.ServiceVersion = b.config.App.Version
+	tracingConfig.Environment = b.config.App.Environment
+
+	tracer, err := tracing.NewTracer(tracingConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize tracing: %w", err)
 	}
@@ -519,8 +449,27 @@ func (b *Bootstrap) InitializeTracing() error {
 
 // InitializeGateway initializes the HTTP gateway
 func (b *Bootstrap) InitializeGateway() error {
-	// Create gateway instance
-	b.gateway = gateway.NewGateway(&b.config.Gateway)
+	gatewayConfig := gateway.DefaultConfig()
+	gatewayConfig.Host = b.config.Server.HTTP.Host
+	gatewayConfig.Port = b.config.Server.HTTP.Port
+	gatewayConfig.ReadTimeout = b.config.Server.HTTP.ReadTimeout
+	gatewayConfig.WriteTimeout = b.config.Server.HTTP.WriteTimeout
+	gatewayConfig.IdleTimeout = b.config.Server.HTTP.IdleTimeout
+	gatewayConfig.CORS.AllowedOrigins = b.config.Security.CORS.AllowOrigins
+	gatewayConfig.CORS.AllowedMethods = b.config.Security.CORS.AllowMethods
+	gatewayConfig.CORS.AllowedHeaders = b.config.Security.CORS.AllowHeaders
+	gatewayConfig.CORS.AllowCredentials = b.config.Security.CORS.AllowCredentials
+	gatewayConfig.RateLimit.Enabled = b.config.Security.RateLimit.Enabled
+	gatewayConfig.RateLimit.Requests = b.config.Security.RateLimit.Limit
+	gatewayConfig.RateLimit.Window = b.config.Security.RateLimit.Window.String()
+	gatewayConfig.Discovery.Type = b.config.Discovery.Type
+	if b.config.Discovery.Address != "" {
+		gatewayConfig.Discovery.Endpoints = []string{b.config.Discovery.Address}
+	}
+	gatewayConfig.Discovery.Namespace = firstNonEmpty(b.config.Discovery.Config["namespace"], "default")
+	gatewayConfig.Discovery.Timeout = b.config.Discovery.Timeout
+
+	b.gateway = gateway.NewGateway(gatewayConfig)
 
 	// Initialize gateway
 	if err := b.gateway.Initialize(); err != nil {
@@ -533,13 +482,59 @@ func (b *Bootstrap) InitializeGateway() error {
 	}
 
 	logger.Info("Gateway initialized successfully",
-		logger.String("host", b.config.Gateway.Host),
-		logger.Int("port", b.config.Gateway.Port))
+		logger.String("host", gatewayConfig.Host),
+		logger.Int("port", gatewayConfig.Port))
 	return nil
 }
 
+func buildDBConfig(dbConfig config.DBConfig) (db.Config, error) {
+	switch dbConfig.Driver {
+	case "mysql":
+		cfg := mysqlpkg.DefaultConfig()
+		cfg.Host = dbConfig.Host
+		cfg.Port = dbConfig.Port
+		cfg.Database = dbConfig.Database
+		cfg.Username = dbConfig.Username
+		cfg.Password = dbConfig.Password
+		return db.Config{Type: db.TypeMySQL, MySQL: cfg}, nil
+	case "postgres", "postgresql":
+		cfg := pg.DefaultConfig()
+		cfg.Host = dbConfig.Host
+		cfg.Port = dbConfig.Port
+		cfg.Database = dbConfig.Database
+		cfg.Username = dbConfig.Username
+		cfg.Password = dbConfig.Password
+		cfg.SSLMode = dbConfig.SSLMode
+		return db.Config{Type: db.TypePostgres, PG: cfg}, nil
+	default:
+		return db.Config{}, fmt.Errorf("unsupported database driver: %s", dbConfig.Driver)
+	}
+}
+
+func parseDegradationLevel(level string) rpc.DegradationLevel {
+	switch level {
+	case "light":
+		return rpc.DegradationLevelLight
+	case "medium":
+		return rpc.DegradationLevelMedium
+	case "heavy":
+		return rpc.DegradationLevelHeavy
+	case "emergency":
+		return rpc.DegradationLevelEmergency
+	default:
+		return rpc.DegradationLevelNormal
+	}
+}
+
+func firstNonEmpty(value string, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
 // GetConfig returns the configuration
-func (b *Bootstrap) GetConfig() *Config {
+func (b *Bootstrap) GetConfig() *config.GlobalConfig {
 	return b.config
 }
 

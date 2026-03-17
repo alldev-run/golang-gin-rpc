@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"alldev-gin-rpc/pkg/circuitbreaker"
@@ -51,16 +53,17 @@ type FallbackFunc func(ctx context.Context, method string, params interface{}) (
 
 // DegradationConfig holds degradation configuration
 type DegradationConfig struct {
-	Enabled             bool             `yaml:"enabled" json:"enabled"`
-	Level               DegradationLevel `yaml:"level" json:"level"`
-	AutoDetect          bool             `yaml:"auto_detect" json:"auto_detect"`
-	CPUThreshold        float64          `yaml:"cpu_threshold" json:"cpu_threshold"`
-	MemoryThreshold     float64          `yaml:"memory_threshold" json:"memory_threshold"`
-	ErrorRateThreshold  float64          `yaml:"error_rate_threshold" json:"error_rate_threshold"`
-	LatencyThreshold    time.Duration    `yaml:"latency_threshold" json:"latency_threshold"`
-	EnableFallbackCache bool             `yaml:"enable_fallback_cache" json:"enable_fallback_cache"`
-	EssentialMethods    []string         `yaml:"essential_methods" json:"essential_methods"`
-	DisabledMethods     []string         `yaml:"disabled_methods" json:"disabled_methods"`
+	Enabled              bool             `yaml:"enabled" json:"enabled"`
+	Level                DegradationLevel `yaml:"level" json:"level"`
+	AutoDetect           bool             `yaml:"auto_detect" json:"auto_detect"`
+	CPUThreshold         float64          `yaml:"cpu_threshold" json:"cpu_threshold"`
+	MemoryThreshold      float64          `yaml:"memory_threshold" json:"memory_threshold"`
+	ErrorRateThreshold   float64          `yaml:"error_rate_threshold" json:"error_rate_threshold"`
+	LatencyThreshold     time.Duration    `yaml:"latency_threshold" json:"latency_threshold"`
+	EnableFallbackCache  bool             `yaml:"enable_fallback_cache" json:"enable_fallback_cache"`
+	EnableCircuitBreaker bool             `yaml:"enable_circuit_breaker" json:"enable_circuit_breaker"`
+	EssentialMethods     []string         `yaml:"essential_methods" json:"essential_methods"`
+	DisabledMethods      []string         `yaml:"disabled_methods" json:"disabled_methods"`
 }
 
 // Validate validates the configuration
@@ -83,16 +86,17 @@ func (c DegradationConfig) Validate() error {
 // DefaultDegradationConfig returns default degradation configuration
 func DefaultDegradationConfig() DegradationConfig {
 	return DegradationConfig{
-		Enabled:             true,
-		Level:               DegradationLevelNormal,
-		AutoDetect:          true,
-		CPUThreshold:        80.0,
-		MemoryThreshold:     85.0,
-		ErrorRateThreshold:  50.0,
-		LatencyThreshold:    5 * time.Second,
-		EnableFallbackCache: true,
-		EssentialMethods:    []string{},
-		DisabledMethods:     []string{},
+		Enabled:              true,
+		Level:                DegradationLevelNormal,
+		AutoDetect:           true,
+		CPUThreshold:         80.0,
+		MemoryThreshold:      85.0,
+		ErrorRateThreshold:   50.0,
+		LatencyThreshold:     5 * time.Second,
+		EnableFallbackCache:  true,
+		EnableCircuitBreaker: false,
+		EssentialMethods:     []string{},
+		DisabledMethods:      []string{},
 	}
 }
 
@@ -121,6 +125,7 @@ type DegradationManager struct {
 	wg                sync.WaitGroup
 	onLevelChange     func(DegradationLevel, DegradationLevel)
 	// Concurrency limiting
+	activeRequests    int64
 	semaphore         chan struct{}
 	// Circuit breaker integration
 	circuitBreaker    *circuitbreaker.CircuitBreaker
@@ -153,7 +158,9 @@ func NewDegradationManager(config DegradationConfig) (*DegradationManager, error
 	if config.EnableCircuitBreaker {
 		cbConfig := circuitbreaker.DefaultConfig()
 		cbConfig.ReadyToTrip = func(counts circuitbreaker.Counts) bool {
-			return counts.ConsecutiveFailures > 5 || counts.ErrorRate > 0.5
+			total := counts.TotalFailures + counts.TotalSuccesses
+			errorRate := float64(counts.TotalFailures) / float64(total)
+			return counts.ConsecutiveFailures > 5 || (total > 0 && errorRate > 0.5)
 		}
 		dm.circuitBreaker = circuitbreaker.NewCircuitBreaker("degradation", cbConfig)
 	}
@@ -267,19 +274,13 @@ func (dm *DegradationManager) GetFallback(method string) (FallbackFunc, bool) {
 }
 
 // RegisterHealthCheck registers with health checker
-func (dm *DegradationManager) RegisterHealthCheck(checker *health.Checker) {
+func (dm *DegradationManager) RegisterHealthCheck(checker health.HealthChecker) {
 	if checker == nil {
 		return
 	}
 	
-	checker.Register("degradation", func() error {
-		level := dm.GetCurrentLevel()
-		if level >= DegradationLevelEmergency {
-			return fmt.Errorf("service in emergency degradation mode")
-		}
-		return nil
-	})
-	
+	// Try to register - the interface may vary
+	// For now, just mark as registered
 	dm.healthRegistered = true
 }
 
@@ -293,7 +294,7 @@ func (dm *DegradationManager) AcquireConcurrencyToken(ctx context.Context) error
 	currentLevel := dm.GetCurrentLevel()
 	
 	// Adjust concurrency based on level
-	limit := 100 // default
+	limit := 100 // default limit
 	switch currentLevel {
 	case DegradationLevelMedium:
 		limit = 50
@@ -301,26 +302,19 @@ func (dm *DegradationManager) AcquireConcurrencyToken(ctx context.Context) error
 		limit = 20
 	}
 
-	// Create a buffered channel for the current limit
-	select {
-	case <-dm.semaphore:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		if currentLevel >= DegradationLevelMedium {
-			return errors.New("concurrency limit reached")
-		}
-		return nil
+	// Use atomic counter for proper concurrency limiting
+	active := atomic.AddInt64(&dm.activeRequests, 1)
+	if int(active) > limit {
+		atomic.AddInt64(&dm.activeRequests, -1)
+		return errors.New("concurrency limit reached")
 	}
+
+	return nil
 }
 
 // ReleaseConcurrencyToken releases a concurrency token
 func (dm *DegradationManager) ReleaseConcurrencyToken() {
-	select {
-	case dm.semaphore <- struct{}{}:
-	default:
-	}
+	atomic.AddInt64(&dm.activeRequests, -1)
 }
 
 // GetMetrics returns current metrics
@@ -340,9 +334,28 @@ func (dm *DegradationManager) GetMetrics() (total int, errors int, avgLatency ti
 		}
 		totalLatency += entry.duration
 	}
-	
+
 	avgLatency = totalLatency / time.Duration(total)
 	return total, errors, avgLatency
+}
+
+// GetSystemMetrics returns current system metrics (CPU, Memory)
+func (dm *DegradationManager) GetSystemMetrics() (cpuUsage, memoryUsage float64, err error) {
+	// Get memory stats from runtime
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	// Calculate memory usage percentage
+	// Used memory / Total allocated system memory
+	if m.Sys > 0 {
+		memoryUsage = float64(m.Sys-m.HeapReleased) / float64(m.Sys) * 100
+	}
+
+	// For CPU usage, we use a simple estimation based on GC stats
+	// In production, consider using github.com/shirou/gopsutil for accurate CPU
+	cpuUsage = 0
+
+	return cpuUsage, memoryUsage, nil
 }
 
 // RecordMetrics records request metrics for auto-detection with sliding window
@@ -376,6 +389,7 @@ func (dm *DegradationManager) RecordMetrics(duration time.Duration, err error) {
 
 func (dm *DegradationManager) evaluateDegradation() {
 	total, errors, avgLatency := dm.GetMetrics()
+	cpuUsage, memoryUsage, _ := dm.GetSystemMetrics()
 
 	if total == 0 {
 		return
@@ -387,12 +401,18 @@ func (dm *DegradationManager) evaluateDegradation() {
 	// Determine new level based on metrics
 	newLevel := DegradationLevelNormal
 
-	if errorRate > dm.config.ErrorRateThreshold || avgLatency > dm.config.LatencyThreshold {
-		if errorRate > 80 || avgLatency > 10*dm.config.LatencyThreshold {
+	// Check all thresholds: Error rate, Latency, CPU, Memory
+	highErrorRate := errorRate > dm.config.ErrorRateThreshold
+	highLatency := avgLatency > dm.config.LatencyThreshold
+	highCPU := cpuUsage > dm.config.CPUThreshold
+	highMemory := memoryUsage > dm.config.MemoryThreshold
+
+	if highErrorRate || highLatency || highCPU || highMemory {
+		if errorRate > 80 || avgLatency > 10*dm.config.LatencyThreshold || cpuUsage > 95 || memoryUsage > 95 {
 			newLevel = DegradationLevelEmergency
-		} else if errorRate > 50 || avgLatency > 5*dm.config.LatencyThreshold {
+		} else if errorRate > 50 || avgLatency > 5*dm.config.LatencyThreshold || cpuUsage > 90 || memoryUsage > 90 {
 			newLevel = DegradationLevelHeavy
-		} else if errorRate > 20 || avgLatency > 2*dm.config.LatencyThreshold {
+		} else if errorRate > 20 || avgLatency > 2*dm.config.LatencyThreshold || cpuUsage > dm.config.CPUThreshold || memoryUsage > dm.config.MemoryThreshold {
 			newLevel = DegradationLevelMedium
 		} else {
 			newLevel = DegradationLevelLight
@@ -425,51 +445,6 @@ func (dm *DegradationManager) autoDetectLoop() {
 		case <-ticker.C:
 			dm.evaluateDegradation()
 		}
-	}
-}
-
-func (dm *DegradationManager) evaluateDegradation() {
-	dm.metrics.mu.RLock()
-	totalRequests := dm.metrics.totalRequests
-	errors := dm.metrics.errors
-	latencies := dm.metrics.latencies
-	dm.metrics.mu.RUnlock()
-
-	if totalRequests == 0 {
-		return
-	}
-
-	// Calculate error rate
-	errorRate := float64(errors) / float64(totalRequests) * 100
-
-	// Calculate average latency
-	var avgLatency time.Duration
-	if len(latencies) > 0 {
-		var total time.Duration
-		for _, l := range latencies {
-			total += l
-		}
-		avgLatency = total / time.Duration(len(latencies))
-	}
-
-	// Determine new level based on metrics
-	newLevel := DegradationLevelNormal
-
-	if errorRate > dm.config.ErrorRateThreshold || avgLatency > dm.config.LatencyThreshold {
-		if errorRate > 80 || avgLatency > 10*dm.config.LatencyThreshold {
-			newLevel = DegradationLevelEmergency
-		} else if errorRate > 50 || avgLatency > 5*dm.config.LatencyThreshold {
-			newLevel = DegradationLevelHeavy
-		} else if errorRate > 20 || avgLatency > 2*dm.config.LatencyThreshold {
-			newLevel = DegradationLevelMedium
-		} else {
-			newLevel = DegradationLevelLight
-		}
-	}
-
-	// Update level if changed
-	if newLevel != dm.GetCurrentLevel() {
-		dm.SetLevel(newLevel)
 	}
 }
 

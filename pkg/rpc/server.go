@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"alldev-gin-rpc/pkg/ratelimiter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"alldev-gin-rpc/pkg/tracing"
@@ -68,19 +70,22 @@ type Server interface {
 
 // GRPCServer wraps gRPC server
 type GRPCServer struct {
-	config *Config
-	server *grpc.Server
-	services []Service
+	config     *Config
+	server     *grpc.Server
+	services   []Service
+	degradation *DegradationManager
 }
 
 // JSONRPCServer wraps JSON-RPC server
 type JSONRPCServer struct {
-	config     *Config
-	server     *http.Server
-	engine     *gin.Engine
-	services   map[string]interface{}
-	tracing    *tracing.JSONRPCInterceptor // Add tracing interceptor
-	auth       *RPCAuth                     // Add authentication
+	config      *Config
+	server      *http.Server
+	engine      *gin.Engine
+	services    map[string]interface{}
+	tracing     *tracing.JSONRPCInterceptor
+	auth        *RPCAuth
+	degradation *DegradationManager
+	rateLimiter *ratelimiter.Manager
 }
 
 // NewServer creates a new RPC server based on configuration
@@ -135,6 +140,7 @@ func NewJSONRPCServer(config Config) *JSONRPCServer {
 		services:   make(map[string]interface{}),
 		tracing:    tracingInterceptor,
 		auth:       auth,
+		rateLimiter: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
 	}
 }
 
@@ -296,8 +302,66 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 		}
 	}
 
+	// Check degradation
+	var result interface{}
+	var err error
+	if s.rateLimiter != nil && !s.rateLimiter.Allow(req.Method) {
+		c.JSON(http.StatusTooManyRequests, JSONRPCResponse{
+			JSONRPC: "2.0",
+			Error: &JSONRPCError{
+				Code:    ServerError,
+				Message: "Rate limit exceeded",
+			},
+			ID: req.ID,
+		})
+		return
+	}
+
+	if s.degradation != nil {
+		// Check if method should be allowed
+		if !s.degradation.ShouldAllowMethod(req.Method) {
+			// Try to get fallback
+			if fallback, ok := s.degradation.GetFallback(req.Method); ok {
+				result, err = fallback(ctx, req.Method, req.Params)
+				if err != nil {
+					c.JSON(http.StatusOK, JSONRPCResponse{
+						JSONRPC: "2.0",
+						Error: &JSONRPCError{
+							Code:    -32603,
+							Message: "Internal error",
+							Data:    err.Error(),
+						},
+						ID: req.ID,
+					})
+					return
+				}
+				c.JSON(http.StatusOK, JSONRPCResponse{
+					JSONRPC: "2.0",
+					Result:  result,
+					ID:      req.ID,
+				})
+				return
+			}
+			c.JSON(http.StatusOK, JSONRPCResponse{
+				JSONRPC: "2.0",
+				Error: &JSONRPCError{
+					Code:    -32603,
+					Message: "Service temporarily unavailable due to degradation",
+				},
+				ID: req.ID,
+			})
+			return
+		}
+		
+		// Record metrics
+		start := time.Now()
+		defer func() {
+			s.degradation.RecordMetrics(time.Since(start), err)
+		}()
+	}
+
 	// Execute the method
-	result, err := s.executeMethod(ctx, req.Method, req.Params)
+	result, err = s.executeMethod(ctx, req.Method, req.Params)
 	if err != nil {
 		// Check if it's a method not found error
 		if err == ErrMethodNotFound {
@@ -495,6 +559,21 @@ func (s *JSONRPCServer) EnableAuth() {
 // DisableAuth disables authentication
 func (s *JSONRPCServer) DisableAuth() {
 	s.auth.config.Enabled = false
+}
+
+// SetDegradationManager sets the degradation manager for the server
+func (s *GRPCServer) SetDegradationManager(dm *DegradationManager) {
+	s.degradation = dm
+}
+
+// SetDegradationManager sets the degradation manager for the server
+func (s *JSONRPCServer) SetDegradationManager(dm *DegradationManager) {
+	s.degradation = dm
+}
+
+// SetRateLimiterManager sets the rate limiter manager for JSON-RPC server
+func (s *JSONRPCServer) SetRateLimiterManager(rlm *ratelimiter.Manager) {
+	s.rateLimiter = rlm
 }
 
 // ServiceInfo provides information about registered services

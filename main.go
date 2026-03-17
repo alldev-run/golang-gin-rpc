@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -62,12 +63,12 @@ func main() {
 
 	// Create application
 	application := app.NewApplication(app.Config{
-		Host:         config.Server.Host,
-		Port:         config.Server.Port,
-		Mode:         config.Server.Mode,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Host:         config.Server.HTTP.Host,
+		Port:         strconv.Itoa(config.Server.HTTP.Port),
+		Mode:         appMode(config.App.Environment, config.App.Debug),
+		ReadTimeout:  config.Server.HTTP.ReadTimeout,
+		WriteTimeout: config.Server.HTTP.WriteTimeout,
+		IdleTimeout:  config.Server.HTTP.IdleTimeout,
 	})
 
 	// Register routes
@@ -98,4 +99,13 @@ func main() {
 	}
 
 	log.Println("Application shutdown complete")
+}
+func appMode(environment string, debug bool) string {
+	if debug {
+		return "debug"
+	}
+	if environment == "test" {
+		return "test"
+	}
+	return "release"
 }
