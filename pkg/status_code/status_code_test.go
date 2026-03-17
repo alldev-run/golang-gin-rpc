@@ -1,6 +1,7 @@
 package status_code
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -160,7 +161,7 @@ func TestStatusCode_EdgeCases(t *testing.T) {
 	}
 	
 	for _, tc := range testCases {
-		t.Run(string(tc.status), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", tc.status), func(t *testing.T) {
 			if msg := tc.status.Message(); msg != tc.expected {
 				t.Errorf("StatusCode %d.Message() = %s, want %s", int(tc.status), msg, tc.expected)
 			}

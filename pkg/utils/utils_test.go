@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -342,5 +343,313 @@ func TestDerefString(t *testing.T) {
 	}
 	if DerefString(nil, "default") != "default" {
 		t.Error("DerefString() with nil pointer incorrect")
+	}
+}
+
+// Additional comprehensive tests for missing functions
+
+func TestStringContainsAny(t *testing.T) {
+	tests := []struct {
+		s      string
+		substr []string
+		want   bool
+	}{
+		{"hello world", []string{"hello", "test"}, true},
+		{"hello world", []string{"test", "world"}, true},
+		{"hello world", []string{"test", "foo"}, false},
+		{"", []string{"test"}, false},
+		{"hello", []string{}, false},
+	}
+
+	for _, tt := range tests {
+		result := StringContainsAny(tt.s, tt.substr...)
+		if result != tt.want {
+			t.Errorf("StringContainsAny(%q, %v) = %v, want %v", tt.s, tt.substr, result, tt.want)
+		}
+	}
+}
+
+func TestStringFilterEmpty(t *testing.T) {
+	input := []string{"a", "", "  ", "b", "\t", "c"}
+	result := StringFilterEmpty(input)
+	expected := []string{"a", "b", "c"}
+	
+	if len(result) != len(expected) {
+		t.Errorf("StringFilterEmpty() returned %d elements, want %d", len(result), len(expected))
+	}
+	
+	for i, v := range result {
+		if v != expected[i] {
+			t.Errorf("StringFilterEmpty()[%d] = %q, want %q", i, v, expected[i])
+		}
+	}
+}
+
+func TestSafeFromJSON(t *testing.T) {
+	// Test valid JSON
+	validJSON := `{"name": "test", "value": 123}`
+	var result map[string]interface{}
+	err := SafeFromJSON(validJSON, &result)
+	if err != nil {
+		t.Errorf("SafeFromJSON() with valid JSON error = %v", err)
+	}
+	if result["name"] != "test" {
+		t.Errorf("SafeFromJSON() name = %v, want test", result["name"])
+	}
+
+	// Test invalid JSON that would cause panic
+	invalidJSON := `{"name": "test", "value":}` // This will cause a panic in json.Unmarshal
+	var result2 map[string]interface{}
+	err = SafeFromJSON(invalidJSON, &result2)
+	if err == nil {
+		t.Error("SafeFromJSON() with invalid JSON should return error")
+	}
+	// The error should contain our panic recovery message
+	if !strings.Contains(err.Error(), "json unmarshal panic") && !strings.Contains(err.Error(), "invalid character") {
+		t.Errorf("SafeFromJSON() error should mention panic or parsing error, got %v", err)
+	}
+}
+
+func TestToInt64Extended(t *testing.T) {
+	tests := []struct {
+		input    any
+		expected int64
+		wantErr  bool
+	}{
+		{int64(123456789), 123456789, false},
+		{123, 123, false},
+		{"123456789", 123456789, false},
+		{float64(123.45), 123, false},
+		{uint64(123), 123, false},
+		{"invalid", 0, true},
+		{nil, 0, true},
+	}
+
+	for _, tt := range tests {
+		result, err := ToInt64(tt.input)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("ToInt64(%v) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			continue
+		}
+		if !tt.wantErr && result != tt.expected {
+			t.Errorf("ToInt64(%v) = %v, want %v", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestToFloat64Extended(t *testing.T) {
+	tests := []struct {
+		input    any
+		expected float64
+		wantErr  bool
+	}{
+		{float64(3.14), 3.14, false},
+		{float32(3.14), 3.140000104904175, false}, // Updated expected value for float32 precision
+		{123, 123.0, false},
+		{"3.14", 3.14, false},
+		{"invalid", 0, true},
+		{nil, 0, true},
+	}
+
+	for _, tt := range tests {
+		result, err := ToFloat64(tt.input)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("ToFloat64(%v) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			continue
+		}
+		if !tt.wantErr && result != tt.expected {
+			t.Errorf("ToFloat64(%v) = %v, want %v", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestMustToBool(t *testing.T) {
+	tests := []struct {
+		input    any
+		expected bool
+	}{
+		{true, true},
+		{false, false},
+		{"true", true},
+		{"false", false},
+		{1, true},
+		{0, false},
+		{"invalid", false}, // Should return false on error
+		{nil, false},      // Should return false on error
+	}
+
+	for _, tt := range tests {
+		result := MustToBool(tt.input)
+		if result != tt.expected {
+			t.Errorf("MustToBool(%v) = %v, want %v", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestContainsIntSlice(t *testing.T) {
+	if !Contains([]int{1, 2, 3}, 2) {
+		t.Error("Contains() should return true for int slice")
+	}
+	if Contains([]int{1, 2, 3}, 4) {
+		t.Error("Contains() should return false for missing element")
+	}
+}
+
+func TestContainsInt64Slice(t *testing.T) {
+	if !Contains([]int64{1, 2, 3}, int64(2)) {
+		t.Error("Contains() should return true for int64 slice")
+	}
+	if Contains([]int64{1, 2, 3}, int64(4)) {
+		t.Error("Contains() should return false for missing element")
+	}
+}
+
+func TestContainsFloat64Slice(t *testing.T) {
+	if !Contains([]float64{1.1, 2.2, 3.3}, 2.2) {
+		t.Error("Contains() should return true for float64 slice")
+	}
+	if Contains([]float64{1.1, 2.2, 3.3}, 4.4) {
+		t.Error("Contains() should return false for missing element")
+	}
+}
+
+func TestContainsUnsupportedType(t *testing.T) {
+	// Test with unsupported slice type
+	if Contains([]bool{true, false}, true) {
+		t.Error("Contains() should return false for unsupported slice type")
+	}
+}
+
+func TestDerefInt(t *testing.T) {
+	i := 42
+	if DerefInt(&i, 0) != 42 {
+		t.Error("DerefInt() with non-nil pointer incorrect")
+	}
+	if DerefInt(nil, 0) != 0 {
+		t.Error("DerefInt() with nil pointer incorrect")
+	}
+	if DerefInt(nil, 99) != 99 {
+		t.Error("DerefInt() with nil pointer and default incorrect")
+	}
+}
+
+func TestPointerHelpersExtended(t *testing.T) {
+	// Test all pointer helpers
+	strPtr := String("test")
+	if strPtr == nil || *strPtr != "test" {
+		t.Error("String() pointer incorrect")
+	}
+
+	intPtr := Int(42)
+	if intPtr == nil || *intPtr != 42 {
+		t.Error("Int() pointer incorrect")
+	}
+
+	int64Ptr := Int64(1234567890)
+	if int64Ptr == nil || *int64Ptr != 1234567890 {
+		t.Error("Int64() pointer incorrect")
+	}
+
+	boolPtr := Bool(true)
+	if boolPtr == nil || *boolPtr != true {
+		t.Error("Bool() pointer incorrect")
+	}
+
+	float64Ptr := Float64(3.14)
+	if float64Ptr == nil || *float64Ptr != 3.14 {
+		t.Error("Float64() pointer incorrect")
+	}
+}
+
+func TestRandomStringEdgeCases(t *testing.T) {
+	// Test with different lengths
+	for n := 0; n < 20; n++ {
+		result := RandomString(n)
+		if len(result) != n {
+			t.Errorf("RandomString(%d) returned length %d, want %d", n, len(result), n)
+		}
+	}
+	
+	// Test that random strings are different
+	s1 := RandomString(10)
+	s2 := RandomString(10)
+	if s1 == s2 {
+		t.Error("RandomString() should produce different strings")
+	}
+}
+
+func TestRandomHexEdgeCases(t *testing.T) {
+	// Test with different lengths
+	for n := 0; n < 10; n++ {
+		result := RandomHex(n)
+		expectedLen := n * 2 // hex encoding doubles the length
+		if len(result) != expectedLen {
+			t.Errorf("RandomHex(%d) returned length %d, want %d", n, len(result), expectedLen)
+		}
+	}
+	
+	// Test that hex strings contain only valid hex characters
+	result := RandomHex(5)
+	for _, c := range result {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			t.Errorf("RandomHex() contains invalid hex character: %c", c)
+		}
+	}
+}
+
+func TestChunkEdgeCases(t *testing.T) {
+	// Test empty slice
+	result := Chunk([]string{}, 3)
+	if len(result) != 0 {
+		t.Errorf("Chunk() with empty slice should return empty slice, got %d chunks", len(result))
+	}
+	
+	// Test size larger than slice
+	result = Chunk([]string{"a", "b"}, 5)
+	if len(result) != 1 || len(result[0]) != 2 {
+		t.Error("Chunk() with size > slice length should return one chunk")
+	}
+	
+	// Test size 0 (should return single chunk)
+	result = Chunk([]string{"a", "b", "c"}, 0)
+	if len(result) != 1 || len(result[0]) != 3 {
+		t.Error("Chunk() with size 0 should return single chunk")
+	}
+	
+	// Test size 1
+	result = Chunk([]string{"a", "b", "c"}, 1)
+	if len(result) != 3 {
+		t.Error("Chunk() with size 1 should return 3 chunks")
+	}
+	for i, chunk := range result {
+		if len(chunk) != 1 {
+			t.Errorf("Chunk() size 1 chunk %d should have length 1", i)
+		}
+	}
+}
+
+func TestToStringComplexTypes(t *testing.T) {
+	// Test with slice
+	slice := []string{"a", "b"}
+	result := ToString(slice)
+	if result == "" {
+		t.Error("ToString() with slice should not be empty")
+	}
+	
+	// Test with map
+	m := map[string]int{"a": 1}
+	result = ToString(m)
+	if result == "" {
+		t.Error("ToString() with map should not be empty")
+	}
+	
+	// Test with struct
+	type TestStruct struct {
+		Field string
+	}
+	s := TestStruct{Field: "test"}
+	result = ToString(s)
+	if result == "" {
+		t.Error("ToString() with struct should not be empty")
 	}
 }

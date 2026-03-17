@@ -592,18 +592,19 @@ func TestHTTPHealthChecker(t *testing.T) {
 }
 
 func TestHTTPHealthChecker_Error(t *testing.T) {
-	// Invalid URL
-	checker := NewHTTPHealthChecker("test_http", "http://invalid-url-that-does-not-exist.com")
+	// Use a more clearly invalid URL
+	checker := NewHTTPHealthChecker("test_http", "http://127.0.0.1:99999") // Invalid port
 	
 	ctx := context.Background()
 	result := checker.Check(ctx)
 	
+	// Should be unhealthy due to connection error
 	if result.Status == StatusHealthy {
 		t.Errorf("HTTPHealthChecker.Check() status should not be healthy for invalid URL")
 	}
 	
 	if result.Message == "" {
-		t.Error("HTTPHealthChecker.Check() should have error message")
+		t.Errorf("HTTPHealthChecker.Check() message should not be empty for invalid URL")
 	}
 }
 

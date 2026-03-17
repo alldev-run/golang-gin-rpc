@@ -1,7 +1,6 @@
 package circuitbreaker
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"

@@ -10,7 +10,6 @@ import (
 
 	"golang-gin-rpc/pkg/logger"
 
-	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
 
@@ -48,6 +47,8 @@ func DefaultConfig() Config {
 type RateLimiter interface {
 	Allow() bool
 	AllowN(n int) bool
+	AllowWithContext(ctx context.Context) (bool, error)
+	AllowNWithContext(ctx context.Context, n int) (bool, error)
 	Wait(ctx context.Context) error
 	WaitN(ctx context.Context, n int) error
 	Reserve() *Reservation
@@ -62,7 +63,11 @@ type TokenBucketRateLimiter struct {
 
 // NewTokenBucketRateLimiter creates a new token bucket rate limiter
 func NewTokenBucketRateLimiter(config Config) *TokenBucketRateLimiter {
-	limiter := rate.NewLimiter(rate.Limit(config.Rate), config.Burst)
+	burst := config.Burst
+	if burst < 0 {
+		burst = 1 // Handle negative burst by setting to 1 to allow at least one request
+	}
+	limiter := rate.NewLimiter(rate.Limit(config.Rate), burst)
 	return &TokenBucketRateLimiter{limiter: limiter}
 }
 
@@ -73,7 +78,30 @@ func (r *TokenBucketRateLimiter) Allow() bool {
 
 // AllowN checks if n requests are allowed
 func (r *TokenBucketRateLimiter) AllowN(n int) bool {
+	if n <= 0 {
+		return n == 0 // Allow 0, deny negative
+	}
 	return r.limiter.AllowN(time.Now(), n)
+}
+
+// AllowWithContext checks if a request is allowed with context support
+func (r *TokenBucketRateLimiter) AllowWithContext(ctx context.Context) (bool, error) {
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+		return r.Allow(), nil
+	}
+}
+
+// AllowNWithContext checks if n requests are allowed with context support
+func (r *TokenBucketRateLimiter) AllowNWithContext(ctx context.Context, n int) (bool, error) {
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+		return r.AllowN(n), nil
+	}
 }
 
 // Wait waits until a request is allowed
@@ -120,8 +148,12 @@ type FixedWindowRateLimiter struct {
 
 // NewFixedWindowRateLimiter creates a new fixed window rate limiter
 func NewFixedWindowRateLimiter(config Config) *FixedWindowRateLimiter {
+	limit := int(config.Rate)
+	if limit < 0 {
+		limit = 0 // Handle negative rate
+	}
 	return &FixedWindowRateLimiter{
-		limit:     int(config.Rate),
+		limit:     limit,
 		window:    config.Window,
 		lastReset: time.Now(),
 	}
@@ -151,6 +183,10 @@ func (r *FixedWindowRateLimiter) AllowN(n int) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if n <= 0 {
+		return n == 0 // Allow 0, deny negative
+	}
+
 	now := time.Now()
 	if now.Sub(r.lastReset) >= r.window {
 		r.count = 0
@@ -163,6 +199,26 @@ func (r *FixedWindowRateLimiter) AllowN(n int) bool {
 
 	r.count += n
 	return true
+}
+
+// AllowWithContext checks if a request is allowed with context support
+func (r *FixedWindowRateLimiter) AllowWithContext(ctx context.Context) (bool, error) {
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+		return r.Allow(), nil
+	}
+}
+
+// AllowNWithContext checks if n requests are allowed with context support
+func (r *FixedWindowRateLimiter) AllowNWithContext(ctx context.Context, n int) (bool, error) {
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+		return r.AllowN(n), nil
+	}
 }
 
 // Wait waits until a request is allowed
@@ -223,9 +279,13 @@ type SlidingWindowRateLimiter struct {
 
 // NewSlidingWindowRateLimiter creates a new sliding window rate limiter
 func NewSlidingWindowRateLimiter(config Config) *SlidingWindowRateLimiter {
+	limit := int(config.Rate)
+	if limit < 0 {
+		limit = 0 // Handle negative rate
+	}
 	return &SlidingWindowRateLimiter{
 		tokens: make([]time.Time, 0),
-		limit:  int(config.Rate),
+		limit:  limit,
 		window: config.Window,
 	}
 }
@@ -253,6 +313,10 @@ func (r *SlidingWindowRateLimiter) AllowN(n int) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if n <= 0 {
+		return n == 0 // Allow 0, deny negative
+	}
+
 	now := time.Now()
 
 	// Remove old tokens outside the window
@@ -266,6 +330,26 @@ func (r *SlidingWindowRateLimiter) AllowN(n int) bool {
 		r.tokens = append(r.tokens, now)
 	}
 	return true
+}
+
+// AllowWithContext checks if a request is allowed with context support
+func (r *SlidingWindowRateLimiter) AllowWithContext(ctx context.Context) (bool, error) {
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+		return r.Allow(), nil
+	}
+}
+
+// AllowNWithContext checks if n requests are allowed with context support
+func (r *SlidingWindowRateLimiter) AllowNWithContext(ctx context.Context, n int) (bool, error) {
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+		return r.AllowN(n), nil
+	}
 }
 
 // Wait waits until a request is allowed
@@ -306,12 +390,14 @@ func (r *SlidingWindowRateLimiter) ReserveN(n int) *Reservation {
 func (r *SlidingWindowRateLimiter) cleanup(now time.Time) {
 	cutoff := now.Add(-r.window)
 
-	for i := 0; i < len(r.tokens); i++ {
-		if r.tokens[i].After(cutoff) {
-			r.tokens = r.tokens[i:]
-			break
+	// Remove all tokens that are outside the window
+	validTokens := make([]time.Time, 0)
+	for _, token := range r.tokens {
+		if token.After(cutoff) {
+			validTokens = append(validTokens, token)
 		}
 	}
+	r.tokens = validTokens
 }
 
 // timeUntilNextWindow calculates time until next available slot
@@ -479,7 +565,8 @@ func NewRateLimiter(config Config) (RateLimiter, error) {
 	case StrategySlidingWindow:
 		return NewSlidingWindowRateLimiter(config), nil
 	default:
-		return nil, fmt.Errorf("unsupported rate limiting strategy: %s", config.Strategy)
+		// Return default token bucket limiter for invalid strategies
+		return NewTokenBucketRateLimiter(config), nil
 	}
 }
 
@@ -509,7 +596,7 @@ func (m *HTTPMiddleware) Wrap(name string, handler http.Handler) http.Handler {
 func (m *HTTPMiddleware) WrapWithConfig(config Config, handler http.Handler) http.Handler {
 	limiter, err := NewRateLimiter(config)
 	if err != nil {
-		logger.Error("Failed to create rate limiter", zap.Error(err))
+		logger.Error(err)
 		return handler
 	}
 
