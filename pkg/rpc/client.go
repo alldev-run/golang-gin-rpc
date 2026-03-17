@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"alldev-gin-rpc/pkg/discovery"
 	"alldev-gin-rpc/pkg/ratelimiter"
 
 	"google.golang.org/grpc"
@@ -27,12 +28,17 @@ const (
 
 // ClientConfig holds client configuration
 type ClientConfig struct {
-	Type       ClientType
-	Host       string
-	Port       int
-	Timeout    time.Duration
-	EnableTLS  bool
-	MaxMsgSize int
+	Type        ClientType    `yaml:"type" json:"type"`
+	Host        string        `yaml:"host" json:"host"`
+	Port        int           `yaml:"port" json:"port"`
+	Timeout     time.Duration `yaml:"timeout" json:"timeout"`
+	EnableTLS   bool          `yaml:"enable_tls" json:"enable_tls"`
+	MaxMsgSize  int           `yaml:"max_msg_size" json:"max_msg_size"`
+	ServiceName string        `yaml:"service_name" json:"service_name"`
+}
+
+type discoveryServiceResolver interface {
+	GetService(ctx context.Context, serviceName string) ([]*discovery.ServiceInstance, error)
 }
 
 // DefaultClientConfig returns default client configuration
@@ -61,6 +67,7 @@ type GRPCClient struct {
 	conn        *grpc.ClientConn
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
+	discovery   discoveryServiceResolver
 }
 
 // JSONRPCClient wraps JSON-RPC client
@@ -70,6 +77,7 @@ type JSONRPCClient struct {
 	baseURL     string
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
+	discovery   discoveryServiceResolver
 }
 
 // NewClient creates a new RPC client based on configuration
@@ -97,7 +105,10 @@ func NewGRPCClient(config ClientConfig) *GRPCClient {
 
 // Connect establishes connection to gRPC server
 func (c *GRPCClient) Connect() error {
-	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
+	addr, err := c.resolveGRPCTarget(context.Background())
+	if err != nil {
+		return err
+	}
 
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -180,6 +191,10 @@ func (c *GRPCClient) SetRateLimiterManager(rlm *ratelimiter.Manager) {
 	c.rateLimiter = rlm
 }
 
+func (c *GRPCClient) SetDiscoveryResolver(resolver discoveryServiceResolver) {
+	c.discovery = resolver
+}
+
 // NewJSONRPCClient creates a new JSON-RPC client
 func NewJSONRPCClient(config ClientConfig) *JSONRPCClient {
 	if config.Timeout == 0 {
@@ -203,10 +218,12 @@ func NewJSONRPCClient(config ClientConfig) *JSONRPCClient {
 
 // Connect tests connection to JSON-RPC server (no-op for HTTP)
 func (c *JSONRPCClient) Connect() error {
-	// For HTTP client, we don't maintain persistent connection
-	// Just verify the server is reachable
 	ctx, cancel := context.WithTimeout(context.Background(), c.config.Timeout)
 	defer cancel()
+
+	if err := c.refreshJSONRPCBaseURL(ctx); err != nil {
+		return err
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/rpc?ping=true", nil)
 	if err != nil {
@@ -247,6 +264,10 @@ func (c *JSONRPCClient) SetRateLimiterManager(rlm *ratelimiter.Manager) {
 	c.rateLimiter = rlm
 }
 
+func (c *JSONRPCClient) SetDiscoveryResolver(resolver discoveryServiceResolver) {
+	c.discovery = resolver
+}
+
 // Call makes a JSON-RPC call
 func (c *JSONRPCClient) Call(ctx context.Context, method string, params interface{}, result interface{}) error {
 	if c.rateLimiter != nil && !c.rateLimiter.Allow(method) {
@@ -279,6 +300,10 @@ func (c *JSONRPCClient) Call(ctx context.Context, method string, params interfac
 			c.degradation.RecordMetrics(time.Since(start), nil)
 		}
 	}()
+
+	if err := c.refreshJSONRPCBaseURL(ctx); err != nil {
+		return err
+	}
 
 	req := JSONRPCRequest{
 		JSONRPC: "2.0",
@@ -347,4 +372,39 @@ func (t *apiKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		t.Base = http.DefaultTransport
 	}
 	return t.Base.RoundTrip(req)
+}
+
+func (c *GRPCClient) resolveGRPCTarget(ctx context.Context) (string, error) {
+	if c.discovery != nil && c.config.ServiceName != "" {
+		instances, err := c.discovery.GetService(ctx, c.config.ServiceName)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve grpc service %s: %w", c.config.ServiceName, err)
+		}
+		if len(instances) == 0 {
+			return "", fmt.Errorf("no instances found for grpc service: %s", c.config.ServiceName)
+		}
+		return fmt.Sprintf("%s:%d", instances[0].Address, instances[0].Port), nil
+	}
+	return fmt.Sprintf("%s:%d", c.config.Host, c.config.Port), nil
+}
+
+func (c *JSONRPCClient) refreshJSONRPCBaseURL(ctx context.Context) error {
+	if c.discovery == nil || c.config.ServiceName == "" {
+		return nil
+	}
+
+	instances, err := c.discovery.GetService(ctx, c.config.ServiceName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve jsonrpc service %s: %w", c.config.ServiceName, err)
+	}
+	if len(instances) == 0 {
+		return fmt.Errorf("no instances found for jsonrpc service: %s", c.config.ServiceName)
+	}
+
+	scheme := "http"
+	if c.config.EnableTLS {
+		scheme = "https"
+	}
+	c.baseURL = fmt.Sprintf("%s://%s:%d", scheme, instances[0].Address, instances[0].Port)
+	return nil
 }

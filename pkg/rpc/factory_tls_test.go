@@ -1,10 +1,22 @@
 package rpc
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"alldev-gin-rpc/pkg/discovery"
+	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestNewClient_ReturnsErrorForUnsupportedType(t *testing.T) {
@@ -207,6 +219,147 @@ func TestAPIKeyTransport_UsesDefaultBaseAndSetsHeader(t *testing.T) {
 	}
 }
 
+func TestGRPCGovernanceUnaryInterceptor_RejectsMissingAPIKey(t *testing.T) {
+	server, err := NewGRPCServer(Config{
+		Type:    ServerTypeGRPC,
+		Host:    "localhost",
+		Port:    50051,
+		Network: "tcp",
+	})
+	if err != nil {
+		t.Fatalf("failed to create grpc server: %v", err)
+	}
+	server.SetAuthConfig(AuthConfig{
+		Enabled:     true,
+		HeaderName:  "x-api-key",
+		APIKeys:     map[string]string{"valid-key": "tester"},
+		SkipMethods: []string{},
+	})
+
+	_, err = server.governanceUnaryInterceptor()(context.Background(), "request", &grpc.UnaryServerInfo{
+		FullMethod: "/svc.Method",
+	}, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return "ok", nil
+	})
+	if err == nil {
+		t.Fatal("expected unauthenticated error")
+	}
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("expected unauthenticated, got %s", status.Code(err))
+	}
+}
+
+func TestGRPCGovernanceUnaryInterceptor_AllowsValidAPIKeyAndPropagatesContext(t *testing.T) {
+	server, err := NewGRPCServer(Config{
+		Type:    ServerTypeGRPC,
+		Host:    "localhost",
+		Port:    50051,
+		Network: "tcp",
+	})
+	if err != nil {
+		t.Fatalf("failed to create grpc server: %v", err)
+	}
+	server.SetAuthConfig(AuthConfig{
+		Enabled:     true,
+		HeaderName:  "x-api-key",
+		APIKeys:     map[string]string{"valid-key": "tester"},
+		SkipMethods: []string{},
+	})
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-api-key", "valid-key"))
+	resp, err := server.governanceUnaryInterceptor()(ctx, "request", &grpc.UnaryServerInfo{
+		FullMethod: "/svc.Method",
+	}, func(ctx context.Context, req interface{}) (interface{}, error) {
+		if method, ok := GetAPIUserFromContext(ctx); !ok || method != "tester" {
+			t.Fatalf("expected authenticated user in context, got %q, %v", method, ok)
+		}
+		if method, ok := GetAPIKeyFromContext(ctx); !ok || method != "valid-key" {
+			t.Fatalf("expected api key in context, got %q, %v", method, ok)
+		}
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatalf("expected successful handler, got %v", err)
+	}
+	if resp != "ok" {
+		t.Fatalf("unexpected response: %v", resp)
+	}
+}
+
+func TestGRPCGovernanceUnaryInterceptor_UsesDegradationFallback(t *testing.T) {
+	server, err := NewGRPCServer(Config{
+		Type:    ServerTypeGRPC,
+		Host:    "localhost",
+		Port:    50051,
+		Network: "tcp",
+	})
+	if err != nil {
+		t.Fatalf("failed to create grpc server: %v", err)
+	}
+
+	dm, err := NewDegradationManager(DefaultDegradationConfig())
+	if err != nil {
+		t.Fatalf("failed to create degradation manager: %v", err)
+	}
+	dm.SetLevel(DegradationLevelEmergency)
+	dm.fallbacks["/svc.Method"] = func(ctx context.Context, method string, req interface{}) (interface{}, error) {
+		return "fallback", nil
+	}
+	server.SetDegradationManager(dm)
+
+	resp, err := server.governanceUnaryInterceptor()(context.Background(), "request", &grpc.UnaryServerInfo{
+		FullMethod: "/svc.Method",
+	}, func(ctx context.Context, req interface{}) (interface{}, error) {
+		t.Fatal("handler should not be called when degradation fallback is used")
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("expected fallback response, got error %v", err)
+	}
+	if resp != "fallback" {
+		t.Fatalf("unexpected fallback response: %v", resp)
+	}
+}
+
+func TestGRPCClient_ResolveTargetViaDiscovery(t *testing.T) {
+	client := NewGRPCClient(ClientConfig{
+		Type:        ClientTypeGRPC,
+		ServiceName: "orders-grpc",
+	})
+	client.SetDiscoveryResolver(&mockDiscoveryResolver{
+		instances: []*discovery.ServiceInstance{
+			{Name: "orders-grpc", Address: "10.0.0.21", Port: 9001},
+		},
+	})
+
+	target, err := client.resolveGRPCTarget(context.Background())
+	if err != nil {
+		t.Fatalf("expected discovery resolution to succeed, got %v", err)
+	}
+	if target != "10.0.0.21:9001" {
+		t.Fatalf("unexpected grpc target: %s", target)
+	}
+}
+
+func TestJSONRPCClient_RefreshBaseURLViaDiscovery(t *testing.T) {
+	client := NewJSONRPCClient(ClientConfig{
+		Type:        ClientTypeJSONRPC,
+		ServiceName: "orders-jsonrpc",
+	})
+	client.SetDiscoveryResolver(&mockDiscoveryResolver{
+		instances: []*discovery.ServiceInstance{
+			{Name: "orders-jsonrpc", Address: "10.0.0.22", Port: 8088},
+		},
+	})
+
+	if err := client.refreshJSONRPCBaseURL(context.Background()); err != nil {
+		t.Fatalf("expected discovery resolution to succeed, got %v", err)
+	}
+	if client.baseURL != "http://10.0.0.22:8088" {
+		t.Fatalf("unexpected jsonrpc baseURL: %s", client.baseURL)
+	}
+}
+
 func TestManagerAddServer_PropagatesServerCreationError(t *testing.T) {
 	manager := NewManager(ManagerConfig{
 		Servers:                 map[string]Config{},
@@ -240,5 +393,153 @@ func TestManagerStop_UsesDefaultGracefulTimeoutWhenUnset(t *testing.T) {
 	}
 	if err := manager.Stop(); err != nil {
 		t.Fatalf("expected stop to succeed with default timeout, got: %v", err)
+	}
+}
+
+type mockDiscoveryResolver struct {
+	instances []*discovery.ServiceInstance
+	err       error
+}
+
+func (m *mockDiscoveryResolver) GetService(ctx context.Context, serviceName string) ([]*discovery.ServiceInstance, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.instances, nil
+}
+
+func TestNewJSONRPCServer_BindsEngineAsHTTPHandler(t *testing.T) {
+	server := NewJSONRPCServer(Config{
+		Type:    ServerTypeJSONRPC,
+		Host:    "localhost",
+		Port:    8080,
+		Timeout: 1,
+	})
+
+	if server.server == nil {
+		t.Fatal("expected http server to be initialized")
+	}
+	if server.server.Handler != server.engine {
+		t.Fatal("expected gin engine to be bound as http handler")
+	}
+}
+
+func TestJSONRPCServer_SetupRoutes_Idempotent(t *testing.T) {
+	server := NewJSONRPCServer(Config{
+		Type:    ServerTypeJSONRPC,
+		Host:    "localhost",
+		Port:    8080,
+		Timeout: 1,
+	})
+
+	server.setupRoutes()
+	firstCount := len(server.engine.Routes())
+	server.setupRoutes()
+	secondCount := len(server.engine.Routes())
+
+	if firstCount != secondCount {
+		t.Fatalf("expected idempotent route setup, got %d then %d", firstCount, secondCount)
+	}
+}
+
+func TestJSONRPCServer_HandleJSONRPC_UsesConfiguredAuthNames(t *testing.T) {
+	server := NewJSONRPCServer(Config{
+		Type:    ServerTypeJSONRPC,
+		Host:    "localhost",
+		Port:    8080,
+		Timeout: 1,
+	})
+	server.SetAuthConfig(AuthConfig{
+		Enabled:     true,
+		HeaderName:  "X-Custom-Key",
+		QueryName:   "custom_key",
+		APIKeys:     map[string]string{"valid-key": "tester"},
+		SkipMethods: []string{},
+	})
+
+	body, err := json.Marshal(JSONRPCRequest{
+		JSONRPC: "2.0",
+		Method:  "svc.echo",
+		Params:  map[string]interface{}{"message": "hello"},
+		ID:      1,
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/rpc?custom_key=valid-key", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Custom-Key", "valid-key")
+	resp := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(resp)
+	ctx.Request = req
+
+	server.handleJSONRPC(ctx)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.Code)
+	}
+	if !strings.Contains(resp.Body.String(), `"code":-32601`) {
+		t.Fatalf("expected method-not-found response after auth passes, got %s", resp.Body.String())
+	}
+}
+
+func TestJSONRPCServer_HealthAndReadyEndpoints(t *testing.T) {
+	server := NewJSONRPCServer(Config{
+		Type:    ServerTypeJSONRPC,
+		Host:    "localhost",
+		Port:    8080,
+		Timeout: 1,
+	})
+	server.setupRoutes()
+
+	tests := []struct {
+		path           string
+		expectedStatus string
+	}{
+		{path: "/health", expectedStatus: "healthy"},
+		{path: "/ready", expectedStatus: "ready"},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		resp := httptest.NewRecorder()
+		server.engine.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("%s expected status 200, got %d", tt.path, resp.Code)
+		}
+		if !strings.Contains(resp.Body.String(), tt.expectedStatus) {
+			t.Fatalf("%s expected body to contain %q, got %s", tt.path, tt.expectedStatus, resp.Body.String())
+		}
+	}
+}
+
+func TestManagerStart_FailsOnPreflightPortConflict(t *testing.T) {
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to allocate listener: %v", err)
+	}
+	defer lis.Close()
+
+	port := lis.Addr().(*net.TCPAddr).Port
+	manager := NewManager(ManagerConfig{
+		Servers: map[string]Config{
+			"grpc": {
+				Type:    ServerTypeGRPC,
+				Host:    "127.0.0.1",
+				Port:    port,
+				Network: "tcp",
+				Timeout: 1,
+			},
+		},
+	})
+
+	err = manager.Start()
+	if err == nil {
+		t.Fatal("expected manager start to fail on occupied port")
+	}
+	if !strings.Contains(err.Error(), "preflight check failed") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -4,9 +4,11 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	"alldev-gin-rpc/pkg/discovery"
 	"go.uber.org/zap"
 	"alldev-gin-rpc/pkg/logger"
 	"alldev-gin-rpc/pkg/ratelimiter"
@@ -17,6 +19,19 @@ type ManagerConfig struct {
 	Servers map[string]Config `yaml:"servers" json:"servers"`
 	Timeout time.Duration    `yaml:"timeout" json:"timeout"`
 	GracefulShutdownTimeout time.Duration `yaml:"graceful_shutdown_timeout" json:"graceful_shutdown_timeout"`
+}
+
+type discoveryRegistrar interface {
+	Register(context.Context, *discovery.ServiceInstance) error
+	Deregister(context.Context, *discovery.ServiceInstance) error
+}
+
+type DiscoveryRegistrationConfig struct {
+	Enabled        bool              `yaml:"enabled" json:"enabled"`
+	ServiceName    string            `yaml:"service_name" json:"service_name"`
+	ServiceAddress string            `yaml:"service_address" json:"service_address"`
+	ServiceTags    []string          `yaml:"service_tags" json:"service_tags"`
+	Metadata       map[string]string `yaml:"metadata" json:"metadata"`
 }
 
 // DefaultManagerConfig returns default RPC manager configuration
@@ -54,6 +69,9 @@ type Manager struct {
 	middleware         *MiddlewareChain
 	degradationManager *DegradationManager
 	rateLimiterManager *ratelimiter.Manager
+	discoveryManager   discoveryRegistrar
+	discoveryConfig    DiscoveryRegistrationConfig
+	registeredInstances map[string]*discovery.ServiceInstance
 	mu                 sync.RWMutex
 	started            bool
 	startTime          time.Time
@@ -68,6 +86,7 @@ func NewManager(config ManagerConfig) *Manager {
 		registry:           NewServiceRegistry(),
 		middleware:         NewMiddlewareChain(),
 		rateLimiterManager: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+		registeredInstances: make(map[string]*discovery.ServiceInstance),
 		startTime:          time.Now(),
 	}
 	_ = manager.rateLimiterManager.AddConfig("default", ratelimiter.DefaultConfig())
@@ -229,6 +248,23 @@ func (m *Manager) SetRateLimiterManager(rlm *ratelimiter.Manager) {
 	}
 }
 
+func (m *Manager) SetDiscoveryIntegration(dm discoveryRegistrar, config DiscoveryRegistrationConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if config.Metadata == nil {
+		config.Metadata = make(map[string]string)
+	}
+	m.discoveryManager = dm
+	m.discoveryConfig = config
+
+	if !m.started || dm == nil || !config.Enabled {
+		return nil
+	}
+
+	return m.registerDiscoveryLocked()
+}
+
 // Start starts all RPC servers
 func (m *Manager) Start() error {
 	m.mu.Lock()
@@ -238,30 +274,40 @@ func (m *Manager) Start() error {
 		return fmt.Errorf("manager already started")
 	}
 	
-	// Register services with servers
 	for _, service := range m.services {
 		for serverName, server := range m.servers {
 			if err := server.RegisterService(service); err != nil {
-				return fmt.Errorf("failed to register service %s with server %s: %w", 
+				return fmt.Errorf("failed to register service %s with server %s: %w",
 					service.Name(), serverName, err)
 			}
 		}
 	}
-	
-	// Start all servers
+
+	for serverName, server := range m.servers {
+		if checker, ok := server.(startPreflightChecker); ok {
+			if err := checker.PreflightCheck(); err != nil {
+				return fmt.Errorf("preflight check failed for server %s: %w", serverName, err)
+			}
+		}
+	}
+
+	if err := m.registerDiscoveryLocked(); err != nil {
+		return err
+	}
+
 	for name, server := range m.servers {
 		go func(serverName string, rpcServer Server) {
-			logger.Info("Starting RPC server", 
+			logger.Info("Starting RPC server",
 				zap.String("name", serverName),
 				zap.String("type", string(rpcServer.Type())),
 				zap.String("address", rpcServer.Addr()))
 			
 			if err := rpcServer.Start(); err != nil {
-				logger.Errorf("Failed to start RPC server", 
+				logger.Errorf("Failed to start RPC server",
 					zap.String("name", serverName),
 					zap.Error(err))
 			} else {
-				logger.Info("RPC server started successfully", 
+				logger.Info("RPC server started successfully",
 					zap.String("name", serverName),
 					zap.String("address", rpcServer.Addr()))
 			}
@@ -271,7 +317,7 @@ func (m *Manager) Start() error {
 	m.started = true
 	m.startTime = time.Now()
 	
-	logger.Info("RPC manager started", 
+	logger.Info("RPC manager started",
 		zap.Int("servers", len(m.servers)),
 		zap.Int("services", len(m.services)))
 	
@@ -289,7 +335,6 @@ func (m *Manager) Stop() error {
 	
 	logger.Info("Stopping RPC manager...")
 	
-	// Create context with timeout for graceful shutdown
 	shutdownTimeout := m.config.GracefulShutdownTimeout
 	if shutdownTimeout <= 0 {
 		shutdownTimeout = 10 * time.Second
@@ -297,7 +342,6 @@ func (m *Manager) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	
-	// Stop all servers
 	var (
 		errors []error
 		errMu  sync.Mutex
@@ -313,7 +357,7 @@ func (m *Manager) Stop() error {
 				errMu.Lock()
 				errors = append(errors, fmt.Errorf("server %s stop failed: %w", serverName, err))
 				errMu.Unlock()
-				logger.Errorf("Failed to stop RPC server", 
+				logger.Errorf("Failed to stop RPC server",
 					zap.String("name", serverName),
 					zap.Error(err))
 			} else {
@@ -322,7 +366,6 @@ func (m *Manager) Stop() error {
 		}(name, server)
 	}
 	
-	// Wait for all servers to stop or timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -338,6 +381,10 @@ func (m *Manager) Stop() error {
 		errors = append(errors, fmt.Errorf("graceful shutdown timeout"))
 		errMu.Unlock()
 	}
+
+	if err := m.deregisterDiscoveryLocked(); err != nil {
+		errors = append(errors, err)
+	}
 	
 	m.started = false
 	
@@ -346,6 +393,98 @@ func (m *Manager) Stop() error {
 	}
 	
 	return nil
+}
+
+func (m *Manager) registerDiscoveryLocked() error {
+	if m.discoveryManager == nil || !m.discoveryConfig.Enabled {
+		return nil
+	}
+
+	if err := m.deregisterDiscoveryLocked(); err != nil {
+		return err
+	}
+
+	timeout := m.config.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	for serverName, server := range m.servers {
+		instance, err := m.buildDiscoveryInstanceLocked(serverName, server)
+		if err != nil {
+			return err
+		}
+		if err := m.discoveryManager.Register(ctx, instance); err != nil {
+			return fmt.Errorf("failed to register rpc instance %s: %w", instance.ID, err)
+		}
+		m.registeredInstances[instance.ID] = instance
+	}
+
+	return nil
+}
+
+func (m *Manager) deregisterDiscoveryLocked() error {
+	if m.discoveryManager == nil || len(m.registeredInstances) == 0 {
+		return nil
+	}
+
+	timeout := m.config.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	for id, instance := range m.registeredInstances {
+		if err := m.discoveryManager.Deregister(ctx, instance); err != nil {
+			return fmt.Errorf("failed to deregister rpc instance %s: %w", id, err)
+		}
+		delete(m.registeredInstances, id)
+	}
+
+	return nil
+}
+
+func (m *Manager) buildDiscoveryInstanceLocked(serverName string, server Server) (*discovery.ServiceInstance, error) {
+	serverConfig, exists := m.config.Servers[serverName]
+	if !exists {
+		return nil, fmt.Errorf("server config %s not found", serverName)
+	}
+
+	serviceName := m.discoveryConfig.ServiceName
+	if serviceName == "" {
+		serviceName = "rpc-service"
+	}
+
+	address := m.discoveryConfig.ServiceAddress
+	if address == "" {
+		address = strings.TrimPrefix(serverConfig.Host, ":")
+	}
+	if address == "" || address == "0.0.0.0" || address == "::" {
+		address = "localhost"
+	}
+
+	metadata := make(map[string]string, len(m.discoveryConfig.Metadata)+3)
+	for key, value := range m.discoveryConfig.Metadata {
+		metadata[key] = value
+	}
+	metadata["protocol"] = string(server.Type())
+	metadata["server_name"] = serverName
+	if len(m.discoveryConfig.ServiceTags) > 0 {
+		metadata["tags"] = strings.Join(m.discoveryConfig.ServiceTags, ",")
+	}
+
+	instanceName := fmt.Sprintf("%s-%s", serviceName, serverName)
+
+	return &discovery.ServiceInstance{
+		ID:      fmt.Sprintf("%s-%s-%d", serviceName, serverName, serverConfig.Port),
+		Name:    instanceName,
+		Address: address,
+		Port:    serverConfig.Port,
+		Payload: metadata,
+	}, nil
 }
 
 // IsStarted returns true if the manager is started

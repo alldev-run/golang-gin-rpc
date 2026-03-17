@@ -1,8 +1,11 @@
 package rpc
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"alldev-gin-rpc/pkg/discovery"
 )
 
 func TestDefaultManagerConfig(t *testing.T) {
@@ -410,6 +413,93 @@ func TestManager_UnregisterService(t *testing.T) {
 	}
 }
 
+func TestManager_DiscoveryRegistrationLifecycle(t *testing.T) {
+	manager := NewManager(ManagerConfig{
+		Servers: map[string]Config{
+			"jsonrpc": {
+				Type:    ServerTypeJSONRPC,
+				Host:    "127.0.0.1",
+				Port:    0,
+				Network: "tcp",
+				Timeout: 1,
+			},
+		},
+		GracefulShutdownTimeout: time.Second,
+	})
+	mockDiscovery := &mockDiscoveryRegistrar{}
+
+	err := manager.SetDiscoveryIntegration(mockDiscovery, DiscoveryRegistrationConfig{
+		Enabled:        true,
+		ServiceName:    "orders",
+		ServiceAddress: "10.0.0.8",
+		ServiceTags:    []string{"rpc", "jsonrpc"},
+		Metadata:       map[string]string{"env": "test"},
+	})
+	if err != nil {
+		t.Fatalf("failed to set discovery integration: %v", err)
+	}
+
+	if err := manager.Start(); err != nil {
+		t.Fatalf("failed to start manager: %v", err)
+	}
+	if len(mockDiscovery.registered) != 1 {
+		t.Fatalf("expected 1 registered instance, got %d", len(mockDiscovery.registered))
+	}
+	if mockDiscovery.registered[0].Name != "orders-jsonrpc" {
+		t.Fatalf("unexpected discovery service name: %s", mockDiscovery.registered[0].Name)
+	}
+	if mockDiscovery.registered[0].Address != "10.0.0.8" {
+		t.Fatalf("unexpected discovery service address: %s", mockDiscovery.registered[0].Address)
+	}
+	if got := mockDiscovery.registered[0].Payload["protocol"]; got != "jsonrpc" {
+		t.Fatalf("unexpected protocol metadata: %s", got)
+	}
+
+	if err := manager.Stop(); err != nil {
+		t.Fatalf("failed to stop manager: %v", err)
+	}
+	if len(mockDiscovery.deregistered) != 1 {
+		t.Fatalf("expected 1 deregistered instance, got %d", len(mockDiscovery.deregistered))
+	}
+}
+
+func TestManager_SetDiscoveryIntegrationAfterStart_RegistersImmediately(t *testing.T) {
+	manager := NewManager(ManagerConfig{
+		Servers: map[string]Config{
+			"jsonrpc": {
+				Type:    ServerTypeJSONRPC,
+				Host:    "127.0.0.1",
+				Port:    0,
+				Network: "tcp",
+				Timeout: 1,
+			},
+		},
+		GracefulShutdownTimeout: time.Second,
+	})
+	mockDiscovery := &mockDiscoveryRegistrar{}
+
+	if err := manager.Start(); err != nil {
+		t.Fatalf("failed to start manager: %v", err)
+	}
+
+	err := manager.SetDiscoveryIntegration(mockDiscovery, DiscoveryRegistrationConfig{
+		Enabled:        true,
+		ServiceName:    "payments",
+		ServiceAddress: "10.0.0.9",
+		Metadata:       map[string]string{"env": "test"},
+	})
+	if err != nil {
+		t.Fatalf("failed to set discovery integration after start: %v", err)
+	}
+	if len(mockDiscovery.registered) != 1 {
+		t.Fatalf("expected 1 registered instance after late integration, got %d", len(mockDiscovery.registered))
+	}
+
+	if err := manager.Stop(); err != nil {
+		t.Fatalf("failed to stop manager: %v", err)
+	}
+}
+
 // MockService for testing
 type MockService struct {
 	name string
@@ -421,5 +511,20 @@ func (m *MockService) Name() string {
 
 func (m *MockService) Register(server interface{}) error {
 	// Mock implementation
+	return nil
+}
+
+type mockDiscoveryRegistrar struct {
+	registered   []*discovery.ServiceInstance
+	deregistered []*discovery.ServiceInstance
+}
+
+func (m *mockDiscoveryRegistrar) Register(ctx context.Context, instance *discovery.ServiceInstance) error {
+	m.registered = append(m.registered, instance)
+	return nil
+}
+
+func (m *mockDiscoveryRegistrar) Deregister(ctx context.Context, instance *discovery.ServiceInstance) error {
+	m.deregistered = append(m.deregistered, instance)
 	return nil
 }

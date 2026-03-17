@@ -13,8 +13,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"alldev-gin-rpc/pkg/ratelimiter"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	"alldev-gin-rpc/pkg/tracing"
 )
 
@@ -69,12 +72,19 @@ type Server interface {
 	RegisterService(service Service) error
 }
 
+type startPreflightChecker interface {
+	PreflightCheck() error
+}
+
 // GRPCServer wraps gRPC server
 type GRPCServer struct {
-	config     *Config
-	server     *grpc.Server
-	services   []Service
+	config      *Config
+	server      *grpc.Server
+	services    []Service
+	tracing     *tracing.GRPCInterceptor
+	auth        *RPCAuth
 	degradation *DegradationManager
+	rateLimiter *ratelimiter.Manager
 }
 
 // JSONRPCServer wraps JSON-RPC server
@@ -87,6 +97,7 @@ type JSONRPCServer struct {
 	auth        *RPCAuth
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
+	routesSetup bool
 }
 
 // NewServer creates a new RPC server based on configuration
@@ -103,9 +114,22 @@ func NewServer(config Config) (Server, error) {
 
 // NewGRPCServer creates a new gRPC server
 func NewGRPCServer(config Config) (*GRPCServer, error) {
+	tracingInterceptor := tracing.NewGRPCInterceptor(tracing.GlobalTracer())
+	auth := NewRPCAuth(DefaultAuthConfig())
+	grpcServer := &GRPCServer{
+		config:      &config,
+		services:    []Service{},
+		tracing:     tracingInterceptor,
+		auth:        auth,
+		rateLimiter: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+	}
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
+		grpc.ChainUnaryInterceptor(
+			tracingInterceptor.UnaryServerInterceptor(),
+			grpcServer.governanceUnaryInterceptor(),
+		),
 	}
 	if config.EnableTLS {
 		if config.CertFile == "" || config.KeyFile == "" {
@@ -118,11 +142,8 @@ func NewGRPCServer(config Config) (*GRPCServer, error) {
 		opts = append(opts, grpc.Creds(creds))
 	}
 
-	return &GRPCServer{
-		config:    &config,
-		server:    grpc.NewServer(opts...),
-		services: []Service{},
-	}, nil
+	grpcServer.server = grpc.NewServer(opts...)
+	return grpcServer, nil
 }
 
 // NewJSONRPCServer creates a new JSON-RPC server
@@ -146,7 +167,7 @@ func NewJSONRPCServer(config Config) *JSONRPCServer {
 
 	return &JSONRPCServer{
 		config:     &config,
-		server:     &http.Server{Addr: config.Host},
+		server:     &http.Server{Addr: config.Host, Handler: engine},
 		engine:     engine,
 		services:   make(map[string]interface{}),
 		tracing:    tracingInterceptor,
@@ -187,6 +208,71 @@ func (s *GRPCServer) Start() error {
 	return s.server.Serve(lis)
 }
 
+func (s *GRPCServer) PreflightCheck() error {
+	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
+	lis, err := net.Listen(s.config.Network, addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+	}
+	_ = lis.Close()
+	return nil
+}
+
+func (s *GRPCServer) governanceUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		ctx = SetRPCMethodInContext(ctx, info.FullMethod)
+
+		headerName := "x-api-key"
+		if s.auth != nil && s.auth.config.HeaderName != "" {
+			headerName = strings.ToLower(s.auth.config.HeaderName)
+		}
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if values := md.Get(headerName); len(values) > 0 && values[0] != "" {
+				apiKey := values[0]
+				ctx = SetAPIKeyInContext(ctx, apiKey)
+				if s.auth != nil && s.auth.HasAPIKey(apiKey) {
+					if user, exists := s.auth.config.APIKeys[apiKey]; exists {
+						ctx = SetAPIUserInContext(ctx, user)
+					}
+				}
+			}
+		}
+
+		if s.auth != nil && s.auth.config.Enabled && !s.auth.ShouldSkipAuth(info.FullMethod) {
+			if !s.auth.IsAuthenticated(ctx) {
+				return nil, status.Error(codes.Unauthenticated, "API key is required")
+			}
+		}
+
+		if s.rateLimiter != nil && !s.rateLimiter.Allow(info.FullMethod) {
+			return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
+		}
+
+		var err error
+		if s.degradation != nil {
+			if !s.degradation.ShouldAllowMethod(info.FullMethod) {
+				if fallback, ok := s.degradation.GetFallback(info.FullMethod); ok {
+					result, fallbackErr := fallback(ctx, info.FullMethod, req)
+					if fallbackErr != nil {
+						return nil, status.Error(codes.Unavailable, fallbackErr.Error())
+					}
+					return result, nil
+				}
+				return nil, status.Error(codes.Unavailable, "service temporarily unavailable due to degradation")
+			}
+
+			start := time.Now()
+			defer func() {
+				s.degradation.RecordMetrics(time.Since(start), err)
+			}()
+		}
+
+		resp, handlerErr := handler(ctx, req)
+		err = handlerErr
+		return resp, handlerErr
+	}
+}
+
 // Start starts the JSON-RPC server
 func (s *JSONRPCServer) Start() error {
 	s.setupRoutes()
@@ -199,6 +285,15 @@ func (s *JSONRPCServer) Start() error {
 	return s.server.ListenAndServe()
 }
 
+func (s *JSONRPCServer) PreflightCheck() error {
+	lis, err := net.Listen(s.config.Network, s.server.Addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", s.server.Addr, err)
+	}
+	_ = lis.Close()
+	return nil
+}
+
 // Stop stops the gRPC server
 func (s *GRPCServer) Stop() error {
 	s.server.GracefulStop()
@@ -207,7 +302,9 @@ func (s *GRPCServer) Stop() error {
 
 // Stop stops the JSON-RPC server
 func (s *JSONRPCServer) Stop() error {
-	return s.server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.config.Timeout)*time.Second)
+	defer cancel()
+	return s.server.Shutdown(ctx)
 }
 
 // Addr returns the server address
@@ -232,17 +329,47 @@ func (s *JSONRPCServer) Type() ServerType {
 
 // setupRoutes sets up JSON-RPC routes
 func (s *JSONRPCServer) setupRoutes() {
+	if s.routesSetup {
+		return
+	}
 	// Wrap the handler with tracing
+	s.engine.GET("/health", s.healthCheck)
+	s.engine.GET("/ready", s.readyCheck)
 	s.engine.POST("/rpc", s.tracing.WrapHandler("jsonrpc.request", s.handleJSONRPC))
 	s.engine.GET("/rpc", s.tracing.WrapHandler("jsonrpc.request", s.handleJSONRPC)) // Support GET for simple requests
+	s.routesSetup = true
+}
+
+func (s *JSONRPCServer) healthCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status": "healthy",
+		"type":   string(s.Type()),
+		"addr":   s.Addr(),
+	})
+}
+
+func (s *JSONRPCServer) readyCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status": "ready",
+		"type":   string(s.Type()),
+		"addr":   s.Addr(),
+	})
 }
 
 // handleJSONRPC handles JSON-RPC requests
 func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 	// Extract API key from request
-	apiKey := c.GetHeader("X-API-Key")
+	headerName := s.auth.config.HeaderName
+	if headerName == "" {
+		headerName = "X-API-Key"
+	}
+	queryName := s.auth.config.QueryName
+	if queryName == "" {
+		queryName = "api_key"
+	}
+	apiKey := c.GetHeader(headerName)
 	if apiKey == "" {
-		apiKey = c.Query("api_key")
+		apiKey = c.Query(queryName)
 	}
 
 	// Set API key in context for RPC authentication
@@ -256,9 +383,6 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 			}
 		}
 	}
-
-	// Update request context
-	c.Request = c.Request.WithContext(ctx)
 
 	// Parse JSON-RPC request
 	var req JSONRPCRequest
@@ -274,6 +398,10 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 		})
 		return
 	}
+
+	// Update request context after the method has been parsed
+	ctx = SetRPCMethodInContext(ctx, req.Method)
+	c.Request = c.Request.WithContext(ctx)
 
 	// Validate JSON-RPC version
 	if req.JSONRPC != "2.0" {
@@ -547,8 +675,18 @@ func (s *JSONRPCServer) GetServices() map[string]interface{} {
 }
 
 // SetAuthConfig sets the authentication configuration
+func (s *GRPCServer) SetAuthConfig(config AuthConfig) {
+	s.auth = NewRPCAuth(config)
+}
+
+// SetAuthConfig sets the authentication configuration
 func (s *JSONRPCServer) SetAuthConfig(config AuthConfig) {
 	s.auth = NewRPCAuth(config)
+}
+
+// GetAuthConfig returns the current authentication configuration
+func (s *GRPCServer) GetAuthConfig() *RPCAuth {
+	return s.auth
 }
 
 // GetAuthConfig returns the current authentication configuration
@@ -586,6 +724,11 @@ func (s *GRPCServer) SetDegradationManager(dm *DegradationManager) {
 // SetDegradationManager sets the degradation manager for the server
 func (s *JSONRPCServer) SetDegradationManager(dm *DegradationManager) {
 	s.degradation = dm
+}
+
+// SetRateLimiterManager sets the rate limiter manager for JSON-RPC server
+func (s *GRPCServer) SetRateLimiterManager(rlm *ratelimiter.Manager) {
+	s.rateLimiter = rlm
 }
 
 // SetRateLimiterManager sets the rate limiter manager for JSON-RPC server

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"alldev-gin-rpc/pkg/auth"
@@ -286,6 +287,18 @@ func (b *Bootstrap) InitializeRPC() error {
 		return fmt.Errorf("failed to start RPC manager: %w", err)
 	}
 
+	if b.discoveryManager != nil {
+		if err := b.rpcManager.SetDiscoveryIntegration(b.discoveryManager, rpc.DiscoveryRegistrationConfig{
+			Enabled:        b.config.Discovery.Enabled,
+			ServiceName:    b.config.App.Name,
+			ServiceAddress: firstNonEmpty(b.config.Discovery.Config["service_address"], firstNonEmpty(b.config.Server.GRPC.Host, b.config.Server.HTTP.Host)),
+			ServiceTags:    append([]string{"rpc", b.config.RPC.Protocol}, splitAndTrim(b.config.Discovery.Config["rpc_tags"])...),
+			Metadata:       map[string]string(b.config.Discovery.Config),
+		}); err != nil {
+			return fmt.Errorf("failed to connect rpc manager with discovery manager: %w", err)
+		}
+	}
+
 	logger.Info("RPC services initialized successfully")
 	return nil
 }
@@ -322,6 +335,18 @@ func (b *Bootstrap) InitializeDiscovery() error {
 	}
 
 	b.discoveryManager = manager
+
+	if b.rpcManager != nil {
+		if err := b.rpcManager.SetDiscoveryIntegration(manager, rpc.DiscoveryRegistrationConfig{
+			Enabled:        b.config.Discovery.Enabled,
+			ServiceName:    b.config.App.Name,
+			ServiceAddress: firstNonEmpty(b.config.Discovery.Config["service_address"], firstNonEmpty(b.config.Server.GRPC.Host, b.config.Server.HTTP.Host)),
+			ServiceTags:    append([]string{"rpc", b.config.RPC.Protocol}, splitAndTrim(b.config.Discovery.Config["rpc_tags"])...),
+			Metadata:       map[string]string(b.config.Discovery.Config),
+		}); err != nil {
+			return fmt.Errorf("failed to connect discovery manager with rpc manager: %w", err)
+		}
+	}
 
 	logger.Info("Service discovery initialized successfully")
 	return nil
@@ -531,6 +556,22 @@ func firstNonEmpty(value string, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func splitAndTrim(value string) []string {
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }
 
 // GetConfig returns the configuration
