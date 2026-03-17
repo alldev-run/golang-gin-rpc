@@ -28,6 +28,9 @@ type MetricsCollector struct {
 	rpcRequestsTotal   *prometheus.CounterVec
 	rpcRequestDuration *prometheus.HistogramVec
 	rpcErrorsTotal     *prometheus.CounterVec
+	rpcRequestsDetailedTotal   *prometheus.CounterVec
+	rpcRequestDetailedDuration *prometheus.HistogramVec
+	rpcGovernanceEventsTotal   *prometheus.CounterVec
 
 	// Database metrics
 	dbConnectionsActive *prometheus.GaugeVec
@@ -114,6 +117,50 @@ func NewMetricsCollector() *MetricsCollector {
 				Help: "Total number of RPC errors",
 			},
 			[]string{"service", "method", "error_type"},
+		),
+		rpcRequestsDetailedTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "rpc_requests_detailed_total",
+				Help: "Total number of RPC requests with protocol, target and status labels",
+			},
+			[]string{"protocol", "service", "method", "target", "status"},
+		),
+		rpcRequestDetailedDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "rpc_request_detailed_duration_seconds",
+				Help:    "RPC request duration in seconds with protocol and target labels",
+				Buckets: prometheus.DefBuckets,
+			},
+			[]string{"protocol", "service", "method", "target", "status"},
+		),
+		rpcGovernanceEventsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "rpc_governance_events_total",
+				Help: "Total number of RPC governance events",
+			},
+			[]string{"protocol", "service", "method", "event"},
+		),
+
+		authAttemptsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "auth_attempts_total",
+				Help: "Total number of auth attempts",
+			},
+			[]string{"protocol", "service", "method"},
+		),
+		authFailuresTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "auth_failures_total",
+				Help: "Total number of auth failures",
+			},
+			[]string{"protocol", "service", "method"},
+		),
+		rateLimitHitsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "rate_limit_hits_total",
+				Help: "Total number of rate limit rejections",
+			},
+			[]string{"protocol", "service", "method"},
 		),
 
 		// Database metrics
@@ -202,6 +249,9 @@ func NewMetricsCollector() *MetricsCollector {
 	collector.rpcRequestsTotal = registerCounterVec(collector.rpcRequestsTotal)
 	collector.rpcRequestDuration = registerHistogramVec(collector.rpcRequestDuration)
 	collector.rpcErrorsTotal = registerCounterVec(collector.rpcErrorsTotal)
+	collector.rpcRequestsDetailedTotal = registerCounterVec(collector.rpcRequestsDetailedTotal)
+	collector.rpcRequestDetailedDuration = registerHistogramVec(collector.rpcRequestDetailedDuration)
+	collector.rpcGovernanceEventsTotal = registerCounterVec(collector.rpcGovernanceEventsTotal)
 	collector.dbConnectionsActive = registerGaugeVec(collector.dbConnectionsActive)
 	collector.dbQueryDuration = registerHistogramVec(collector.dbQueryDuration)
 	collector.dbErrorsTotal = registerCounterVec(collector.dbErrorsTotal)
@@ -212,6 +262,9 @@ func NewMetricsCollector() *MetricsCollector {
 	collector.activeConnections = registerGaugeVec(collector.activeConnections)
 	collector.memoryUsage = registerGaugeVec(collector.memoryUsage)
 	collector.goroutineCount = registerGaugeVec(collector.goroutineCount)
+	collector.authAttemptsTotal = registerCounterVec(collector.authAttemptsTotal)
+	collector.authFailuresTotal = registerCounterVec(collector.authFailuresTotal)
+	collector.rateLimitHitsTotal = registerCounterVec(collector.rateLimitHitsTotal)
 
 	return collector
 }
@@ -279,6 +332,27 @@ func (m *MetricsCollector) RecordRPCRequest(service, method, status string, dura
 // RecordRPCError records an RPC error
 func (m *MetricsCollector) RecordRPCError(service, method, errorType string) {
 	m.rpcErrorsTotal.WithLabelValues(service, method, errorType).Inc()
+}
+
+func (m *MetricsCollector) RecordRPCRequestDetailed(protocol, service, method, target, status string, duration time.Duration) {
+	m.rpcRequestsDetailedTotal.WithLabelValues(protocol, service, method, target, status).Inc()
+	m.rpcRequestDetailedDuration.WithLabelValues(protocol, service, method, target, status).Observe(duration.Seconds())
+}
+
+func (m *MetricsCollector) RecordRPCGovernanceEvent(protocol, service, method, event string) {
+	m.rpcGovernanceEventsTotal.WithLabelValues(protocol, service, method, event).Inc()
+}
+
+func (m *MetricsCollector) RecordAuthAttempt(protocol, service, method string) {
+	m.authAttemptsTotal.WithLabelValues(protocol, service, method).Inc()
+}
+
+func (m *MetricsCollector) RecordAuthFailure(protocol, service, method string) {
+	m.authFailuresTotal.WithLabelValues(protocol, service, method).Inc()
+}
+
+func (m *MetricsCollector) RecordRateLimitHit(protocol, service, method string) {
+	m.rateLimitHitsTotal.WithLabelValues(protocol, service, method).Inc()
 }
 
 // RecordDBConnection records database connection

@@ -3,12 +3,14 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
 
 // mockDiscovery implements Discovery interface for testing
 type mockDiscovery struct {
+	mu       sync.RWMutex
 	services map[string][]*ServiceInstance
 }
 
@@ -19,6 +21,8 @@ func newMockDiscovery() *mockDiscovery {
 }
 
 func (m *mockDiscovery) Register(ctx context.Context, instance *ServiceInstance) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.services[instance.Name] == nil {
 		m.services[instance.Name] = []*ServiceInstance{}
 	}
@@ -27,6 +31,8 @@ func (m *mockDiscovery) Register(ctx context.Context, instance *ServiceInstance)
 }
 
 func (m *mockDiscovery) Deregister(ctx context.Context, instance *ServiceInstance) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	instances := m.services[instance.Name]
 	if instances == nil {
 		return nil
@@ -42,8 +48,12 @@ func (m *mockDiscovery) Deregister(ctx context.Context, instance *ServiceInstanc
 }
 
 func (m *mockDiscovery) GetService(ctx context.Context, serviceName string) ([]*ServiceInstance, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if instances, ok := m.services[serviceName]; ok {
-		return instances, nil
+		copied := make([]*ServiceInstance, len(instances))
+		copy(copied, instances)
+		return copied, nil
 	}
 	return []*ServiceInstance{}, nil
 }
@@ -376,5 +386,46 @@ func TestDiscoveryConfig(t *testing.T) {
 	}
 	if config.Timeout != 5*time.Second {
 		t.Errorf("Expected Timeout 5s, got %v", config.Timeout)
+	}
+}
+
+func TestConfigValidate_AppliesDefaultsInPlace(t *testing.T) {
+	cfg := Config{}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	if cfg.Type != RegistryTypeConsul {
+		t.Fatalf("expected default type consul, got %s", cfg.Type)
+	}
+	if cfg.Address != "localhost:8500" {
+		t.Fatalf("expected default consul address, got %s", cfg.Address)
+	}
+	if cfg.Namespace != "default" {
+		t.Fatalf("expected default namespace, got %s", cfg.Namespace)
+	}
+	if cfg.Timeout != 5*time.Second {
+		t.Fatalf("expected default timeout 5s, got %v", cfg.Timeout)
+	}
+	if cfg.HealthCheckInterval != 30*time.Second {
+		t.Fatalf("expected default health check interval 30s, got %v", cfg.HealthCheckInterval)
+	}
+	if cfg.DeregisterCriticalServiceAfter != 24*time.Hour {
+		t.Fatalf("expected default deregister duration 24h, got %v", cfg.DeregisterCriticalServiceAfter)
+	}
+	if cfg.Options == nil {
+		t.Fatal("expected options map to be initialized")
+	}
+}
+
+func TestConfigValidate_StaticRegistryDoesNotRequireAddress(t *testing.T) {
+	cfg := Config{Type: RegistryTypeStatic}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	if cfg.Address != "" {
+		t.Fatalf("expected static registry to keep empty address, got %s", cfg.Address)
 	}
 }

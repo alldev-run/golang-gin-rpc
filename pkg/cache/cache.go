@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -10,33 +11,119 @@ import (
 	"alldev-gin-rpc/pkg/cache/redis"
 	"alldev-gin-rpc/pkg/cache/memcache"
 	"alldev-gin-rpc/pkg/cache/failover"
+	goredis "github.com/redis/go-redis/v9"
 )
+
+var ErrCacheOperationNotSupported = errors.New("cache operation not supported")
+
+type cacheStatsTracker struct {
+	mu    sync.RWMutex
+	stats CacheStats
+}
+
+func (t *cacheStatsTracker) snapshot() CacheStats {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.stats
+}
+
+func (t *cacheStatsTracker) touch() {
+	t.stats.LastAccess = time.Now()
+}
+
+func (t *cacheStatsTracker) recordHit() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stats.Hits++
+	t.touch()
+}
+
+func (t *cacheStatsTracker) recordMiss() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stats.Misses++
+	t.touch()
+}
+
+func (t *cacheStatsTracker) recordSet() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stats.Sets++
+	t.touch()
+}
+
+func (t *cacheStatsTracker) recordDelete() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stats.Deletes++
+	t.touch()
+}
+
+func (t *cacheStatsTracker) recordError() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stats.Errors++
+	t.touch()
+}
 
 // redisAdapter adapts redis.Client to Cache interface
 type redisAdapter struct {
 	client *redis.Client
+	stats  cacheStatsTracker
 }
 
 func (r *redisAdapter) Get(ctx context.Context, key string) (interface{}, error) {
-	return r.client.Get(ctx, key)
+	value, err := r.client.Get(ctx, key)
+	if err != nil {
+		if errors.Is(err, goredis.Nil) {
+			r.stats.recordMiss()
+			return nil, nil
+		}
+		r.stats.recordError()
+		return nil, err
+	}
+	if value == "" {
+		r.stats.recordMiss()
+	} else {
+		r.stats.recordHit()
+	}
+	return value, nil
 }
 
 func (r *redisAdapter) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	return r.client.Set(ctx, key, value, ttl)
+	if err := r.client.Set(ctx, key, value, ttl); err != nil {
+		r.stats.recordError()
+		return err
+	}
+	r.stats.recordSet()
+	return nil
 }
 
 func (r *redisAdapter) Delete(ctx context.Context, key string) error {
-	return r.client.Del(ctx, key)
+	if err := r.client.Del(ctx, key); err != nil {
+		r.stats.recordError()
+		return err
+	}
+	r.stats.recordDelete()
+	return nil
 }
 
 func (r *redisAdapter) Exists(ctx context.Context, key string) (bool, error) {
 	count, err := r.client.Exists(ctx, key)
-	return count > 0, err
+	if err != nil {
+		r.stats.recordError()
+		return false, err
+	}
+	if count > 0 {
+		r.stats.recordHit()
+	} else {
+		r.stats.recordMiss()
+	}
+	return count > 0, nil
 }
 
 func (r *redisAdapter) Clear(ctx context.Context) error {
-	// Redis doesn't have a clear all command, this would need implementation
-	return nil
+	return ErrCacheOperationNotSupported
 }
 
 func (r *redisAdapter) Close() error {
@@ -52,22 +139,26 @@ func (r *redisAdapter) SetWithRandomTTL(ctx context.Context, key string, value i
 }
 
 func (r *redisAdapter) GetStats() CacheStats {
-	return CacheStats{} // Basic implementation
+	return r.stats.snapshot()
 }
 
 // memcacheAdapter adapts memcache.Client to Cache interface
 type memcacheAdapter struct {
 	client *memcache.Client
+	stats  cacheStatsTracker
 }
 
 func (m *memcacheAdapter) Get(ctx context.Context, key string) (interface{}, error) {
 	item, err := m.client.Get(ctx, key)
 	if err != nil {
+		m.stats.recordError()
 		return nil, err
 	}
 	if item == nil {
+		m.stats.recordMiss()
 		return nil, nil
 	}
+	m.stats.recordHit()
 	return item.Value, nil
 }
 
@@ -84,6 +175,7 @@ func (m *memcacheAdapter) Set(ctx context.Context, key string, value interface{}
 	case string:
 		valueBytes = []byte(v)
 	default:
+		m.stats.recordError()
 		return fmt.Errorf("unsupported value type: %T", value)
 	}
 	
@@ -92,19 +184,35 @@ func (m *memcacheAdapter) Set(ctx context.Context, key string, value interface{}
 		Value:      valueBytes,
 		Expiration: expiration,
 	}
-	return m.client.Set(ctx, item)
+	if err := m.client.Set(ctx, item); err != nil {
+		m.stats.recordError()
+		return err
+	}
+	m.stats.recordSet()
+	return nil
 }
 
 func (m *memcacheAdapter) Delete(ctx context.Context, key string) error {
-	return m.client.Delete(ctx, key)
+	if err := m.client.Delete(ctx, key); err != nil {
+		m.stats.recordError()
+		return err
+	}
+	m.stats.recordDelete()
+	return nil
 }
 
 func (m *memcacheAdapter) Exists(ctx context.Context, key string) (bool, error) {
 	item, err := m.client.Get(ctx, key)
 	if err != nil {
+		m.stats.recordError()
 		return false, err
 	}
-	return item != nil, nil
+	if item != nil {
+		m.stats.recordHit()
+		return true, nil
+	}
+	m.stats.recordMiss()
+	return false, nil
 }
 
 func (m *memcacheAdapter) Clear(ctx context.Context) error {
@@ -124,7 +232,7 @@ func (m *memcacheAdapter) SetWithRandomTTL(ctx context.Context, key string, valu
 }
 
 func (m *memcacheAdapter) GetStats() CacheStats {
-	return CacheStats{} // Basic implementation
+	return m.stats.snapshot()
 }
 
 // Cache defines the cache interface with enterprise features
@@ -386,26 +494,44 @@ func NewMemcacheCache(config MemcacheConfig) (Cache, error) {
 // failoverAdapter adapts failover.FailoverCache to Cache interface
 type failoverAdapter struct {
 	cache *failover.FailoverCache
+	stats cacheStatsTracker
 }
 
 func (f *failoverAdapter) Get(ctx context.Context, key string) (interface{}, error) {
 	value, exists := f.cache.Get(ctx, key)
 	if !exists {
+		f.stats.recordMiss()
 		return nil, nil
 	}
+	f.stats.recordHit()
 	return value, nil
 }
 
 func (f *failoverAdapter) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	return f.cache.Set(ctx, key, value, ttl)
+	if err := f.cache.Set(ctx, key, value, ttl); err != nil {
+		f.stats.recordError()
+		return err
+	}
+	f.stats.recordSet()
+	return nil
 }
 
 func (f *failoverAdapter) Delete(ctx context.Context, key string) error {
-	return f.cache.Delete(ctx, key)
+	if err := f.cache.Delete(ctx, key); err != nil {
+		f.stats.recordError()
+		return err
+	}
+	f.stats.recordDelete()
+	return nil
 }
 
 func (f *failoverAdapter) Exists(ctx context.Context, key string) (bool, error) {
 	_, exists := f.cache.Get(ctx, key)
+	if exists {
+		f.stats.recordHit()
+	} else {
+		f.stats.recordMiss()
+	}
 	return exists, nil
 }
 
@@ -426,7 +552,7 @@ func (f *failoverAdapter) SetWithRandomTTL(ctx context.Context, key string, valu
 }
 
 func (f *failoverAdapter) GetStats() CacheStats {
-	return CacheStats{} // Basic implementation
+	return f.stats.snapshot()
 }
 
 // FailoverConfig holds failover cache configuration
@@ -434,9 +560,7 @@ type FailoverConfig = failover.Config
 
 // NewFailoverCache creates a new failover cache instance
 func NewFailoverCache(config FailoverConfig) (Cache, error) {
-	// For now, return a default failover cache
-	// In a real implementation, you would use the config to create the appropriate storage backends
-	fc, err := failover.NewDefaultFailover()
+	fc, err := failover.NewFailoverCacheFromConfig(config)
 	if err != nil {
 		return nil, err
 	}

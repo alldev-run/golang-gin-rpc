@@ -8,8 +8,7 @@ import (
 
 // Middleware returns a Gin middleware that validates JWT access tokens from the Authorization header.
 // Sets user_id and username in context on successful validation.
-func Middleware() gin.HandlerFunc {
-
+func (m *Manager) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		token := c.GetHeader("Authorization")
@@ -23,7 +22,7 @@ func Middleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := ValidateAccessToken(token)
+		claims, err := m.ValidateAccessToken(token)
 
 		if err != nil {
 
@@ -39,4 +38,8 @@ func Middleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func Middleware() gin.HandlerFunc {
+	return DefaultManager().Middleware()
 }

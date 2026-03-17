@@ -12,9 +12,9 @@ import (
 )
 
 // encrypt encrypts data using AES-GCM with the configured secret key.
-func encrypt(data []byte) (string, error) {
-
-	key := sha256.Sum256([]byte(config.Secret))
+func (m *Manager) encrypt(data []byte) (string, error) {
+	cfg := m.Config()
+	key := sha256.Sum256([]byte(cfg.Secret))
 
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
@@ -38,9 +38,9 @@ func encrypt(data []byte) (string, error) {
 }
 
 // decrypt decrypts an encrypted token using AES-GCM.
-func decrypt(token string) ([]byte, error) {
-
-	key := sha256.Sum256([]byte(config.Secret))
+func (m *Manager) decrypt(token string) ([]byte, error) {
+	cfg := m.Config()
+	key := sha256.Sum256([]byte(cfg.Secret))
 
 	data, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
@@ -68,20 +68,18 @@ func decrypt(token string) ([]byte, error) {
 }
 
 // encodeClaims marshals and encrypts claims into a token string.
-func encodeClaims(c Claims) (string, error) {
-
+func (m *Manager) encodeClaims(c Claims) (string, error) {
 	data, err := json.Marshal(c)
 	if err != nil {
 		return "", err
 	}
 
-	return encrypt(data)
+	return m.encrypt(data)
 }
 
 // decodeClaims decrypts and unmarshals a token string into claims.
-func decodeClaims(token string) (*Claims, error) {
-
-	data, err := decrypt(token)
+func (m *Manager) decodeClaims(token string) (*Claims, error) {
+	data, err := m.decrypt(token)
 	if err != nil {
 		return nil, err
 	}
@@ -91,4 +89,20 @@ func decodeClaims(token string) (*Claims, error) {
 	err = json.Unmarshal(data, &c)
 
 	return &c, err
+}
+
+func encrypt(data []byte) (string, error) {
+	return DefaultManager().encrypt(data)
+}
+
+func decrypt(token string) ([]byte, error) {
+	return DefaultManager().decrypt(token)
+}
+
+func encodeClaims(c Claims) (string, error) {
+	return DefaultManager().encodeClaims(c)
+}
+
+func decodeClaims(token string) (*Claims, error) {
+	return DefaultManager().decodeClaims(token)
 }

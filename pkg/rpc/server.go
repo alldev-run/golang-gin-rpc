@@ -85,6 +85,7 @@ type GRPCServer struct {
 	auth        *RPCAuth
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
+	observer    clientObserver
 }
 
 // JSONRPCServer wraps JSON-RPC server
@@ -97,6 +98,7 @@ type JSONRPCServer struct {
 	auth        *RPCAuth
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
+	observer    clientObserver
 	routesSetup bool
 }
 
@@ -220,7 +222,17 @@ func (s *GRPCServer) PreflightCheck() error {
 
 func (s *GRPCServer) governanceUnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		start := time.Now()
+		statusText := "ok"
 		ctx = SetRPCMethodInContext(ctx, info.FullMethod)
+		defer func() {
+			if s.observer != nil {
+				s.observer.RecordRequest(ClientTypeGRPC, info.FullMethod, s.Addr(), statusText, time.Since(start))
+			}
+		}()
+		if gov, ok := s.observer.(governanceObserver); ok {
+			gov.RecordGovernance(ClientTypeGRPC, info.FullMethod, "method_latency")
+		}
 
 		headerName := "x-api-key"
 		if s.auth != nil && s.auth.config.HeaderName != "" {
@@ -239,12 +251,23 @@ func (s *GRPCServer) governanceUnaryInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		if s.auth != nil && s.auth.config.Enabled && !s.auth.ShouldSkipAuth(info.FullMethod) {
+			if gov, ok := s.observer.(governanceObserver); ok {
+				gov.RecordGovernance(ClientTypeGRPC, info.FullMethod, "auth_attempt")
+			}
 			if !s.auth.IsAuthenticated(ctx) {
+				statusText = "unauthenticated"
+				if gov, ok := s.observer.(governanceObserver); ok {
+					gov.RecordGovernance(ClientTypeGRPC, info.FullMethod, "auth_reject")
+				}
 				return nil, status.Error(codes.Unauthenticated, "API key is required")
 			}
 		}
 
 		if s.rateLimiter != nil && !s.rateLimiter.Allow(info.FullMethod) {
+			statusText = "rate_limited"
+			if gov, ok := s.observer.(governanceObserver); ok {
+				gov.RecordGovernance(ClientTypeGRPC, info.FullMethod, "rate_limit_reject")
+			}
 			return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
 		}
 
@@ -254,9 +277,18 @@ func (s *GRPCServer) governanceUnaryInterceptor() grpc.UnaryServerInterceptor {
 				if fallback, ok := s.degradation.GetFallback(info.FullMethod); ok {
 					result, fallbackErr := fallback(ctx, info.FullMethod, req)
 					if fallbackErr != nil {
+						statusText = "degraded_error"
 						return nil, status.Error(codes.Unavailable, fallbackErr.Error())
 					}
+					statusText = "degraded_fallback"
+					if gov, ok := s.observer.(governanceObserver); ok {
+						gov.RecordGovernance(ClientTypeGRPC, info.FullMethod, "degrade_fallback")
+					}
 					return result, nil
+				}
+				statusText = "degraded_reject"
+				if gov, ok := s.observer.(governanceObserver); ok {
+					gov.RecordGovernance(ClientTypeGRPC, info.FullMethod, "degrade_reject")
 				}
 				return nil, status.Error(codes.Unavailable, "service temporarily unavailable due to degradation")
 			}
@@ -269,6 +301,9 @@ func (s *GRPCServer) governanceUnaryInterceptor() grpc.UnaryServerInterceptor {
 
 		resp, handlerErr := handler(ctx, req)
 		err = handlerErr
+		if handlerErr != nil {
+			statusText = "handler_error"
+		}
 		return resp, handlerErr
 	}
 }
@@ -358,6 +393,18 @@ func (s *JSONRPCServer) readyCheck(c *gin.Context) {
 
 // handleJSONRPC handles JSON-RPC requests
 func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
+	start := time.Now()
+	statusText := "ok"
+	methodName := ""
+	defer func() {
+		if s.observer != nil {
+			s.observer.RecordRequest(ClientTypeJSONRPC, methodName, c.FullPath(), statusText, time.Since(start))
+		}
+	}()
+	if gov, ok := s.observer.(governanceObserver); ok {
+		gov.RecordGovernance(ClientTypeJSONRPC, methodName, "method_latency")
+	}
+
 	// Extract API key from request
 	headerName := s.auth.config.HeaderName
 	if headerName == "" {
@@ -387,6 +434,7 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 	// Parse JSON-RPC request
 	var req JSONRPCRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		statusText = "parse_error"
 		c.JSON(http.StatusOK, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error: &JSONRPCError{
@@ -400,11 +448,16 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 	}
 
 	// Update request context after the method has been parsed
+	methodName = req.Method
+	if gov, ok := s.observer.(governanceObserver); ok {
+		gov.RecordGovernance(ClientTypeJSONRPC, req.Method, "method_latency")
+	}
 	ctx = SetRPCMethodInContext(ctx, req.Method)
 	c.Request = c.Request.WithContext(ctx)
 
 	// Validate JSON-RPC version
 	if req.JSONRPC != "2.0" {
+		statusText = "invalid_request"
 		c.JSON(http.StatusOK, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error: &JSONRPCError{
@@ -419,6 +472,7 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 
 	// Validate method
 	if req.Method == "" {
+		statusText = "invalid_request"
 		c.JSON(http.StatusOK, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error: &JSONRPCError{
@@ -433,7 +487,14 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 
 	// Check authentication (skip for system methods)
 	if s.auth.config.Enabled && !s.auth.ShouldSkipAuth(req.Method) {
+		if gov, ok := s.observer.(governanceObserver); ok {
+			gov.RecordGovernance(ClientTypeJSONRPC, req.Method, "auth_attempt")
+		}
 		if !s.auth.IsAuthenticated(ctx) {
+			statusText = "unauthorized"
+			if gov, ok := s.observer.(governanceObserver); ok {
+				gov.RecordGovernance(ClientTypeJSONRPC, req.Method, "auth_reject")
+			}
 			c.JSON(http.StatusOK, JSONRPCResponse{
 				JSONRPC: "2.0",
 				Error: &JSONRPCError{
@@ -451,6 +512,10 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 	var result interface{}
 	var err error
 	if s.rateLimiter != nil && !s.rateLimiter.Allow(req.Method) {
+		statusText = "rate_limited"
+		if gov, ok := s.observer.(governanceObserver); ok {
+			gov.RecordGovernance(ClientTypeJSONRPC, req.Method, "rate_limit_reject")
+		}
 		c.JSON(http.StatusTooManyRequests, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error: &JSONRPCError{
@@ -469,6 +534,7 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 			if fallback, ok := s.degradation.GetFallback(req.Method); ok {
 				result, err = fallback(ctx, req.Method, req.Params)
 				if err != nil {
+					statusText = "degraded_error"
 					c.JSON(http.StatusOK, JSONRPCResponse{
 						JSONRPC: "2.0",
 						Error: &JSONRPCError{
@@ -480,12 +546,20 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 					})
 					return
 				}
+				statusText = "degraded_fallback"
+				if gov, ok := s.observer.(governanceObserver); ok {
+					gov.RecordGovernance(ClientTypeJSONRPC, req.Method, "degrade_fallback")
+				}
 				c.JSON(http.StatusOK, JSONRPCResponse{
 					JSONRPC: "2.0",
 					Result:  result,
 					ID:      req.ID,
 				})
 				return
+			}
+			statusText = "degraded_reject"
+			if gov, ok := s.observer.(governanceObserver); ok {
+				gov.RecordGovernance(ClientTypeJSONRPC, req.Method, "degrade_reject")
 			}
 			c.JSON(http.StatusOK, JSONRPCResponse{
 				JSONRPC: "2.0",
@@ -510,6 +584,7 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 	if err != nil {
 		// Check if it's a method not found error
 		if err == ErrMethodNotFound {
+			statusText = "method_not_found"
 			c.JSON(http.StatusOK, JSONRPCResponse{
 				JSONRPC: "2.0",
 				Error: &JSONRPCError{
@@ -523,6 +598,7 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 		}
 
 		// Internal error
+		statusText = "internal_error"
 		c.JSON(http.StatusOK, JSONRPCResponse{
 			JSONRPC: "2.0",
 			Error: &JSONRPCError{
@@ -731,9 +807,17 @@ func (s *GRPCServer) SetRateLimiterManager(rlm *ratelimiter.Manager) {
 	s.rateLimiter = rlm
 }
 
+func (s *GRPCServer) SetObserver(observer clientObserver) {
+	s.observer = observer
+}
+
 // SetRateLimiterManager sets the rate limiter manager for JSON-RPC server
 func (s *JSONRPCServer) SetRateLimiterManager(rlm *ratelimiter.Manager) {
 	s.rateLimiter = rlm
+}
+
+func (s *JSONRPCServer) SetObserver(observer clientObserver) {
+	s.observer = observer
 }
 
 // ServiceInfo provides information about registered services

@@ -654,3 +654,25 @@ func BenchmarkSimpleHash(b *testing.B) {
 		simpleHash(key)
 	}
 }
+
+func TestRedisAdapter_Clear_ReturnsExplicitUnsupportedError(t *testing.T) {
+	adapter := &redisAdapter{}
+
+	err := adapter.Clear(context.Background())
+	if !errors.Is(err, ErrCacheOperationNotSupported) {
+		t.Fatalf("expected ErrCacheOperationNotSupported, got %v", err)
+	}
+}
+
+func TestNewFailoverCache_UsesConfigDefaults(t *testing.T) {
+	cache, err := NewFailoverCache(FailoverConfig{})
+	if err != nil {
+		t.Fatalf("expected zero-value config to be defaulted, got error: %v", err)
+	}
+	if cache == nil {
+		t.Fatal("expected failover cache to be created")
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("expected failover cache close to succeed, got: %v", err)
+	}
+}

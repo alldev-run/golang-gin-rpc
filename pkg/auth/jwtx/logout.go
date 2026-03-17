@@ -3,18 +3,18 @@ package jwtx
 import "time"
 
 // Logout invalidates a token by adding it to the blacklist.
-func Logout(token string) error {
-
-	claims, err := decodeClaims(token)
+func (m *Manager) Logout(token string) error {
+	cfg := m.Config()
+	claims, err := m.decodeClaims(token)
 	if err != nil {
 		return err
 	}
 
 	ttl := time.Until(claims.ExpireAt)
 
-	if config.Store != nil {
+	if cfg.Store != nil {
 
-		return config.Store.Set(
+		return cfg.Store.Set(
 			"blacklist:"+claims.TokenID,
 			"1",
 			ttl,
@@ -25,13 +25,21 @@ func Logout(token string) error {
 }
 
 // RevokeUser revokes all tokens for a user by incrementing their version.
-func RevokeUser(userID string) {
-
-	if config.Store == nil {
+func (m *Manager) RevokeUser(userID string) {
+	cfg := m.Config()
+	if cfg.Store == nil {
 		return
 	}
 
 	key := "user:version:" + userID
 
-	config.Store.Set(key, "999", 0)
+	cfg.Store.Set(key, "999", 0)
+}
+
+func Logout(token string) error {
+	return DefaultManager().Logout(token)
+}
+
+func RevokeUser(userID string) {
+	DefaultManager().RevokeUser(userID)
 }

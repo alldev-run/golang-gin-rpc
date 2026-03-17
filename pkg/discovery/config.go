@@ -177,8 +177,11 @@ func ProductionConfig(address string) Config {
 	}
 }
 
-// Validate validates the configuration
-func (c Config) Validate() error {
+// Validate validates the configuration and applies defaults in place.
+func (c *Config) Validate() error {
+	if c == nil {
+		return nil
+	}
 	if c.Type == "" {
 		c.Type = RegistryTypeConsul
 	}

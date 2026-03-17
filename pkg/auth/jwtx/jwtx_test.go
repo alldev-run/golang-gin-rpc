@@ -48,15 +48,16 @@ func TestInit(t *testing.T) {
 		Secret: "test-secret",
 	}
 	Init(cfg)
+	current := DefaultManager().Config()
 
-	if config.Secret != "test-secret" {
-		t.Errorf("Expected secret to be 'test-secret', got '%s'", config.Secret)
+	if current.Secret != "test-secret" {
+		t.Errorf("Expected secret to be 'test-secret', got '%s'", current.Secret)
 	}
-	if config.AccessTokenTTL != 15*time.Minute {
-		t.Errorf("Expected default access token TTL to be 15 minutes, got %v", config.AccessTokenTTL)
+	if current.AccessTokenTTL != 15*time.Minute {
+		t.Errorf("Expected default access token TTL to be 15 minutes, got %v", current.AccessTokenTTL)
 	}
-	if config.RefreshTokenTTL != 7*24*time.Hour {
-		t.Errorf("Expected default refresh token TTL to be 7 days, got %v", config.RefreshTokenTTL)
+	if current.RefreshTokenTTL != 7*24*time.Hour {
+		t.Errorf("Expected default refresh token TTL to be 7 days, got %v", current.RefreshTokenTTL)
 	}
 
 	// Test with custom values
@@ -66,15 +67,16 @@ func TestInit(t *testing.T) {
 		RefreshTokenTTL: 30 * 24 * time.Hour,
 	}
 	Init(customCfg)
+	current = DefaultManager().Config()
 
-	if config.Secret != "custom-secret" {
-		t.Errorf("Expected secret to be 'custom-secret', got '%s'", config.Secret)
+	if current.Secret != "custom-secret" {
+		t.Errorf("Expected secret to be 'custom-secret', got '%s'", current.Secret)
 	}
-	if config.AccessTokenTTL != time.Hour {
-		t.Errorf("Expected custom access token TTL to be 1 hour, got %v", config.AccessTokenTTL)
+	if current.AccessTokenTTL != time.Hour {
+		t.Errorf("Expected custom access token TTL to be 1 hour, got %v", current.AccessTokenTTL)
 	}
-	if config.RefreshTokenTTL != 30*24*time.Hour {
-		t.Errorf("Expected custom refresh token TTL to be 30 days, got %v", config.RefreshTokenTTL)
+	if current.RefreshTokenTTL != 30*24*time.Hour {
+		t.Errorf("Expected custom refresh token TTL to be 30 days, got %v", current.RefreshTokenTTL)
 	}
 }
 
@@ -529,5 +531,29 @@ func TestLogout(t *testing.T) {
 		t.Error("ValidateAccessToken() should return error after logout")
 	} else if err.Error() != "token revoked" {
 		t.Errorf("Expected 'token revoked' error, got %v", err)
+	}
+}
+
+func TestManager_Isolation(t *testing.T) {
+	storeA := newMockStore()
+	storeB := newMockStore()
+	managerA := NewManager(Config{
+		Secret: "secret-a",
+		Store:  storeA,
+	})
+	managerB := NewManager(Config{
+		Secret: "secret-b",
+		Store:  storeB,
+	})
+
+	pairA, err := managerA.GenerateTokenPair("user-a", "alice", "device-a")
+	if err != nil {
+		t.Fatalf("managerA.GenerateTokenPair() error = %v", err)
+	}
+	if _, err := managerA.ValidateAccessToken(pairA.AccessToken); err != nil {
+		t.Fatalf("managerA.ValidateAccessToken() error = %v", err)
+	}
+	if _, err := managerB.ValidateAccessToken(pairA.AccessToken); err == nil {
+		t.Fatal("expected managerB validation to fail for managerA token")
 	}
 }

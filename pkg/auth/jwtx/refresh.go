@@ -7,9 +7,9 @@ import (
 
 // Refresh validates a refresh token and generates a new token pair.
 // Deletes the used refresh token from the store after successful validation.
-func Refresh(refreshToken string) (*TokenPair, error) {
-
-	claims, err := decodeClaims(refreshToken)
+func (m *Manager) Refresh(refreshToken string) (*TokenPair, error) {
+	cfg := m.Config()
+	claims, err := m.decodeClaims(refreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -24,20 +24,24 @@ func Refresh(refreshToken string) (*TokenPair, error) {
 
 	key := "refresh:" + claims.TokenID
 
-	if config.Store != nil {
+	if cfg.Store != nil {
 
-		_, err = config.Store.Get(key)
+		_, err = cfg.Store.Get(key)
 
 		if err != nil {
 			return nil, errors.New("refresh token invalid")
 		}
 
-		config.Store.Del(key)
+		cfg.Store.Del(key)
 	}
 
-	return GenerateTokenPair(
+	return m.GenerateTokenPair(
 		claims.UserID,
 		claims.Username,
 		claims.DeviceID,
 	)
+}
+
+func Refresh(refreshToken string) (*TokenPair, error) {
+	return DefaultManager().Refresh(refreshToken)
 }

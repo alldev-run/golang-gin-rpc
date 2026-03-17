@@ -426,15 +426,15 @@ func TestEnhancedMetricsCollector(t *testing.T) {
 	
 	// Test security metrics
 	if collector.authAttemptsTotal != nil {
-		collector.authAttemptsTotal.WithLabelValues("jwt").Inc()
+		collector.authAttemptsTotal.WithLabelValues("grpc", "auth-service", "login").Inc()
 	}
 	
 	if collector.authFailuresTotal != nil {
-		collector.authFailuresTotal.WithLabelValues("jwt").Inc()
+		collector.authFailuresTotal.WithLabelValues("grpc", "auth-service", "login").Inc()
 	}
 	
 	if collector.rateLimitHitsTotal != nil {
-		collector.rateLimitHitsTotal.WithLabelValues("ip").Inc()
+		collector.rateLimitHitsTotal.WithLabelValues("http", "gateway", "/api/orders").Inc()
 	}
 	
 	// Test cache metrics

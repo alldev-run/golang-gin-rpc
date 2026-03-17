@@ -71,34 +71,30 @@ type MemcacheStorageConfig struct {
 }
 
 // Validate validates the configuration.
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
+	if c == nil {
+		return nil
+	}
 	if c.StorageType == "" {
 		c.StorageType = StorageTypeFile
 	}
-	
 	if c.StoragePath == "" {
 		c.StoragePath = "/tmp/failover_cache"
 	}
-	
 	if c.FileSuffix == "" {
 		c.FileSuffix = ".failover"
 	}
-	
 	if c.MaxRetries <= 0 {
 		c.MaxRetries = 3
 	}
-	
 	if c.RetryDelay <= 0 {
 		c.RetryDelay = 1 * time.Second
 	}
-	
 	if c.HealthCheckInterval <= 0 {
 		c.HealthCheckInterval = 30 * time.Second
 	}
-	
 	if len(c.FallbackOrder) == 0 {
 		c.FallbackOrder = []string{"file", "memory"}
 	}
-	
 	return nil
 }

@@ -94,3 +94,75 @@ func TestAuthManager_IsEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthConfigValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  AuthConfig
+		wantErr bool
+	}{
+		{
+			name: "disabled auth allows empty secret",
+			config: AuthConfig{
+				Enabled: false,
+			},
+		},
+		{
+			name: "enabled auth requires secret",
+			config: AuthConfig{
+				Enabled: true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "enabled auth with secret is valid",
+			config: AuthConfig{
+				Enabled: true,
+				JWT: jwtx.Config{
+					Secret: "test-secret",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr && err == nil {
+				t.Fatal("expected validation error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected validation error: %v", err)
+			}
+		})
+	}
+}
+
+func TestNewAuthManager_InvalidConfigIsNotReady(t *testing.T) {
+	manager := NewAuthManager(AuthConfig{
+		Enabled: true,
+	})
+
+	if manager.IsReady() {
+		t.Fatal("expected auth manager to be not ready")
+	}
+	if manager.ValidationError() == nil {
+		t.Fatal("expected validation error to be exposed")
+	}
+}
+
+func TestNewAuthManager_ValidConfigIsReady(t *testing.T) {
+	manager := NewAuthManager(AuthConfig{
+		Enabled: true,
+		JWT: jwtx.Config{
+			Secret: "test-secret",
+		},
+	})
+
+	if !manager.IsReady() {
+		t.Fatal("expected auth manager to be ready")
+	}
+	if manager.ValidationError() != nil {
+		t.Fatalf("unexpected validation error: %v", manager.ValidationError())
+	}
+}

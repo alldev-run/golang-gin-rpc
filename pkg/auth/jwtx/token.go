@@ -15,15 +15,15 @@ type TokenPair struct {
 }
 
 // GenerateTokenPair generates a new pair of access and refresh tokens for a user.
-func GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
-
+func (m *Manager) GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
+	cfg := m.Config()
 	now := time.Now()
 
 	version := 1
 
-	if config.Store != nil {
+	if cfg.Store != nil {
 
-		v, err := config.Store.Get("user:version:" + userID)
+		v, err := cfg.Store.Get("user:version:" + userID)
 
 		if err == nil {
 
@@ -43,7 +43,7 @@ func GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
 		Type:    TokenTypeAccess,
 
 		IssuedAt: now,
-		ExpireAt: now.Add(config.AccessTokenTTL),
+		ExpireAt: now.Add(cfg.AccessTokenTTL),
 	}
 
 	refresh := Claims{
@@ -56,25 +56,25 @@ func GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
 		Type:    TokenTypeRefresh,
 
 		IssuedAt: now,
-		ExpireAt: now.Add(config.RefreshTokenTTL),
+		ExpireAt: now.Add(cfg.RefreshTokenTTL),
 	}
 
-	accessToken, err := encodeClaims(access)
+	accessToken, err := m.encodeClaims(access)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := encodeClaims(refresh)
+	refreshToken, err := m.encodeClaims(refresh)
 	if err != nil {
 		return nil, err
 	}
 
-	if config.Store != nil {
+	if cfg.Store != nil {
 
-		config.Store.Set(
+		cfg.Store.Set(
 			"refresh:"+refresh.TokenID,
 			userID,
-			config.RefreshTokenTTL,
+			cfg.RefreshTokenTTL,
 		)
 	}
 
@@ -86,9 +86,9 @@ func GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
 
 // ValidateAccessToken validates an access token and returns its claims.
 // Checks token type, expiration, blacklist status, and user version.
-func ValidateAccessToken(token string) (*Claims, error) {
-
-	claims, err := decodeClaims(token)
+func (m *Manager) ValidateAccessToken(token string) (*Claims, error) {
+	cfg := m.Config()
+	claims, err := m.decodeClaims(token)
 	if err != nil {
 		return nil, err
 	}
@@ -101,15 +101,15 @@ func ValidateAccessToken(token string) (*Claims, error) {
 		return nil, errors.New("token expired")
 	}
 
-	if config.Store != nil {
+	if cfg.Store != nil {
 
-		_, err = config.Store.Get("blacklist:" + claims.TokenID)
+		_, err = cfg.Store.Get("blacklist:" + claims.TokenID)
 
 		if err == nil {
 			return nil, errors.New("token revoked")
 		}
 
-		v, err := config.Store.Get("user:version:" + claims.UserID)
+		v, err := cfg.Store.Get("user:version:" + claims.UserID)
 
 		if err == nil {
 
@@ -122,4 +122,12 @@ func ValidateAccessToken(token string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+func GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
+	return DefaultManager().GenerateTokenPair(userID, username, deviceID)
+}
+
+func ValidateAccessToken(token string) (*Claims, error) {
+	return DefaultManager().ValidateAccessToken(token)
 }
