@@ -63,8 +63,8 @@ package main
 
 import (
     "github.com/gin-gonic/gin"
-    "golang-gin-rpc/internal/bootstrap"
-    "golang-gin-rpc/pkg/gateway"
+    "alldev-gin-rpc/internal/bootstrap"
+    "alldev-gin-rpc/pkg/gateway"
 )
 
 func main() {
@@ -99,7 +99,7 @@ func main() {
 package main
 
 import (
-    "golang-gin-rpc/pkg/gateway"
+    "alldev-gin-rpc/pkg/gateway"
 )
 
 func main() {

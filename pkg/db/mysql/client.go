@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"golang-gin-rpc/pkg/db/orm"
+	"alldev-gin-rpc/pkg/db/orm"
 
 	_ "github.com/go-sql-driver/mysql"
 )

@@ -2,7 +2,7 @@ package auth
 
 import (
 	"testing"
-	"golang-gin-rpc/pkg/auth/jwtx"
+	"alldev-gin-rpc/pkg/auth/jwtx"
 )
 
 func TestNewAuthManager(t *testing.T) {
@@ -16,16 +16,14 @@ func TestNewAuthManager(t *testing.T) {
 			config: AuthConfig{
 				Enabled: true,
 				JWT: jwtx.Config{
-					SecretKey: "test-secret",
-					Issuer:    "test-issuer",
+					Secret: "test-secret",
 				},
 			},
 			want: &AuthManager{
 				config: AuthConfig{
 					Enabled: true,
 					JWT: jwtx.Config{
-						SecretKey: "test-secret",
-						Issuer:    "test-issuer",
+						Secret: "test-secret",
 					},
 				},
 			},
@@ -35,16 +33,14 @@ func TestNewAuthManager(t *testing.T) {
 			config: AuthConfig{
 				Enabled: false,
 				JWT: jwtx.Config{
-					SecretKey: "test-secret",
-					Issuer:    "test-issuer",
+					Secret: "test-secret",
 				},
 			},
 			want: &AuthManager{
 				config: AuthConfig{
 					Enabled: false,
 					JWT: jwtx.Config{
-						SecretKey: "test-secret",
-						Issuer:    "test-issuer",
+						Secret: "test-secret",
 					},
 				},
 			},
@@ -60,11 +56,8 @@ func TestNewAuthManager(t *testing.T) {
 			if got.config.Enabled != tt.want.config.Enabled {
 				t.Errorf("NewAuthManager().config.Enabled = %v, want %v", got.config.Enabled, tt.want.config.Enabled)
 			}
-			if got.config.JWT.SecretKey != tt.want.config.JWT.SecretKey {
-				t.Errorf("NewAuthManager().config.JWT.SecretKey = %v, want %v", got.config.JWT.SecretKey, tt.want.config.JWT.SecretKey)
-			}
-			if got.config.JWT.Issuer != tt.want.config.JWT.Issuer {
-				t.Errorf("NewAuthManager().config.JWT.Issuer = %v, want %v", got.config.JWT.Issuer, tt.want.config.JWT.Issuer)
+			if got.config.JWT.Secret != tt.want.config.JWT.Secret {
+				t.Errorf("NewAuthManager().config.JWT.Secret = %v, want %v", got.config.JWT.Secret, tt.want.config.JWT.Secret)
 			}
 		})
 	}

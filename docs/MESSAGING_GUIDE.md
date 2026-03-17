@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-This guide covers the messaging system that provides unified support for multiple messaging systems in the golang-gin-rpc framework, including **RabbitMQ**, **Apache Kafka**, and future support for additional systems.
+This guide covers the messaging system that provides unified support for multiple messaging systems in the alldev-gin-rpc framework, including **RabbitMQ**, **Apache Kafka**, and future support for additional systems.
 
 ## 🏗️ Architecture
 
@@ -129,7 +129,7 @@ import (
     "log"
     "time"
     
-    "golang-gin-rpc/pkg/messaging"
+    "alldev-gin-rpc/pkg/messaging"
 )
 
 func main() {
@@ -196,7 +196,7 @@ import (
     "log"
     "time"
     
-    "golang-gin-rpc/pkg/messaging"
+    "alldev-gin-rpc/pkg/messaging"
 )
 
 func main() {

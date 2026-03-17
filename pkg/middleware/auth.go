@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"golang-gin-rpc/pkg/auth/jwtx"
-	"golang-gin-rpc/pkg/response"
+	"alldev-gin-rpc/pkg/auth/jwtx"
+	"alldev-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

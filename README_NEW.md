@@ -18,7 +18,7 @@
 ## 📁 项目结构
 
 ```
-golang-gin-rpc/
+alldev-gin-rpc/
 ├── cmd/                    # 应用程序入口
 │   └── server/
 │       └── main.go
@@ -271,7 +271,7 @@ docker-compose down
 make docker-build
 
 # 运行容器
-docker run -p 8080:8080 golang-gin-rpc:latest
+docker run -p 8080:8080 alldev-gin-rpc:latest
 ```
 
 ## 📊 监控和日志
@@ -336,7 +336,7 @@ func TestUserAPI(t *testing.T) {
 
 1. 查看 [文档](docs/)
 2. 查看 [示例](examples/)
-3. 提交 [Issue](https://github.com/your-username/golang-gin-rpc/issues)
+3. 提交 [Issue](https://github.com/your-username/alldev-gin-rpc/issues)
 4. 联系维护者
 
 ## 🔄 更新日志

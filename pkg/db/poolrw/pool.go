@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/db"
-	"golang-gin-rpc/pkg/db/rwproxy"
+	"alldev-gin-rpc/pkg/db"
+	"alldev-gin-rpc/pkg/db/rwproxy"
 )
 
 // RWPoolConfig holds configuration for the integrated pool.

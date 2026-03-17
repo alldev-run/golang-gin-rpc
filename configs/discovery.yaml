@@ -7,7 +7,7 @@ discovery:
   timeout: 30s
   health_check_interval: 30s
   auto_register: true
-  service_name: "golang-gin-rpc"
+  service_name: "alldev-gin-rpc"
   service_address: "localhost"
   service_port: 8080
   service_tags:

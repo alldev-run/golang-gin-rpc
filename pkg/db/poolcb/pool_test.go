@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"golang-gin-rpc/pkg/db"
-	"golang-gin-rpc/pkg/db/circuitbreaker"
-	"golang-gin-rpc/pkg/db/pool"
+	"alldev-gin-rpc/pkg/db"
+	"alldev-gin-rpc/pkg/db/circuitbreaker"
+	"alldev-gin-rpc/pkg/db/pool"
 )
 
 func TestDefaultConfig(t *testing.T) {

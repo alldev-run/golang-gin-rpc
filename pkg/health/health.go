@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/cache"
+	"alldev-gin-rpc/pkg/cache"
 )
 
 // HealthStatus represents the health status

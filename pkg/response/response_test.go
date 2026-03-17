@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"golang-gin-rpc/pkg/status_code"
+	"alldev-gin-rpc/pkg/status_code"
 )
 
 func TestResponse_Struct(t *testing.T) {

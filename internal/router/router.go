@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	
-	"golang-gin-rpc/internal/app"
-	"golang-gin-rpc/pkg/response"
+	"alldev-gin-rpc/internal/app"
+	"alldev-gin-rpc/pkg/response"
 )
 
 // Router handles route registration
@@ -27,7 +27,7 @@ func (r *Router) RegisterRoutes() {
 	router.GET("/health", func(c *gin.Context) {
 		response.Success(c, gin.H{
 			"status": "healthy",
-			"service": "golang-gin-rpc",
+			"service": "alldev-gin-rpc",
 		})
 	})
 

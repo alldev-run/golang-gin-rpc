@@ -1,4 +1,4 @@
-# golang-gin-rpc
+# alldev-gin-rpc
 
 A lightweight Go project showcasing a MySQL client with fluent query builders, connection pooling, and transaction support.
 

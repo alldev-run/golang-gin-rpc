@@ -11,11 +11,12 @@ import (
 
 func TestTracerProvider(t *testing.T) {
 	config := Config{
+		Type:              "zipkin",
 		ServiceName:       "test-service",
 		ServiceVersion:    "1.0.0",
 		Environment:       "test",
 		Enabled:           false, // Disabled for testing
-		ZipkinURL:         "http://localhost:9411/api/v2/spans",
+		Endpoint:          "http://localhost:9411/api/v2/spans",
 		SampleRate:        1.0,
 		BatchTimeout:      5 * time.Second,
 		MaxExportBatchSize: 512,
@@ -43,6 +44,7 @@ func TestGlobalTracer(t *testing.T) {
 
 	// Test initialization with config
 	config := Config{
+		Type:        "zipkin",
 		ServiceName: "test-global",
 		Enabled:     false,
 	}
@@ -57,6 +59,7 @@ func TestGlobalTracer(t *testing.T) {
 
 func TestSpanOperations(t *testing.T) {
 	config := Config{
+		Type:        "zipkin",
 		ServiceName: "test-spans",
 		Enabled:     false,
 	}
@@ -94,6 +97,7 @@ func TestSpanOperations(t *testing.T) {
 
 func TestHTTPTracing(t *testing.T) {
 	config := Config{
+		Type:        "zipkin",
 		ServiceName: "test-http",
 		Enabled:     false,
 	}
@@ -116,6 +120,7 @@ func TestHTTPTracing(t *testing.T) {
 
 func TestGRPCInterceptor(t *testing.T) {
 	config := Config{
+		Type:        "zipkin",
 		ServiceName: "test-grpc",
 		Enabled:     false,
 	}
@@ -144,7 +149,7 @@ func TestGRPCInterceptor(t *testing.T) {
 func TestConfiguration(t *testing.T) {
 	// Test default config
 	config := DefaultConfig()
-	assert.Equal(t, "golang-gin-rpc", config.ServiceName)
+	assert.Equal(t, "alldev-gin-rpc", config.ServiceName)
 	assert.Equal(t, "1.0.0", config.ServiceVersion)
 	assert.Equal(t, "development", config.Environment)
 	assert.False(t, config.Enabled)
@@ -165,6 +170,7 @@ func TestConfiguration(t *testing.T) {
 
 func BenchmarkSpanCreation(b *testing.B) {
 	config := Config{
+		Type:        "zipkin",
 		ServiceName: "benchmark",
 		Enabled:     false,
 	}
@@ -181,6 +187,7 @@ func BenchmarkSpanCreation(b *testing.B) {
 
 func BenchmarkAttributeSetting(b *testing.B) {
 	config := Config{
+		Type:        "zipkin",
 		ServiceName: "benchmark",
 		Enabled:     false,
 	}

@@ -56,7 +56,7 @@ logger:
 tracing:
   zipkin:
     type: "zipkin"
-    service_name: "golang-gin-rpc"
+    service_name: "alldev-gin-rpc"
     service_version: "1.0.0"
     environment: "development"
     enabled: false
@@ -74,7 +74,7 @@ tracing:
   
   jaeger:
     type: "jaeger"
-    service_name: "golang-gin-rpc"
+    service_name: "alldev-gin-rpc"
     service_version: "1.0.0"
     environment: "development"
     enabled: false
@@ -92,7 +92,7 @@ tracing:
   
   otlp:
     type: "otlp"
-    service_name: "golang-gin-rpc"
+    service_name: "alldev-gin-rpc"
     service_version: "1.0.0"
     environment: "development"
     enabled: false
@@ -146,7 +146,7 @@ discovery:
   timeout: 30s
   health_check_interval: 30s
   auto_register: true
-  service_name: "golang-gin-rpc"
+  service_name: "alldev-gin-rpc"
   service_address: "localhost"
   service_port: 8080
   service_tags:

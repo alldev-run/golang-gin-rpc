@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"golang-gin-rpc/pkg/cache/failover"
-	"golang-gin-rpc/pkg/db/orm"
+	"alldev-gin-rpc/pkg/cache/failover"
+	"alldev-gin-rpc/pkg/db/orm"
 )
 
 func main() {

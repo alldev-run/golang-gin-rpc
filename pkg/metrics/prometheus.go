@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

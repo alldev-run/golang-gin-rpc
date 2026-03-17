@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"golang-gin-rpc/pkg/db/mysql"
-	"golang-gin-rpc/pkg/cache/redis"
+	"alldev-gin-rpc/pkg/db/mysql"
+	"alldev-gin-rpc/pkg/cache/redis"
 )
 
 func TestDefaultConfig(t *testing.T) {

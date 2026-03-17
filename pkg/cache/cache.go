@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/cache/redis"
-	"golang-gin-rpc/pkg/cache/memcache"
-	"golang-gin-rpc/pkg/cache/failover"
+	"alldev-gin-rpc/pkg/cache/redis"
+	"alldev-gin-rpc/pkg/cache/memcache"
+	"alldev-gin-rpc/pkg/cache/failover"
 )
 
 // redisAdapter adapts redis.Client to Cache interface

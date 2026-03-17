@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 
 	"golang.org/x/time/rate"
 )

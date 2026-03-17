@@ -2,9 +2,20 @@ package failover
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
+
+// StorageError represents a storage operation error
+type StorageError struct {
+	Type    string
+	Message string
+}
+
+func (e *StorageError) Error() string {
+	return fmt.Sprintf("storage %s error: %s", e.Type, e.Message)
+}
 
 // MockStorage implements Storage interface for testing
 type MockStorage struct {
@@ -52,6 +63,14 @@ func (m *MockStorage) Clear(ctx context.Context) error {
 	return nil
 }
 
+func (m *MockStorage) Keys(ctx context.Context) []string {
+	keys := make([]string, 0, len(m.data))
+	for key := range m.data {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
 func (m *MockStorage) HealthCheck(ctx context.Context) error {
 	if !m.isHealthy {
 		return &StorageError{Type: "health", Message: "mock unhealthy"}
@@ -84,29 +103,27 @@ func TestNewFailoverCache(t *testing.T) {
 
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 
-	if fc.primary != primary {
-		t.Errorf("NewFailoverCache().primary = %v, want %v", fc.primary, primary)
+	if fc.GetPrimary() != primary {
+		t.Errorf("NewFailoverCache().primary = %v, want %v", fc.GetPrimary(), primary)
 	}
-	if fc.secondary != secondary {
-		t.Errorf("NewFailoverCache().secondary = %v, want %v", fc.secondary, secondary)
+	if fc.GetSecondary() != secondary {
+		t.Errorf("NewFailoverCache().secondary = %v, want %v", fc.GetSecondary(), secondary)
 	}
-	if fc.tertiary != tertiary {
-		t.Errorf("NewFailoverCache().tertiary = %v, want %v", fc.tertiary, tertiary)
+	if fc.GetTertiary() != tertiary {
+		t.Errorf("NewFailoverCache().tertiary = %v, want %v", fc.GetTertiary(), tertiary)
 	}
-	if fc.maxRetries != 3 {
-		t.Errorf("NewFailoverCache().maxRetries = %v, want %v", fc.maxRetries, 3)
+	if fc.GetMaxRetries() != 3 {
+		t.Errorf("NewFailoverCache().maxRetries = %v, want %v", fc.GetMaxRetries(), 3)
 	}
-	if fc.retryDelay != time.Millisecond*100 {
-		t.Errorf("NewFailoverCache().retryDelay = %v, want %v", fc.retryDelay, time.Millisecond*100)
+	if fc.GetRetryDelay() != time.Millisecond*100 {
+		t.Errorf("NewFailoverCache().retryDelay = %v, want %v", fc.GetRetryDelay(), time.Millisecond*100)
 	}
-	if fc.healthCheckInterval != time.Millisecond*500 {
-		t.Errorf("NewFailoverCache().healthCheckInterval = %v, want %v", fc.healthCheckInterval, time.Millisecond*500)
+	if fc.GetHealthCheckInterval() != time.Millisecond*500 {
+		t.Errorf("NewFailoverCache().healthCheckInterval = %v, want %v", fc.GetHealthCheckInterval(), time.Millisecond*500)
 	}
 
 	// Clean up
-	if fc.healthTicker != nil {
-		fc.healthTicker.Stop()
-	}
+	fc.Stop()
 }
 
 func TestFailoverCache_Get_PrimarySuccess(t *testing.T) {
@@ -264,8 +281,8 @@ func TestFailoverCache_Set_SecondaryFallback(t *testing.T) {
 		}
 	}()
 
-	// Make primary fail
-	primary.SetShouldFail(true)
+	// Make primary unhealthy
+	primary.SetHealthy(false)
 
 	// Set should fallback to secondary
 	err := fc.Set(context.Background(), "test-key", "test-value", 0)

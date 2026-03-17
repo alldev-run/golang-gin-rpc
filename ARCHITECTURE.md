@@ -4,7 +4,7 @@
 
 ### 1. **项目结构优化**
 ```
-golang-gin-rpc/
+alldev-gin-rpc/
 ├── internal/               # ✅ 新增内部包
 │   ├── app/               # ✅ 应用程序核心
 │   ├── bootstrap/         # ✅ 初始化引导
@@ -117,7 +117,7 @@ make setup          # 项目初始化
 ```bash
 # 1. 克隆项目
 git clone <repository>
-cd golang-gin-rpc
+cd alldev-gin-rpc
 
 # 2. 安装依赖
 make deps

@@ -1,4 +1,4 @@
-module golang-gin-rpc
+module alldev-gin-rpc
 
 go 1.25.7
 

@@ -1,6 +1,6 @@
 # Tracing Configuration
 tracing:
-  service_name: "golang-gin-rpc"
+  service_name: "alldev-gin-rpc"
   service_version: "1.0.0"
   environment: "development"
   enabled: true

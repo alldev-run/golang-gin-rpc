@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"golang-gin-rpc/pkg/db/orm"
+	"alldev-gin-rpc/pkg/db/orm"
 )
 
 func main() {

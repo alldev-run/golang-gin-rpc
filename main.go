@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"golang-gin-rpc/internal/app"
-	"golang-gin-rpc/internal/bootstrap"
-	"golang-gin-rpc/internal/router"
-	"golang-gin-rpc/pkg/tracing"
+	"alldev-gin-rpc/internal/app"
+	"alldev-gin-rpc/internal/bootstrap"
+	"alldev-gin-rpc/internal/router"
+	"alldev-gin-rpc/pkg/tracing"
 )
 
 func main() {
@@ -74,10 +74,6 @@ func main() {
 	router := router.NewRouter(application)
 	router.RegisterRoutes()
 
-	// Setup graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Handle signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -101,7 +97,5 @@ func main() {
 		log.Printf("Error during shutdown: %v", err)
 	}
 
-	// Cancel main context
-	cancel()
 	log.Println("Application shutdown complete")
 }

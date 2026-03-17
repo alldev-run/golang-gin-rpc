@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // Config holds slow query logger configuration.

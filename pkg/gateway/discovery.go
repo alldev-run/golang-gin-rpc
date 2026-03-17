@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/discovery"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/discovery"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // ServiceDiscovery integrates with existing discovery package

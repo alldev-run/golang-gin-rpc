@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"golang-gin-rpc/pkg/tracing"
+	"alldev-gin-rpc/pkg/tracing"
 )
 
 // Tracing creates a new Gin tracing middleware

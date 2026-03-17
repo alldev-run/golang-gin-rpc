@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"golang-gin-rpc/pkg/cache"
-	"golang-gin-rpc/pkg/errors"
-	"golang-gin-rpc/pkg/health"
-	"golang-gin-rpc/pkg/metrics"
-	"golang-gin-rpc/pkg/db/pool"
+	"alldev-gin-rpc/pkg/cache"
+	"alldev-gin-rpc/pkg/errors"
+	"alldev-gin-rpc/pkg/health"
+	"alldev-gin-rpc/pkg/metrics"
+	"alldev-gin-rpc/pkg/db/pool"
 
 	"github.com/gin-gonic/gin"
 )

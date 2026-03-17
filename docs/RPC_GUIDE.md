@@ -66,8 +66,8 @@ package main
 
 import (
     "context"
-    "golang-gin-rpc/pkg/rpc"
-    "golang-gin-rpc/pkg/rpc/examples"
+    "alldev-gin-rpc/pkg/rpc"
+    "alldev-gin-rpc/pkg/rpc/examples"
 )
 
 // 创建自定义服务
@@ -101,8 +101,8 @@ package main
 
 import (
     "log"
-    "golang-gin-rpc/internal/bootstrap"
-    "golang-gin-rpc/pkg/rpc/examples"
+    "alldev-gin-rpc/internal/bootstrap"
+    "alldev-gin-rpc/pkg/rpc/examples"
 )
 
 func main() {
@@ -153,7 +153,7 @@ package main
 import (
     "context"
     "log"
-    "golang-gin-rpc/pkg/rpc/grpc"
+    "alldev-gin-rpc/pkg/rpc/grpc"
 )
 
 func main() {
@@ -179,8 +179,8 @@ package main
 import (
     "context"
     "log"
-    "golang-gin-rpc/pkg/rpc/jsonrpc"
-    "golang-gin-rpc/pkg/rpc/examples"
+    "alldev-gin-rpc/pkg/rpc/jsonrpc"
+    "alldev-gin-rpc/pkg/rpc/examples"
 )
 
 func main() {

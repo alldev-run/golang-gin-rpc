@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
-	"golang-gin-rpc/pkg/metrics"
+	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/metrics"
 
 	"go.uber.org/zap"
 )
@@ -287,7 +287,7 @@ func (p *EnhancedPool) Transaction(ctx context.Context, fn func(*sql.Tx) error) 
 	
 	if err := fn(tx); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			logger.Error("Failed to rollback transaction",
+			logger.Errorf("Failed to rollback transaction",
 				zap.Error(err),
 				zap.Error(rbErr))
 		}
@@ -358,7 +358,7 @@ func (p *EnhancedPool) performHealthCheck() {
 	p.mu.Unlock()
 	
 	if err != nil {
-		logger.Error("Database health check failed",
+		logger.Errorf("Database health check failed",
 			zap.Error(err),
 			zap.Time("last_check", p.lastHealthCheck))
 	} else {

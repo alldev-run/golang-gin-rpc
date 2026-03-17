@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // LoadBalancerFactory creates load balancers
@@ -29,7 +29,7 @@ func (f *LoadBalancerFactory) Create(strategy string) LoadBalancer {
 	case "least_connections":
 		return NewLeastConnectionsLoadBalancer()
 	default:
-		logger.Warnf("Unknown load balancer strategy: %s, using round_robin", strategy)
+		logger.Warn("Unknown load balancer strategy, using round_robin", logger.String("strategy", strategy))
 		return NewRoundRobinLoadBalancer()
 	}
 }
@@ -60,7 +60,7 @@ func (lb *RoundRobinLoadBalancer) Select(targets []string) (string, error) {
 	index := atomic.AddUint64(&lb.current, 1) - 1
 	selected := currentTargets[index%uint64(len(currentTargets))]
 
-	logger.Debugf("RoundRobin selected target: %s", selected)
+	logger.Debug("RoundRobin selected target", logger.String("target", selected))
 	return selected, nil
 }
 
@@ -72,7 +72,7 @@ func (lb *RoundRobinLoadBalancer) UpdateTargets(targets []string) {
 	lb.targets = make([]string, len(targets))
 	copy(lb.targets, targets)
 	
-	logger.Debugf("RoundRobin updated targets: %v", targets)
+	logger.Debug("RoundRobin updated targets", logger.Any("targets", targets))
 }
 
 // RandomLoadBalancer implements random load balancing
@@ -102,7 +102,7 @@ func (lb *RandomLoadBalancer) Select(targets []string) (string, error) {
 	index := lb.rand.Intn(len(currentTargets))
 	selected := currentTargets[index]
 
-	logger.Debugf("Random selected target: %s", selected)
+	logger.Debug("Random selected target", logger.String("target", selected))
 	return selected, nil
 }
 
@@ -114,7 +114,7 @@ func (lb *RandomLoadBalancer) UpdateTargets(targets []string) {
 	lb.targets = make([]string, len(targets))
 	copy(lb.targets, targets)
 	
-	logger.Debugf("Random updated targets: %v", targets)
+	logger.Debug("Random updated targets", logger.Any("targets", targets))
 }
 
 // WeightedLoadBalancer implements weighted load balancing
@@ -166,14 +166,14 @@ func (lb *WeightedLoadBalancer) Select(targets []string) (string, error) {
 	for _, target := range currentTargets {
 		currentWeight += target.Weight
 		if random < currentWeight {
-			logger.Debugf("Weighted selected target: %s (weight: %d)", target.Address, target.Weight)
+			logger.Debug("Weighted selected target", logger.String("target", target.Address), logger.Int("weight", target.Weight))
 			return target.Address, nil
 		}
 	}
 
 	// Fallback to first target
 	selected := currentTargets[0].Address
-	logger.Debugf("Weighted fallback selected target: %s", selected)
+	logger.Debug("Weighted fallback selected target", logger.String("target", selected))
 	return selected, nil
 }
 
@@ -191,7 +191,7 @@ func (lb *WeightedLoadBalancer) UpdateTargets(targets []string) {
 		}
 	}
 	
-	logger.Debugf("Weighted updated targets: %v", targets)
+	logger.Debug("Weighted updated targets", logger.Any("targets", targets))
 }
 
 // SetWeights sets weights for targets
@@ -202,7 +202,7 @@ func (lb *WeightedLoadBalancer) SetWeights(weightedTargets []WeightedTarget) {
 	lb.targets = make([]WeightedTarget, len(weightedTargets))
 	copy(lb.targets, weightedTargets)
 	
-	logger.Debugf("Weighted set weights: %v", weightedTargets)
+	logger.Debug("Weighted set weights", logger.Any("weights", weightedTargets))
 }
 
 // LeastConnectionsLoadBalancer implements least connections load balancing
@@ -246,7 +246,7 @@ func (lb *LeastConnectionsLoadBalancer) Select(targets []string) (string, error)
 	// Increment connection count
 	atomic.AddInt32(&selected.Connections, 1)
 
-	logger.Debugf("LeastConnections selected target: %s (connections: %d)", selected.Address, selected.Connections)
+	logger.Debug("LeastConnections selected target", logger.String("target", selected.Address), logger.Int("connections", int(selected.Connections)))
 	return selected.Address, nil
 }
 
@@ -263,7 +263,7 @@ func (lb *LeastConnectionsLoadBalancer) UpdateTargets(targets []string) {
 		}
 	}
 	
-	logger.Debugf("LeastConnections updated targets: %v", targets)
+	logger.Debug("LeastConnections updated targets", logger.Any("targets", targets))
 }
 
 // ReleaseConnection releases a connection for a target

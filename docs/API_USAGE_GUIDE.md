@@ -22,9 +22,9 @@ package main
 
 import (
     "context"
-    "golang-gin-rpc/pkg/db"
-    "golang-gin-rpc/pkg/mysql"
-    "golang-gin-rpc/pkg/redis"
+    "alldev-gin-rpc/pkg/db"
+    "alldev-gin-rpc/pkg/mysql"
+    "alldev-gin-rpc/pkg/redis"
 )
 
 func main() {
@@ -159,8 +159,8 @@ affected, err := result.RowsAffected()
 
 ```go
 import (
-    "golang-gin-rpc/pkg/db/pool"
-    "golang-gin-rpc/pkg/db"
+    "alldev-gin-rpc/pkg/db/pool"
+    "alldev-gin-rpc/pkg/db"
 )
 
 // Configure pool
@@ -234,7 +234,7 @@ if err := p.Unregister("mysql-main"); err != nil {
 ```go
 import (
     "database/sql"
-    "golang-gin-rpc/pkg/db/rwproxy"
+    "alldev-gin-rpc/pkg/db/rwproxy"
 )
 
 // Create master connection
@@ -314,7 +314,7 @@ if err := client.RemoveReplica(0); err != nil {
 ### Basic Circuit Breaker Usage
 
 ```go
-import "golang-gin-rpc/pkg/db/circuitbreaker"
+import "alldev-gin-rpc/pkg/db/circuitbreaker"
 
 // Create breaker
 config := circuitbreaker.Config{
@@ -399,7 +399,7 @@ breaker.ForceClosed()
 ### Wrapping Database Operations
 
 ```go
-import "golang-gin-rpc/pkg/db/slowquery"
+import "alldev-gin-rpc/pkg/db/slowquery"
 
 // Configure logger
 config := slowquery.Config{
@@ -466,7 +466,7 @@ logger.LogManual("complex_operation", duration, err,
 ### Creating Migrations
 
 ```go
-import "golang-gin-rpc/pkg/db/migration"
+import "alldev-gin-rpc/pkg/db/migration"
 
 // Create migrator
 m := migration.New(db)
@@ -543,7 +543,7 @@ if err := m.Down(ctx); err != nil {
 
 ```go
 import (
-    "golang-gin-rpc/pkg/db/metrics"
+    "alldev-gin-rpc/pkg/db/metrics"
     "github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -689,9 +689,9 @@ import (
     "time"
     
     "github.com/gin-gonic/gin"
-    "golang-gin-rpc/pkg/db"
-    "golang-gin-rpc/pkg/db/poolcb"
-    "golang-gin-rpc/pkg/mysql"
+    "alldev-gin-rpc/pkg/db"
+    "alldev-gin-rpc/pkg/db/poolcb"
+    "alldev-gin-rpc/pkg/mysql"
 )
 
 type Server struct {

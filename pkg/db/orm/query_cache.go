@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/cache/failover"
-	"golang-gin-rpc/pkg/cache/memcache"
-	"golang-gin-rpc/pkg/cache/redis"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/cache/failover"
+	"alldev-gin-rpc/pkg/cache/memcache"
+	"alldev-gin-rpc/pkg/cache/redis"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // CacheEntry represents a cached query result.
@@ -71,7 +71,7 @@ func (rc *RedisCache) Get(key string) (interface{}, bool) {
 
 	var result interface{}
 	if err := json.Unmarshal([]byte(data), &result); err != nil {
-		logger.Error("Failed to unmarshal cache data | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to unmarshal cache data", logger.String("key", key), logger.Error(err))
 		return nil, false
 	}
 
@@ -85,12 +85,12 @@ func (rc *RedisCache) Set(key string, value interface{}, ttl time.Duration) {
 
 	data, err := json.Marshal(value)
 	if err != nil {
-		logger.Error("Failed to marshal cache data | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to marshal cache data", logger.String("key", key), logger.Error(err))
 		return
 	}
 
 	if err := rc.client.Set(ctx, rc.keyPrefix+key, string(data), ttl); err != nil {
-		logger.Error("Failed to set cache | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to set cache", logger.String("key", key), logger.Error(err))
 	}
 }
 
@@ -100,7 +100,7 @@ func (rc *RedisCache) Delete(key string) {
 	defer cancel()
 
 	if err := rc.client.Del(ctx, rc.keyPrefix+key); err != nil {
-		logger.Error("Failed to delete cache | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to delete cache", logger.String("key", key), logger.Error(err))
 	}
 }
 
@@ -113,14 +113,14 @@ func (rc *RedisCache) Clear() {
 	rdb := rc.client.RDB()
 	keys, err := rdb.Keys(ctx, rc.keyPrefix+"*").Result()
 	if err != nil {
-		logger.Error("Failed to get cache keys for clear | error: " + err.Error())
+		logger.Errorf("Failed to get cache keys for clear", logger.Error(err))
 		return
 	}
 
 	if len(keys) > 0 {
 		err := rdb.Del(ctx, keys...).Err()
 		if err != nil {
-			logger.Error("Failed to clear cache | error: " + err.Error())
+			logger.Errorf("Failed to clear cache", logger.Error(err))
 		}
 	}
 }
@@ -133,7 +133,7 @@ func (rc *RedisCache) Keys() []string {
 	rdb := rc.client.RDB()
 	keys, err := rdb.Keys(ctx, rc.keyPrefix+"*").Result()
 	if err != nil {
-		logger.Error("Failed to get cache keys | error: " + err.Error())
+		logger.Errorf("Failed to get cache keys", logger.Error(err))
 		return nil
 	}
 
@@ -175,7 +175,7 @@ func (mc *MemcacheCache) Get(key string) (interface{}, bool) {
 
 	var result interface{}
 	if err := json.Unmarshal(item.Value, &result); err != nil {
-		logger.Error("Failed to unmarshal cache data | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to unmarshal cache data", logger.String("key", key), logger.Error(err))
 		return nil, false
 	}
 
@@ -189,7 +189,7 @@ func (mc *MemcacheCache) Set(key string, value interface{}, ttl time.Duration) {
 
 	data, err := json.Marshal(value)
 	if err != nil {
-		logger.Error("Failed to marshal cache data | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to marshal cache data", logger.String("key", key), logger.Error(err))
 		return
 	}
 
@@ -200,7 +200,7 @@ func (mc *MemcacheCache) Set(key string, value interface{}, ttl time.Duration) {
 	}
 
 	if err := mc.client.Set(ctx, item); err != nil {
-		logger.Error("Failed to set cache | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to set cache", logger.String("key", key), logger.Error(err))
 	}
 }
 
@@ -210,7 +210,7 @@ func (mc *MemcacheCache) Delete(key string) {
 	defer cancel()
 
 	if err := mc.client.Delete(ctx, mc.keyPrefix+key); err != nil {
-		logger.Error("Failed to delete cache | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to delete cache", logger.String("key", key), logger.Error(err))
 	}
 }
 
@@ -223,7 +223,7 @@ func (mc *MemcacheCache) Clear() {
 	// We'll need to track keys or use a different approach
 	// For now, we'll delete all cache
 	if err := mc.client.DeleteAll(ctx); err != nil {
-		logger.Error("Failed to clear cache | error: " + err.Error())
+		logger.Errorf("Failed to clear cache", logger.Error(err))
 	}
 }
 
@@ -511,13 +511,13 @@ func (fc *FileCache) Set(key string, value interface{}, ttl time.Duration) {
 
 	data, err := json.Marshal(entry)
 	if err != nil {
-		logger.Error("Failed to marshal cache data | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to marshal cache data", logger.String("key", key), logger.Error(err))
 		return
 	}
 
 	filePath := fc.getFilePath(key)
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		logger.Error("Failed to write cache file | key: " + key + " | error: " + err.Error())
+		logger.Errorf("Failed to write cache file | key: " + key + " | error: " + err.Error())
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -124,15 +125,27 @@ func (c *Client) IsSecure() bool {
 }
 
 // GetState returns the connection state
-func (c *Client) GetState() grpc.ConnectivityState {
+func (c *Client) GetState() connectivity.State {
 	return c.conn.GetState()
 }
 
 // WaitForReady waits for the connection to be ready
 func (c *Client) WaitForReady(ctx context.Context) error {
-	return c.conn.WaitForStateChange(ctx, func(state grpc.ConnectivityState) bool {
-		return state == grpc.Ready
-	})
+	currentState := c.conn.GetState()
+	if currentState == connectivity.Ready {
+		return nil
+	}
+	
+	changed := c.conn.WaitForStateChange(ctx, currentState)
+	if !changed {
+		return ctx.Err()
+	}
+	
+	finalState := c.conn.GetState()
+	if finalState == connectivity.Ready {
+		return nil
+	}
+	return fmt.Errorf("connection not ready, current state: %v", finalState)
 }
 
 // ClientPool manages a pool of gRPC clients
@@ -223,13 +236,13 @@ func (h *HealthChecker) CheckHealth(ctx context.Context) error {
 	state := h.client.GetState()
 	
 	switch state {
-	case grpc.Ready, grpc.Idle:
+	case connectivity.Ready, connectivity.Idle:
 		return nil
-	case grpc.Connecting:
+	case connectivity.Connecting:
 		return fmt.Errorf("service is connecting")
-	case grpc.TransientFailure:
+	case connectivity.TransientFailure:
 		return fmt.Errorf("service is in transient failure")
-	case grpc.Shutdown:
+	case connectivity.Shutdown:
 		return fmt.Errorf("service is shutdown")
 	default:
 		return fmt.Errorf("unknown service state: %v", state)

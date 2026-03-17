@@ -1,7 +1,7 @@
 # Golang Gin RPC Application Makefile
 
 # Application variables
-APP_NAME = golang-gin-rpc
+APP_NAME = alldev-gin-rpc
 BUILD_DIR = bin
 CONFIG_DIR = configs
 LOG_DIR = logs

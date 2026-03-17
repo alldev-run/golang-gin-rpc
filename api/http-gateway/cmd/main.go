@@ -11,7 +11,7 @@ import (
 
 	"go-micro/api/http-gateway/internal/middleware"
 	"go-micro/api/http-gateway/internal/router"
-	"golang-gin-rpc/pkg/tracing"
+	"alldev-gin-rpc/pkg/tracing"
 
 	"github.com/gin-gonic/gin"
 )

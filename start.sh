@@ -100,7 +100,7 @@ download_deps() {
 # Build the application
 build_app() {
     print_status "Building application..."
-    go build -o ./bin/golang-gin-rpc .
+    go build -o ./bin/alldev-gin-rpc .
     
     if [ $? -eq 0 ]; then
         print_status "Build successful"
@@ -117,7 +117,7 @@ run_app() {
     print_status "Health check endpoint: http://localhost:8080/health"
     print_status "Press Ctrl+C to stop the application"
     
-    ./bin/golang-gin-rpc
+    ./bin/alldev-gin-rpc
 }
 
 # Main execution
@@ -142,7 +142,7 @@ case "${1:-}" in
         print_status "Application built successfully"
         ;;
     "run")
-        if [ ! -f "./bin/golang-gin-rpc" ]; then
+        if [ ! -f "./bin/alldev-gin-rpc" ]; then
             print_warning "Binary not found, building first..."
             build_app
         fi

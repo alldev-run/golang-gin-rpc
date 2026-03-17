@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"golang-gin-rpc/pkg/auth/jwtx"
+	"alldev-gin-rpc/pkg/auth/jwtx"
 )
 
 // AuthConfig holds authentication configuration

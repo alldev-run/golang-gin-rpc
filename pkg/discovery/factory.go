@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"golang-gin-rpc/pkg/discovery/consul"
-	"golang-gin-rpc/pkg/discovery/etcd"
+	"alldev-gin-rpc/pkg/discovery/consul"
+	"alldev-gin-rpc/pkg/discovery/etcd"
 )
 
 // Config 统一定义注册中心配置

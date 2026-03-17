@@ -27,7 +27,7 @@ func TestInit(t *testing.T) {
 	logger.Debug("debug message")
 	logger.Info("info message")
 	logger.Warn("warn message")
-	logger.Error("error message")
+	logger.Errorf("error message")
 
 	// Test convenience functions
 	Debug("debug message")

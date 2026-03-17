@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // LogLevel represents the logging level.
@@ -106,7 +106,7 @@ func (sl *SQLLogger) LogQuery(queryLog *QueryLog) {
 
 	if queryLog.Error != nil {
 		logMsg += " | error: " + queryLog.Error.Error()
-		logger.Error(logMsg)
+		logger.Errorf(logMsg)
 		return
 	}
 
@@ -133,7 +133,7 @@ func (sl *SQLLogger) LogTransaction(operation string, duration time.Duration, er
 			" | operation: " + operation +
 			" | duration: " + duration.String() +
 			" | error: " + err.Error()
-		logger.Error(logMsg)
+		logger.Errorf(logMsg)
 	} else if sl.level >= LogLevelInfo {
 		logger.Info(logMsg)
 	}

@@ -38,7 +38,7 @@
 ## 📁 项目结构
 
 ```
-golang-gin-rpc/
+alldev-gin-rpc/
 ├── internal/                    # 内部包
 │   ├── app/                   # 应用核心
 │   ├── bootstrap/             # 启动引导
@@ -120,7 +120,7 @@ discovery:
   registry_type: "consul"
   registry_address: "localhost:8500"
   auto_register: true
-  service_name: "golang-gin-rpc"
+  service_name: "alldev-gin-rpc"
 ```
 
 ## 📊 API 端点

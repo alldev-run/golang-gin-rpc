@@ -27,7 +27,7 @@ func DefaultClientConfig() ClientConfig {
 		URL:        "http://localhost:8080/rpc",
 		Timeout:    30 * time.Second,
 		Headers:    make(map[string]string),
-		UserAgent:  "golang-gin-rpc-jsonrpc-client/1.0",
+		UserAgent:  "alldev-gin-rpc-jsonrpc-client/1.0",
 		MaxRetries: 3,
 		RetryDelay: 1 * time.Second,
 	}

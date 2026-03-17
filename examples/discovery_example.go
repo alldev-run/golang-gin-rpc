@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
-	"golang-gin-rpc/pkg/discovery"
-	"golang-gin-rpc/pkg/discovery/examples"
+	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/discovery"
+	"alldev-gin-rpc/pkg/discovery/examples"
 )
 
 func main() {
@@ -95,7 +95,7 @@ func registerExampleServices(manager *discovery.ServiceDiscoveryManager) {
 	defer cancel()
 
 	if err := manager.Register(ctx, userService); err != nil {
-		logger.Error("Failed to register user service", zap.Error(err))
+		logger.Errorf("Failed to register user service", zap.Error(err))
 	} else {
 		logger.Info("User service registered successfully")
 	}
@@ -113,7 +113,7 @@ func registerExampleServices(manager *discovery.ServiceDiscoveryManager) {
 	}
 
 	if err := manager.Register(ctx, orderService); err != nil {
-		logger.Error("Failed to register order service", zap.Error(err))
+		logger.Errorf("Failed to register order service", zap.Error(err))
 	} else {
 		logger.Info("Order service registered successfully")
 	}
@@ -131,7 +131,7 @@ func registerExampleServices(manager *discovery.ServiceDiscoveryManager) {
 	}
 
 	if err := manager.Register(ctx, paymentService); err != nil {
-		logger.Error("Failed to register payment service", zap.Error(err))
+		logger.Errorf("Failed to register payment service", zap.Error(err))
 	} else {
 		logger.Info("Payment service registered successfully")
 	}
@@ -173,7 +173,7 @@ func demoServiceDiscovery(selector *discovery.ServiceSelector) {
 	logger.Info("=== Demo 1: Getting user service instances ===")
 	instances, err := selector.GetRegistry().GetManager().GetService(ctx, "user-service")
 	if err != nil {
-		logger.Error("Failed to get user service", zap.Error(err))
+		logger.Errorf("Failed to get user service", zap.Error(err))
 	} else {
 		logger.Info("User service instances found", zap.Int("count", len(instances)))
 		for _, instance := range instances {
@@ -200,7 +200,7 @@ func demoServiceDiscovery(selector *discovery.ServiceSelector) {
 		for i := 0; i < 5; i++ {
 			instance, tracker, err := selector.SelectInstance(ctx, "user-service", "192.168.1.100")
 			if err != nil {
-				logger.Error("Failed to select instance", zap.Error(err))
+				logger.Errorf("Failed to select instance", zap.Error(err))
 				continue
 			}
 
@@ -234,7 +234,7 @@ func demoServiceDiscovery(selector *discovery.ServiceSelector) {
 
 	health, err := healthChecker.GetDetailedHealth(ctx)
 	if err != nil {
-		logger.Error("Health check failed", zap.Error(err))
+		logger.Errorf("Health check failed", zap.Error(err))
 	} else {
 		logger.Info("Health status", zap.Any("health", health))
 	}

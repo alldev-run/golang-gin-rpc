@@ -3,7 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
-	"golang-gin-rpc/pkg/db/orm"
+	"alldev-gin-rpc/pkg/db/orm"
 	"testing"
 	"time"
 )

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // Proxy handles HTTP proxying
@@ -83,14 +83,14 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 		// Select target using load balancer
 		target, err := p.gateway.balancer.Select(route.targets)
 		if err != nil {
-			logger.Errorf("Failed to select target: %v", logger.Error(err))
+			logger.Errorf("Failed to select target", logger.Error(err))
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Service unavailable"})
 			return
 		}
 
 		// Proxy request
 		if err := p.proxyRequest(ctx, c, target, route); err != nil {
-			logger.Errorf("Proxy request failed: %v", logger.Error(err))
+			logger.Errorf("Proxy request failed", logger.Error(err))
 			p.handleProxyError(c, err)
 			return
 		}

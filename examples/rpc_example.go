@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
-	"golang-gin-rpc/pkg/rpc"
-	"golang-gin-rpc/pkg/rpc/examples"
-	"golang-gin-rpc/pkg/rpc/grpc"
-	"golang-gin-rpc/pkg/rpc/jsonrpc"
+	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/rpc"
+	"alldev-gin-rpc/pkg/rpc/examples"
+	"alldev-gin-rpc/pkg/rpc/grpc"
+	"alldev-gin-rpc/pkg/rpc/jsonrpc"
 )
 
 func main() {
@@ -91,7 +91,7 @@ func main() {
 
 	// Graceful shutdown
 	if err := manager.Stop(); err != nil {
-		logger.Error("Error during shutdown", zap.Error(err))
+		logger.Errorf("Error during shutdown", zap.Error(err))
 	} else {
 		logger.Info("RPC servers stopped successfully")
 	}
@@ -103,14 +103,14 @@ func runDemoClients() {
 	// Demo gRPC client
 	go func() {
 		if err := demoGRPCClient(); err != nil {
-			logger.Error("gRPC client demo failed", zap.Error(err))
+			logger.Errorf("gRPC client demo failed", zap.Error(err))
 		}
 	}()
 
 	// Demo JSON-RPC client
 	go func() {
 		if err := demoJSONRPCClient(); err != nil {
-			logger.Error("JSON-RPC client demo failed", zap.Error(err))
+			logger.Errorf("JSON-RPC client demo failed", zap.Error(err))
 		}
 	}()
 }
@@ -121,7 +121,7 @@ func demoGRPCClient() {
 	config := grpc.DefaultClientConfig()
 	client, err := grpc.NewClient(config)
 	if err != nil {
-		logger.Error("Failed to create gRPC client", zap.Error(err))
+		logger.Errorf("Failed to create gRPC client", zap.Error(err))
 		return
 	}
 	defer client.Close()
@@ -143,7 +143,7 @@ func demoJSONRPCClient() {
 	var pingResult interface{}
 	err := client.Call(context.Background(), "system.ping", nil, &pingResult)
 	if err != nil {
-		logger.Error("JSON-RPC ping failed", zap.Error(err))
+		logger.Errorf("JSON-RPC ping failed", zap.Error(err))
 	} else {
 		logger.Info("JSON-RPC ping successful", zap.Any("result", pingResult))
 	}
@@ -156,7 +156,7 @@ func demoJSONRPCClient() {
 	var addResp examples.AddResponse
 	err = client.Call(context.Background(), "calculator.add", addReq, &addResp)
 	if err != nil {
-		logger.Error("JSON-RPC add failed", zap.Error(err))
+		logger.Errorf("JSON-RPC add failed", zap.Error(err))
 	} else {
 		logger.Info("JSON-RPC add successful", zap.Float64("result", addResp.Result))
 	}
@@ -169,7 +169,7 @@ func demoJSONRPCClient() {
 	var mulResp examples.MultiplyResponse
 	err = client.Call(context.Background(), "calculator.multiply", mulReq, &mulResp)
 	if err != nil {
-		logger.Error("JSON-RPC multiply failed", zap.Error(err))
+		logger.Errorf("JSON-RPC multiply failed", zap.Error(err))
 	} else {
 		logger.Info("JSON-RPC multiply successful", zap.Float64("result", mulResp.Result))
 	}
@@ -182,7 +182,7 @@ func demoJSONRPCClient() {
 	var echoResp examples.EchoResponse
 	err = client.Call(context.Background(), "echo.echo", echoReq, &echoResp)
 	if err != nil {
-		logger.Error("JSON-RPC echo failed", zap.Error(err))
+		logger.Errorf("JSON-RPC echo failed", zap.Error(err))
 	} else {
 		logger.Info("JSON-RPC echo successful", 
 			zap.String("message", echoResp.Message),
@@ -196,7 +196,7 @@ func demoJSONRPCClient() {
 	var reverseResp examples.ReverseResponse
 	err = client.Call(context.Background(), "echo.reverse", reverseReq, &reverseResp)
 	if err != nil {
-		logger.Error("JSON-RPC reverse failed", zap.Error(err))
+		logger.Errorf("JSON-RPC reverse failed", zap.Error(err))
 	} else {
 		logger.Info("JSON-RPC reverse successful", zap.String("reversed", reverseResp.Reversed))
 	}
@@ -208,7 +208,7 @@ func demoJSONRPCClient() {
 	var historyResp examples.HistoryResponse
 	err = client.Call(context.Background(), "calculator.getHistory", historyReq, &historyResp)
 	if err != nil {
-		logger.Error("JSON-RPC getHistory failed", zap.Error(err))
+		logger.Errorf("JSON-RPC getHistory failed", zap.Error(err))
 	} else {
 		logger.Info("JSON-RPC getHistory successful", 
 			zap.Int("total", historyResp.Total),

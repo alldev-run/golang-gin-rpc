@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // ManagerConfig holds RPC manager configuration
@@ -58,7 +58,7 @@ type Manager struct {
 
 // NewManager creates a new RPC manager
 func NewManager(config ManagerConfig) *Manager {
-	return &Manager{
+	manager := &Manager{
 		config:     config,
 		servers:    make(map[string]Server),
 		services:   make(map[string]Service),
@@ -66,6 +66,14 @@ func NewManager(config ManagerConfig) *Manager {
 		middleware: NewMiddlewareChain(),
 		startTime:  time.Now(),
 	}
+	
+	// Initialize servers from config
+	for name, serverConfig := range config.Servers {
+		server := NewServer(serverConfig)
+		manager.servers[name] = server
+	}
+	
+	return manager
 }
 
 // AddServer adds an RPC server to the manager
@@ -197,7 +205,7 @@ func (m *Manager) Start() error {
 				zap.String("address", rpcServer.Addr()))
 			
 			if err := rpcServer.Start(); err != nil {
-				logger.Error("Failed to start RPC server", 
+				logger.Errorf("Failed to start RPC server", 
 					zap.String("name", serverName),
 					zap.Error(err))
 			} else {
@@ -240,7 +248,7 @@ func (m *Manager) Stop() error {
 			logger.Info("Stopping RPC server", zap.String("name", serverName))
 			
 			if err := rpcServer.Stop(); err != nil {
-				logger.Error("Failed to stop RPC server", 
+				logger.Errorf("Failed to stop RPC server", 
 					zap.String("name", serverName),
 					zap.Error(err))
 			} else {

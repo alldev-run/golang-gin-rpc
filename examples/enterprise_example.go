@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"time"
 
-	"golang-gin-rpc/pkg/cache"
-	"golang-gin-rpc/pkg/db/pool"
-	"golang-gin-rpc/pkg/errors"
-	"golang-gin-rpc/pkg/health"
-	"golang-gin-rpc/pkg/metrics"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/cache"
+	"alldev-gin-rpc/pkg/db/pool"
+	"alldev-gin-rpc/pkg/errors"
+	"alldev-gin-rpc/pkg/health"
+	"alldev-gin-rpc/pkg/metrics"
+	"alldev-gin-rpc/pkg/logger"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gin-gonic/gin"
@@ -163,7 +163,7 @@ func (app *EnterpriseApplication) recoveryMiddleware() gin.HandlerFunc {
 					WithRequestID(c.GetString("request_id")).
 					WithStackTrace()
 				
-				logger.Error("Panic recovered in HTTP handler",
+				logger.Errorf("Panic recovered in HTTP handler",
 					zap.String("error", appErr.Error()),
 					zap.String("request_id", c.GetString("request_id")),
 					zap.String("method", c.Request.Method),
@@ -206,7 +206,7 @@ func (app *EnterpriseApplication) getUsers(c *gin.Context) {
 		appErr := errors.Wrap(err, errors.ErrCodeDBQuery, "Failed to query users").
 			WithRequestID(c.GetString("request_id"))
 		
-		logger.Error("Failed to query users",
+		logger.Errorf("Failed to query users",
 			zap.Error(appErr),
 			zap.String("request_id", c.GetString("request_id")),
 		)
@@ -231,7 +231,7 @@ func (app *EnterpriseApplication) getUsers(c *gin.Context) {
 			appErr := errors.Wrap(err, errors.ErrCodeDBQuery, "Failed to scan user").
 				WithRequestID(c.GetString("request_id"))
 			
-			logger.Error("Failed to scan user",
+			logger.Errorf("Failed to scan user",
 				zap.Error(appErr),
 				zap.String("request_id", c.GetString("request_id")),
 			)
@@ -314,7 +314,7 @@ func (app *EnterpriseApplication) createUser(c *gin.Context) {
 		appErr := errors.Wrap(err, errors.ErrCodeDBTransaction, "Failed to create user").
 			WithRequestID(c.GetString("request_id"))
 		
-		logger.Error("Failed to create user",
+		logger.Errorf("Failed to create user",
 			zap.Error(appErr),
 			zap.String("request_id", c.GetString("request_id")),
 		)
@@ -394,7 +394,7 @@ func (app *EnterpriseApplication) setCacheValue(c *gin.Context) {
 		appErr := errors.Wrap(err, errors.ErrCodeCacheConnection, "Failed to set cache").
 			WithRequestID(c.GetString("request_id"))
 		
-		logger.Error("Failed to set cache",
+		logger.Errorf("Failed to set cache",
 			zap.Error(appErr),
 			zap.String("key", key),
 			zap.String("request_id", c.GetString("request_id")),
@@ -424,12 +424,12 @@ func (app *EnterpriseApplication) Shutdown(ctx context.Context) error {
 	
 	// Close database pool
 	if err := app.dbPool.Close(); err != nil {
-		logger.Error("Failed to close database pool", zap.Error(err))
+		logger.Errorf("Failed to close database pool", zap.Error(err))
 	}
 	
 	// Close cache
 	if err := app.cache.Close(); err != nil {
-		logger.Error("Failed to close cache", zap.Error(err))
+		logger.Errorf("Failed to close cache", zap.Error(err))
 	}
 	
 	logger.Info("Enterprise application shutdown complete")
@@ -462,7 +462,7 @@ func main() {
 	go func() {
 		logger.Info("Starting metrics server on :9090")
 		if err := http.ListenAndServe(":9090", app.metrics.MetricsHandler()); err != nil {
-			logger.Error("Metrics server failed", zap.Error(err))
+			logger.Errorf("Metrics server failed", zap.Error(err))
 		}
 	}()
 	

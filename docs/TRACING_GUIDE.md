@@ -1,6 +1,6 @@
 # 分布式链路追踪指南
 
-本文档介绍如何在 golang-gin-rpc 项目中使用分布式链路追踪功能。
+本文档介绍如何在 alldev-gin-rpc 项目中使用分布式链路追踪功能。
 
 ## 概述
 
@@ -30,7 +30,7 @@ docker-compose -f deploy/docker-compose.zipkin.yml up -d
 
 ```yaml
 tracing:
-  service_name: "golang-gin-rpc"
+  service_name: "alldev-gin-rpc"
   service_version: "1.0.0"
   environment: "development"
   enabled: true
@@ -61,7 +61,7 @@ go run main.go
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
-| `service_name` | 服务名称 | `golang-gin-rpc` |
+| `service_name` | 服务名称 | `alldev-gin-rpc` |
 | `service_version` | 服务版本 | `1.0.0` |
 | `environment` | 环境 | `development` |
 | `enabled` | 是否启用追踪 | `false` |
@@ -276,7 +276,7 @@ fmt.Printf("Tracing enabled: %v\n", tracer.IsEnabled())
 ### 与 Gin 集成
 
 ```go
-import "golang-gin-rpc/pkg/tracing"
+import "alldev-gin-rpc/pkg/tracing"
 
 func main() {
     r := gin.New()
@@ -292,7 +292,7 @@ func main() {
 ### 与 gRPC 集成
 
 ```go
-import "golang-gin-rpc/pkg/tracing"
+import "alldev-gin-rpc/pkg/tracing"
 
 func setupGRPCServer() *grpc.Server {
     tracer := tracing.GlobalTracer()

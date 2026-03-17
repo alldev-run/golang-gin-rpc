@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"golang-gin-rpc/pkg/rpc"
+	"alldev-gin-rpc/pkg/rpc"
 )
 
 // UserService represents a user management service
@@ -59,7 +59,7 @@ func NewUserService() *UserService {
 
 // Register registers the user service with a gRPC server
 func (s *UserService) Register(server interface{}) error {
-	if grpcServer, ok := server.(*grpc.Server); ok {
+	if _, ok := server.(*grpc.Server); ok {
 		// In a real implementation, you would register the actual gRPC service
 		// For this example, we'll just set metadata
 		s.SetMetadata("grpc_registered", true)

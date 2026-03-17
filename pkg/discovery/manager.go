@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // ManagerConfig holds service discovery manager configuration
@@ -34,7 +34,7 @@ func DefaultManagerConfig() ManagerConfig {
 		Timeout:             30 * time.Second,
 		HealthCheckInterval: 30 * time.Second,
 		AutoRegister:        true,
-		ServiceName:         "golang-gin-rpc",
+		ServiceName:         "alldev-gin-rpc",
 		ServiceAddress:      "localhost",
 		ServicePort:         8080,
 		ServiceTags:         []string{"go", "rpc", "api"},
@@ -132,7 +132,7 @@ func (m *ServiceDiscoveryManager) Stop() error {
 	// Deregister self if auto registered
 	if m.config.AutoRegister {
 		if err := m.deregisterSelf(); err != nil {
-			logger.Error("Failed to deregister self", zap.Error(err))
+			logger.Errorf("Failed to deregister self", zap.Error(err))
 		}
 	}
 
@@ -377,7 +377,7 @@ func (w *ServiceWatcher) watchLoop(ctx context.Context) {
 		case <-ticker.C:
 			instances, err := w.manager.GetService(ctx, w.serviceName)
 			if err != nil {
-				logger.Error("Failed to get service during watch", 
+				logger.Errorf("Failed to get service during watch", 
 					zap.String("service", w.serviceName),
 					zap.Error(err))
 				continue

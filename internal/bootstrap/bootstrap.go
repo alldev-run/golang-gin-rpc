@@ -7,18 +7,18 @@ import (
 	"path/filepath"
 	"time"
 
-	"golang-gin-rpc/pkg/auth"
-	"golang-gin-rpc/pkg/cache"
-	"golang-gin-rpc/pkg/cache/redis"
-	"golang-gin-rpc/pkg/db"
-	"golang-gin-rpc/pkg/db/mysql"
-	"golang-gin-rpc/pkg/discovery"
-	"golang-gin-rpc/pkg/gateway"
-	"golang-gin-rpc/pkg/health"
-	"golang-gin-rpc/pkg/logger"
-	"golang-gin-rpc/pkg/metrics"
-	"golang-gin-rpc/pkg/rpc"
-	"golang-gin-rpc/pkg/tracing"
+	"alldev-gin-rpc/pkg/auth"
+	"alldev-gin-rpc/pkg/cache"
+	"alldev-gin-rpc/pkg/cache/redis"
+	"alldev-gin-rpc/pkg/db"
+	"alldev-gin-rpc/pkg/db/mysql"
+	"alldev-gin-rpc/pkg/discovery"
+	"alldev-gin-rpc/pkg/gateway"
+	"alldev-gin-rpc/pkg/health"
+	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/metrics"
+	"alldev-gin-rpc/pkg/rpc"
+	"alldev-gin-rpc/pkg/tracing"
 
 	"gopkg.in/yaml.v3"
 )
@@ -225,7 +225,7 @@ func (b *Bootstrap) InitializeDatabases() error {
 		// Test connection
 		ctx := context.Background()
 		if err := client.Ping(ctx); err != nil {
-			logger.Warn("Database %s connection failed", logger.String("name", name), logger.Error(err))
+			logger.Warn("Database connection failed", logger.String("name", name), logger.Error(err))
 		} else {
 			logger.Info("Database %s connected successfully", logger.String("name", name))
 		}

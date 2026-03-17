@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // corsMiddleware provides CORS middleware
@@ -109,7 +109,7 @@ func loggingMiddleware() gin.HandlerFunc {
 			logger.String("client_ip", param.ClientIP),
 			logger.Int("status", param.StatusCode),
 			logger.Duration("latency", param.Latency),
-			logger.String("request_id", param.Keys["request_id"]),
+			logger.String("request_id", param.Keys["request_id"].(string)),
 		)
 		return ""
 	})

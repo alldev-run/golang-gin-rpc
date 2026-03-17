@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // log helpers to avoid direct zap dependency
@@ -25,7 +25,7 @@ func logWarn(msg string) {
 }
 
 func logError(msg string) {
-	logger.Error(msg)
+	logger.Errorf(msg)
 }
 
 func logDebugf(msg string, args ...interface{}) {
@@ -41,7 +41,7 @@ func logWarnf(msg string, args ...interface{}) {
 }
 
 func logErrorf(msg string, args ...interface{}) {
-	logger.Error(fmt.Sprintf(msg, args...))
+	logger.Errorf(fmt.Sprintf(msg, args...))
 }
 
 // TransactionConfig holds configuration for transaction operations.

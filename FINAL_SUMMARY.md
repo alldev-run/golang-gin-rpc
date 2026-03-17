@@ -202,7 +202,7 @@ docker run -d --name grafana -p 3000:3000 grafana/grafana:latest
 ```bash
 # 1. 克隆项目
 git clone <repository-url>
-cd golang-gin-rpc
+cd alldev-gin-rpc
 
 # 2. 启动演示
 ./demo-enterprise.sh

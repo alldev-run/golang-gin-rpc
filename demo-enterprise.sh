@@ -51,7 +51,7 @@ check_dependencies() {
     print_status "✅ Go is installed"
     
     # Check if project is built
-    if [ ! -f "./golang-gin-rpc" ]; then
+    if [ ! -f "./alldev-gin-rpc" ]; then
         print_warning "Binary not found, building..."
         make build
     fi

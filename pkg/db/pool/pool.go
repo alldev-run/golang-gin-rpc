@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang-gin-rpc/pkg/db"
+	"alldev-gin-rpc/pkg/db"
 )
 
 // State represents the connection state.

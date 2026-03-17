@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // Application represents the main application
@@ -66,12 +66,25 @@ func (app *Application) Start() error {
 	// Start server in goroutine
 	go func() {
 		if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("Server failed to start", zap.Error(err))
+			logger.Errorf("Server failed to start", logger.Error(err))
 			close(app.shutdown)
 		}
 	}()
 
 	return nil
+}
+
+// Shutdown gracefully shuts down the application
+func (app *Application) Shutdown(ctx context.Context) error {
+	logger.Info("Shutting down server...")
+	
+	if err := app.server.Shutdown(ctx); err != nil {
+		logger.Errorf("Server forced to shutdown", logger.Error(err))
+		return err
+	} else {
+		logger.Info("Server shutdown complete")
+		return nil
+	}
 }
 
 // WaitForShutdown waits for shutdown signals
@@ -92,7 +105,7 @@ func (app *Application) WaitForShutdown() {
 	defer cancel()
 
 	if err := app.server.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", zap.Error(err))
+		logger.Errorf("Server forced to shutdown", logger.Error(err))
 	} else {
 		logger.Info("Server shutdown complete")
 	}

@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"sync"
 
-	"golang-gin-rpc/pkg/db"
-	"golang-gin-rpc/pkg/db/circuitbreaker"
-	"golang-gin-rpc/pkg/db/pool"
+	"alldev-gin-rpc/pkg/db"
+	"alldev-gin-rpc/pkg/db/circuitbreaker"
+	"alldev-gin-rpc/pkg/db/pool"
 )
 
 // Config holds the combined pool and circuit breaker configuration.

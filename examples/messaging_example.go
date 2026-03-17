@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"golang-gin-rpc/pkg/messaging"
+	"alldev-gin-rpc/pkg/messaging"
 )
 
 // UserEvent represents a user event message

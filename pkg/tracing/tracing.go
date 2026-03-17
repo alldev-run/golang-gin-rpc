@@ -18,7 +18,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // TracerType represents the type of tracing backend
@@ -239,7 +239,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Type:               "zipkin",
-		ServiceName:        "golang-gin-rpc",
+		ServiceName:        "alldev-gin-rpc",
 		ServiceVersion:     "1.0.0",
 		Environment:        "development",
 		Enabled:            false,

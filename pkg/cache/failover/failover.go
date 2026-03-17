@@ -45,6 +45,58 @@ func NewFailoverCache(primary, secondary, tertiary Storage, config Config) *Fail
 	return fc
 }
 
+// GetPrimary returns the primary storage backend (for testing)
+func (fc *FailoverCache) GetPrimary() Storage {
+	fc.mu.RLock()
+	defer fc.mu.RUnlock()
+	return fc.primary
+}
+
+// GetSecondary returns the secondary storage backend (for testing)
+func (fc *FailoverCache) GetSecondary() Storage {
+	fc.mu.RLock()
+	defer fc.mu.RUnlock()
+	return fc.secondary
+}
+
+// GetTertiary returns the tertiary storage backend (for testing)
+func (fc *FailoverCache) GetTertiary() Storage {
+	fc.mu.RLock()
+	defer fc.mu.RUnlock()
+	return fc.tertiary
+}
+
+// GetMaxRetries returns the max retries configuration (for testing)
+func (fc *FailoverCache) GetMaxRetries() int {
+	fc.mu.RLock()
+	defer fc.mu.RUnlock()
+	return fc.maxRetries
+}
+
+// GetRetryDelay returns the retry delay configuration (for testing)
+func (fc *FailoverCache) GetRetryDelay() time.Duration {
+	fc.mu.RLock()
+	defer fc.mu.RUnlock()
+	return fc.retryDelay
+}
+
+// GetHealthCheckInterval returns the health check interval (for testing)
+func (fc *FailoverCache) GetHealthCheckInterval() time.Duration {
+	fc.mu.RLock()
+	defer fc.mu.RUnlock()
+	return fc.healthCheckInterval
+}
+
+// Stop stops the failover cache and its health checker (for testing)
+func (fc *FailoverCache) Stop() {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	if fc.healthTicker != nil {
+		fc.healthTicker.Stop()
+		fc.healthTicker = nil
+	}
+}
+
 // Get retrieves a value trying primary, then secondary, then tertiary.
 func (fc *FailoverCache) Get(ctx context.Context, key string) (interface{}, bool) {
 	// Try primary first
@@ -240,8 +292,19 @@ func (fc *FailoverCache) updateHealthStatus() {
 
 // startHealthCheck starts the health check goroutine.
 func (fc *FailoverCache) startHealthCheck() {
-	for range fc.healthTicker.C {
-		fc.updateHealthStatus()
+	for {
+		fc.mu.RLock()
+		ticker := fc.healthTicker
+		fc.mu.RUnlock()
+		
+		if ticker == nil {
+			break
+		}
+		
+		select {
+		case <-ticker.C:
+			fc.updateHealthStatus()
+		}
 	}
 }
 

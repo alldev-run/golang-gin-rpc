@@ -2,11 +2,11 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
-	"golang-gin-rpc/pkg/discovery"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // Gateway represents the HTTP gateway
@@ -80,19 +80,19 @@ func (g *Gateway) Initialize() error {
 
 	// Initialize service discovery
 	if err := g.initDiscovery(); err != nil {
-		logger.Errorf("Failed to initialize service discovery: %v", logger.Error(err))
+		logger.Errorf("Failed to initialize service discovery", logger.Error(err))
 		return err
 	}
 
 	// Initialize load balancer
 	if err := g.initLoadBalancer(); err != nil {
-		logger.Errorf("Failed to initialize load balancer: %v", logger.Error(err))
+		logger.Errorf("Failed to initialize load balancer", logger.Error(err))
 		return err
 	}
 
 	// Initialize routes
 	if err := g.initRoutes(); err != nil {
-		logger.Errorf("Failed to initialize routes: %v", logger.Error(err))
+		logger.Errorf("Failed to initialize routes", logger.Error(err))
 		return err
 	}
 
@@ -195,8 +195,8 @@ func (g *Gateway) initRoutes() error {
 		if g.discovery != nil {
 			endpoints, err := g.discovery.GetServiceEndpoints(routeConfig.Service)
 			if err != nil {
-				logger.Errorf("Failed to get endpoints for service %s: %v", 
-					routeConfig.Service, logger.Error(err))
+				logger.Errorf("Failed to get endpoints for service", 
+					logger.String("service", routeConfig.Service), logger.Error(err))
 				// Continue with empty targets, will be refreshed later
 			} else {
 				route.targets = endpoints
@@ -207,7 +207,7 @@ func (g *Gateway) initRoutes() error {
 		g.router.routes[key] = route
 	}
 
-	logger.Infof("Initialized %d routes", len(g.config.Routes))
+	logger.Info("Initialized routes", logger.Int("count", len(g.config.Routes)))
 	return nil
 }
 
@@ -259,8 +259,8 @@ func (g *Gateway) refreshServices() {
 	for _, route := range g.router.routes {
 		endpoints, err := g.discovery.GetServiceEndpoints(route.config.Service)
 		if err != nil {
-			logger.Errorf("Failed to refresh endpoints for service %s: %v", 
-				route.config.Service, logger.Error(err))
+			logger.Errorf("Failed to refresh endpoints for service", 
+				logger.String("service", route.config.Service), logger.Error(err))
 			continue
 		}
 		

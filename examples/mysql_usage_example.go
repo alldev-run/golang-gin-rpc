@@ -6,11 +6,11 @@ import (
 	"log"
 	"time"
 
-	"golang-gin-rpc/pkg/db"
-	"golang-gin-rpc/pkg/db/mysql"
-	"golang-gin-rpc/pkg/db/orm"
-	"golang-gin-rpc/pkg/db/pool"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/db"
+	"alldev-gin-rpc/pkg/db/mysql"
+	"alldev-gin-rpc/pkg/db/orm"
+	"alldev-gin-rpc/pkg/db/pool"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 // User 示例用户模型

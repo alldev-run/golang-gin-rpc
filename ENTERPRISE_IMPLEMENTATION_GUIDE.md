@@ -25,7 +25,7 @@
 package bootstrap
 
 import (
-    "golang-gin-rpc/pkg/metrics"
+    "alldev-gin-rpc/pkg/metrics"
     "go.uber.org/zap"
 )
 
@@ -84,9 +84,9 @@ rate_limiter:
 package rpc
 
 import (
-    "golang-gin-rpc/pkg/metrics"
-    "golang-gin-rpc/pkg/circuitbreaker"
-    "golang-gin-rpc/pkg/ratelimiter"
+    "alldev-gin-rpc/pkg/metrics"
+    "alldev-gin-rpc/pkg/circuitbreaker"
+    "alldev-gin-rpc/pkg/ratelimiter"
 )
 
 // MetricsMiddleware wraps RPC calls with metrics
@@ -126,7 +126,7 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'golang-gin-rpc'
+  - job_name: 'alldev-gin-rpc'
     static_configs:
       - targets: ['localhost:9090']
     metrics_path: '/metrics'
@@ -440,20 +440,20 @@ CMD ["./main"]
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: golang-gin-rpc
+  name: alldev-gin-rpc
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: golang-gin-rpc
+      app: alldev-gin-rpc
   template:
     metadata:
       labels:
-        app: golang-gin-rpc
+        app: alldev-gin-rpc
     spec:
       containers:
       - name: app
-        image: golang-gin-rpc:latest
+        image: alldev-gin-rpc:latest
         ports:
         - containerPort: 8080
         - containerPort: 50051
@@ -484,10 +484,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: golang-gin-rpc-service
+  name: alldev-gin-rpc-service
 spec:
   selector:
-    app: golang-gin-rpc
+    app: alldev-gin-rpc
   ports:
   - name: http
     port: 80
@@ -503,11 +503,11 @@ spec:
 ### 3. Helm Chart
 
 ```yaml
-# helm/golang-gin-rpc/values.yaml
+# helm/alldev-gin-rpc/values.yaml
 replicaCount: 3
 
 image:
-  repository: golang-gin-rpc
+  repository: alldev-gin-rpc
   tag: latest
   pullPolicy: IfNotPresent
 

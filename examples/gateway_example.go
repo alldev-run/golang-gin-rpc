@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"golang-gin-rpc/internal/bootstrap"
-	"golang-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/internal/bootstrap"
+	"alldev-gin-rpc/pkg/logger"
 )
 
 func main() {
@@ -89,7 +89,7 @@ func main() {
 		logger.Info("HTTP Gateway starting",
 			logger.String("address", addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Errorf("Failed to start server: %v", logger.Error(err))
+			logger.Errorf("Failed to start server: %v", logger.Errorf(err))
 		}
 	}()
 
@@ -102,12 +102,12 @@ func main() {
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Errorf("Error during server shutdown: %v", logger.Error(err))
+		logger.Errorf("Error during server shutdown: %v", logger.Errorf(err))
 	}
 
 	// Close bootstrap
 	if err := bs.Close(); err != nil {
-		logger.Errorf("Error during bootstrap shutdown: %v", logger.Error(err))
+		logger.Errorf("Error during bootstrap shutdown: %v", logger.Errorf(err))
 	}
 
 	logger.Info("HTTP Gateway shutdown complete")

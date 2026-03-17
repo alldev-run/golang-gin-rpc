@@ -7,8 +7,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"golang-gin-rpc/pkg/logger"
-	"golang-gin-rpc/pkg/response"
+	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -89,7 +89,7 @@ func defaultLogger(c *gin.Context, err interface{}) {
 	}
 
 	// Log the panic with context
-	logger.Error("Panic recovered",
+	logger.Errorf("Panic recovered",
 		zap.String("error", fmt.Sprintf("%v", err)),
 		zap.String("method", method),
 		zap.String("path", path),
@@ -148,7 +148,7 @@ func RecoveryWithRequestLogging(bodyLimit int64) gin.HandlerFunc {
 // HandlePanic is a helper function to handle panics in goroutines
 func HandlePanic(operation string) {
 	if err := recover(); err != nil {
-		logger.Error("Panic in goroutine",
+		logger.Errorf("Panic in goroutine",
 			zap.String("operation", operation),
 			zap.String("error", fmt.Sprintf("%v", err)),
 			zap.String("stack", string(debug.Stack())),
@@ -166,7 +166,7 @@ func SafeGo(fn func()) {
 
 // ErrorHandler is a custom error handler that can be used with gin.Error()
 func ErrorHandler(c *gin.Context, err error) {
-	logger.Error("Request error",
+	logger.Errorf("Request error",
 		zap.String("error", err.Error()),
 		zap.String("method", c.Request.Method),
 		zap.String("path", c.Request.URL.Path),
