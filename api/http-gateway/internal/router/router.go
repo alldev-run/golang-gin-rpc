@@ -1,7 +1,7 @@
 package router
 
 import (
-	"go-micro/api/http-gateway/internal/handler"
+	"alldev-gin-rpc/api/http-gateway/internal/handler"
 
 	"github.com/gin-gonic/gin"
 )

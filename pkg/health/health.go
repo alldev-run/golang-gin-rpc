@@ -56,30 +56,6 @@ type HealthChecker interface {
 	Check(ctx context.Context) *CheckResult
 }
 
-// HealthConfig holds configuration for the health service
-type HealthConfig struct {
-	Enabled bool `yaml:"enabled" json:"enabled"`
-}
-
-// HealthCheckConfig holds configuration for health checks
-type HealthCheckConfig struct {
-	Timeout         time.Duration `yaml:"timeout" json:"timeout"`
-	Interval        time.Duration `yaml:"interval" json:"interval"`
-	FailureThreshold int          `yaml:"failure_threshold" json:"failure_threshold"`
-	SuccessThreshold int          `json:"success_threshold" json:"success_threshold"`
-	Enabled         bool          `yaml:"enabled" json:"enabled"`
-}
-
-// DefaultHealthCheckConfig returns default configuration
-func DefaultHealthCheckConfig() HealthCheckConfig {
-	return HealthCheckConfig{
-		Timeout:          5 * time.Second,
-		Interval:         30 * time.Second,
-		FailureThreshold: 3,
-		SuccessThreshold: 2,
-		Enabled:          true,
-	}
-}
 
 // HealthManager manages health checks
 type HealthManager struct {

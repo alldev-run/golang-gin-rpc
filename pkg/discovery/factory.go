@@ -4,32 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"alldev-gin-rpc/pkg/discovery/consul"
 	"alldev-gin-rpc/pkg/discovery/etcd"
 )
 
-// Config 统一定义注册中心配置
-type Config struct {
-	Type    string        // "consul" 或 "etcd"
-	Addr    string        // 注册中心地址 "127.0.0.1:8500" 或 "127.0.0.1:2379"
-	Timeout time.Duration // 连接超时时间
-}
-
 // NewDiscovery 根据配置返回具体的实现实例
 func NewDiscovery(conf Config) (Discovery, error) {
 	switch conf.Type {
-	case "consul":
+	case RegistryTypeConsul:
 		// 调用 consul 目录下的初始化函数
-		registry, err := consul.NewRegistry(conf.Addr)
+		registry, err := consul.NewRegistry(conf.Address)
 		if err != nil {
 			return nil, err
 		}
 		return &consulAdapter{registry: registry}, nil
-	case "etcd":
+	case RegistryTypeEtcd:
 		// 调用 etcd 目录下的初始化函数
-		registry, err := etcd.NewRegistry(conf.Addr, conf.Timeout)
+		registry, err := etcd.NewRegistry(conf.Address, conf.Timeout)
 		if err != nil {
 			return nil, err
 		}

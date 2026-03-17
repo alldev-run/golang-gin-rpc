@@ -40,8 +40,8 @@ func NewServiceDiscovery(config DiscoveryConfig) (*ServiceDiscovery, error) {
 	
 	// Create discovery instance using existing factory
 	discoveryConfig := discovery.Config{
-		Type:    config.Type,
-		Addr:    config.Endpoints[0], // Use first endpoint for now
+		Type:    discovery.RegistryType(config.Type),
+		Address: config.Endpoints[0], // Use first endpoint for now
 		Timeout: config.Timeout,
 	}
 	

@@ -10,17 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AuthConfig holds configuration for authentication middleware
-type AuthConfig struct {
-	// SkipPaths are paths that skip authentication
-	SkipPaths []string
-	// Skipper is a function to skip authentication for specific requests
-	Skipper func(c *gin.Context) bool
-	// TokenLookup is how to look for the token (default: "header:Authorization:Bearer ")
-	TokenLookup string
-	// KeyFunc is a function to extract user ID from claims (default: claims.UserID)
-	KeyFunc func(claims *jwtx.Claims) string
-}
 
 // JWT creates a JWT authentication middleware
 func JWT(config AuthConfig) gin.HandlerFunc {
@@ -54,7 +43,11 @@ func JWT(config AuthConfig) gin.HandlerFunc {
 		// Set user information in context
 		userID := claims.UserID
 		if config.KeyFunc != nil {
-			userID = config.KeyFunc(claims)
+			// Convert claims to interface{} for KeyFunc
+			claimsInterface := interface{}(claims)
+			if id := config.KeyFunc(&claimsInterface); id != "" {
+				userID = id
+			}
 		}
 
 		c.Set("user_id", userID)
@@ -97,7 +90,11 @@ func JWTOptional(config AuthConfig) gin.HandlerFunc {
 		// Set user information in context
 		userID := claims.UserID
 		if config.KeyFunc != nil {
-			userID = config.KeyFunc(claims)
+			// Convert claims to interface{} for KeyFunc
+			claimsInterface := interface{}(claims)
+			if id := config.KeyFunc(&claimsInterface); id != "" {
+				userID = id
+			}
 		}
 
 		c.Set("user_id", userID)
@@ -175,9 +172,12 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 
 // shouldSkipAuth checks if the request should skip authentication
 func shouldSkipAuth(c *gin.Context, config AuthConfig) bool {
-	// Check custom skipper function
-	if config.Skipper != nil && config.Skipper(c) {
-		return true
+	// Check custom skipper function - convert string-based skipper to gin.Context-based
+	if config.Skipper != nil {
+		// For now, we'll just check the path since Skipper expects string, not gin.Context
+		if config.Skipper(c.Request.URL.Path) {
+			return true
+		}
 	}
 
 	// Check skip paths

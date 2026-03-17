@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"go.uber.org/zap"
-	"alldev-gin-rpc/pkg/logger"
 	"alldev-gin-rpc/pkg/discovery"
-	"alldev-gin-rpc/pkg/discovery/examples"
+	"alldev-gin-rpc/pkg/logger"
+
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -59,13 +59,13 @@ func main() {
 	// Start service watcher
 	go func() {
 		time.Sleep(3 * time.Second) // Wait for services to be registered
-		watchServices(selector)
+		watchServices(selector, manager)
 	}()
 
 	// Demo service discovery
 	go func() {
 		time.Sleep(5 * time.Second) // Wait for services to be available
-		demoServiceDiscovery(selector)
+		demoServiceDiscovery(selector, manager)
 	}()
 
 	// Wait for interrupt signal
@@ -137,13 +137,13 @@ func registerExampleServices(manager *discovery.ServiceDiscoveryManager) {
 	}
 }
 
-func watchServices(selector *discovery.ServiceSelector) {
+func watchServices(selector *discovery.ServiceSelector, manager *discovery.ServiceDiscoveryManager) {
 	logger.Info("Starting service watcher")
 
 	ctx := context.Background()
 
 	// Watch user service
-	watcher := discovery.NewServiceWatcher(selector.GetRegistry().GetManager(), "user-service")
+	watcher := discovery.NewServiceWatcher(manager, "user-service")
 	defer watcher.Stop()
 
 	watchCh := watcher.Watch(ctx)
@@ -164,14 +164,14 @@ func watchServices(selector *discovery.ServiceSelector) {
 	}
 }
 
-func demoServiceDiscovery(selector *discovery.ServiceSelector) {
+func demoServiceDiscovery(selector *discovery.ServiceSelector, manager *discovery.ServiceDiscoveryManager) {
 	logger.Info("Demoing service discovery")
 
 	ctx := context.Background()
 
 	// Demo 1: Get user service instances
 	logger.Info("=== Demo 1: Getting user service instances ===")
-	instances, err := selector.GetRegistry().GetManager().GetService(ctx, "user-service")
+	instances, err := manager.GetService(ctx, "user-service")
 	if err != nil {
 		logger.Errorf("Failed to get user service", zap.Error(err))
 	} else {
@@ -218,9 +218,9 @@ func demoServiceDiscovery(selector *discovery.ServiceSelector) {
 	// Demo 3: Service registry info
 	logger.Info("=== Demo 3: Service registry information ===")
 	registry := selector.GetRegistry()
-	
+
 	logger.Info("All registered services", zap.Strings("services", registry.ListServices()))
-	
+
 	for _, serviceName := range registry.ListServices() {
 		info := registry.GetServiceInfo(serviceName)
 		logger.Info("Service info",
@@ -230,13 +230,16 @@ func demoServiceDiscovery(selector *discovery.ServiceSelector) {
 
 	// Demo 4: Health check simulation
 	logger.Info("=== Demo 4: Health check simulation ===")
-	healthChecker := discovery.NewHealthChecker(selector.GetRegistry().GetManager())
+	// Since there's no dedicated health checker for discovery, we'll simulate one
+	// In a real implementation, you would create a custom health checker
+	logger.Info("Health check simulation - checking registered services")
 
-	health, err := healthChecker.GetDetailedHealth(ctx)
+	// Get all registered services for health simulation
+	services, err := manager.GetAllServices(ctx)
 	if err != nil {
-		logger.Errorf("Health check failed", zap.Error(err))
+		logger.Errorf("Failed to get services for health check", zap.Error(err))
 	} else {
-		logger.Info("Health status", zap.Any("health", health))
+		logger.Info("Health status", zap.Any("services", services))
 	}
 }
 
@@ -249,29 +252,31 @@ func getPayloadKeys(payload map[string]string) []string {
 }
 
 // Example of creating a custom service with discovery integration
-type CustomService struct {
-	name      string
-	manager   *discovery.ServiceDiscoveryManager
-	selector  *discovery.ServiceSelector
-	instance  *discovery.ServiceInstance
+type DiscoveryService struct {
+	name     string
+	manager  *discovery.ServiceDiscoveryManager
+	selector *discovery.ServiceSelector
+	instance *discovery.ServiceInstance
+	port     int
 }
 
-func NewCustomService(name string, port int, manager *discovery.ServiceDiscoveryManager) *CustomService {
-	return &CustomService{
+func NewDiscoveryService(name string, port int, manager *discovery.ServiceDiscoveryManager) *DiscoveryService {
+	return &DiscoveryService{
 		name:    name,
 		manager: manager,
+		port:    port,
 	}
 }
 
-func (s *CustomService) Start() error {
+func (s *DiscoveryService) Start() error {
 	// Register self with discovery
 	s.instance = &discovery.ServiceInstance{
 		ID:      fmt.Sprintf("%s-%d", s.name, time.Now().Unix()),
 		Name:    s.name,
 		Address: "localhost",
-		Port:    8080 + port, // Avoid port conflicts
+		Port:    8080 + s.port, // Avoid port conflicts
 		Payload: map[string]string{
-			"version":     "1.0.0",
+			"version":      "1.0.0",
 			"started_at":   time.Now().Format(time.RFC3339),
 			"service_type": "custom",
 		},
@@ -295,7 +300,7 @@ func (s *CustomService) Start() error {
 	return nil
 }
 
-func (s *CustomService) Stop() error {
+func (s *DiscoveryService) Stop() error {
 	if s.instance != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -312,7 +317,7 @@ func (s *CustomService) Stop() error {
 	return nil
 }
 
-func (s *CustomService) CallOtherService(serviceName string) error {
+func (s *DiscoveryService) CallOtherService(serviceName string) error {
 	ctx := context.Background()
 
 	instance, tracker, err := s.selector.SelectInstance(ctx, serviceName, "127.0.0.1")

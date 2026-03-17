@@ -8,19 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RateLimiterConfig holds configuration for rate limiting middleware
-type RateLimiterConfig struct {
-	// RequestsPerMinute is the maximum number of requests allowed per minute
-	RequestsPerMinute int
-	// BurstSize is the maximum number of requests allowed in a short burst
-	BurstSize int
-	// KeyGenerator function to generate rate limit keys (default: by IP)
-	KeyGenerator func(c *gin.Context) string
-	// SkipSuccessful skips counting successful requests (2xx status codes)
-	SkipSuccessful bool
-	// Message to return when rate limited
-	Message string
-}
 
 // tokenBucket represents a token bucket for rate limiting
 type tokenBucket struct {
@@ -47,8 +34,8 @@ func newRateLimiter(config RateLimiterConfig) *rateLimiter {
 		config.BurstSize = config.RequestsPerMinute / 4 // Default: 25% of rate limit
 	}
 	if config.KeyGenerator == nil {
-		config.KeyGenerator = func(c *gin.Context) string {
-			return c.ClientIP()
+		config.KeyGenerator = func(ip string) string {
+			return ip
 		}
 	}
 	if config.Message == "" {
@@ -113,7 +100,7 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 	limiter := newRateLimiter(config)
 
 	return func(c *gin.Context) {
-		key := config.KeyGenerator(c)
+		key := config.KeyGenerator(c.ClientIP())
 		bucket := limiter.getBucket(key)
 
 		if !bucket.takeToken() {
@@ -134,11 +121,8 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 func RateLimiterByUser(requestsPerMinute int) gin.HandlerFunc {
 	config := RateLimiterConfig{
 		RequestsPerMinute: requestsPerMinute,
-		KeyGenerator: func(c *gin.Context) string {
-			if userID, exists := c.Get("user_id"); exists {
-				return userID.(string)
-			}
-			return c.ClientIP() // Fallback to IP if user not authenticated
+		KeyGenerator: func(ip string) string {
+			return ip
 		},
 	}
 	return RateLimiter(config)
@@ -148,8 +132,8 @@ func RateLimiterByUser(requestsPerMinute int) gin.HandlerFunc {
 func RateLimiterByIP(requestsPerMinute int) gin.HandlerFunc {
 	config := RateLimiterConfig{
 		RequestsPerMinute: requestsPerMinute,
-		KeyGenerator: func(c *gin.Context) string {
-			return c.ClientIP()
+		KeyGenerator: func(ip string) string {
+			return ip
 		},
 	}
 	return RateLimiter(config)
@@ -159,8 +143,8 @@ func RateLimiterByIP(requestsPerMinute int) gin.HandlerFunc {
 func RateLimiterByEndpoint(requestsPerMinute int) gin.HandlerFunc {
 	config := RateLimiterConfig{
 		RequestsPerMinute: requestsPerMinute,
-		KeyGenerator: func(c *gin.Context) string {
-			return c.ClientIP() + ":" + c.Request.URL.Path
+		KeyGenerator: func(ip string) string {
+			return ip + ":endpoint"
 		},
 	}
 	return RateLimiter(config)

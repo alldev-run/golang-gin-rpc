@@ -1,0 +1,44 @@
+# RPC Authentication Configuration
+
+# RPC Server Configuration
+rpc:
+  servers:
+    jsonrpc:
+      type: "jsonrpc"
+      host: "localhost"
+      port: 8080
+      network: "tcp"
+      timeout: 30
+      max_msg_size: 4194304  # 4MB
+      enable_tls: false
+      cert_file: ""
+      key_file: ""
+  
+  timeout: 30s
+  graceful_shutdown_timeout: 10s
+
+# RPC Authentication Settings
+rpc_auth:
+  enabled: true
+  header_name: "X-API-Key"
+  query_name: "api_key"
+  
+  # Skip authentication for these methods
+  skip_methods:
+    - "system.ping"
+    - "health.check"
+    - "service.stats"
+  
+  # Valid API Keys (key -> description/user)
+  api_keys:
+    "sk-1234567890abcdef": "admin-user"
+    "sk-abcdef1234567890": "service-account"
+    "sk-9876543210fedcba": "readonly-user"
+    "demo-key-2024": "demo-user"
+
+# Alternative: Use environment variables for API keys
+# In production, you should load API keys from environment variables or secure storage
+# Example:
+# api_keys:
+#   "${API_KEY_ADMIN}": "admin-user"
+#   "${API_KEY_SERVICE}": "service-account"

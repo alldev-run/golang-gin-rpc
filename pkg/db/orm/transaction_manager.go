@@ -647,6 +647,28 @@ func (tm *TransactionManager) SetConfig(config TransactionConfig) {
 	tm.config = config
 }
 
+// Close closes the transaction manager and cleans up resources.
+func (tm *TransactionManager) Close() error {
+	// Close connection pool if exists
+	if tm.connectionPool != nil {
+		tm.connectionPool.Close()
+	}
+	
+	// Close tracer if it has a Close method
+	if tm.tracer != nil {
+		if closer, ok := tm.tracer.(interface{ Close() error }); ok {
+			closer.Close()
+		}
+	}
+	
+	return nil
+}
+
+// GetActiveTransactionCount returns the number of active transactions.
+func (tm *TransactionManager) GetActiveTransactionCount() int {
+	return int(atomic.LoadInt64(&tm.activeTxCount))
+}
+
 // GetConfig returns the current transaction manager configuration.
 func (tm *TransactionManager) GetConfig() TransactionConfig {
 	return tm.config

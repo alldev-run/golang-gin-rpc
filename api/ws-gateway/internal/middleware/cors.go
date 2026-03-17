@@ -1,0 +1,3 @@
+package middleware
+
+// CORS placeholder

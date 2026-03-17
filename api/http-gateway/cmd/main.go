@@ -9,14 +9,17 @@ import (
 	"syscall"
 	"time"
 
-	"go-micro/api/http-gateway/internal/middleware"
-	"go-micro/api/http-gateway/internal/router"
+	"alldev-gin-rpc/pkg/gateway"
+	"alldev-gin-rpc/pkg/logger"
 	"alldev-gin-rpc/pkg/tracing"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// Initialize logger
+	logger.Init(logger.DefaultConfig())
+
 	// Initialize tracing
 	if err := tracing.InitForDevelopment("http-gateway"); err != nil {
 		log.Printf("Failed to initialize tracing: %v", err)
@@ -31,54 +34,89 @@ func main() {
 		}
 	}()
 
-	// Set Gin mode
-	gin.SetMode(gin.ReleaseMode)
-	
-	// Create Gin engine
-	r := gin.New()
-	
-	// Add middleware
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
-	r.Use(middleware.Tracing("http-gateway"))
-	r.Use(middleware.CORS())
-	r.Use(middleware.RequestID())
+	// Create gateway configuration
+	config := gateway.DefaultConfig()
+	config.Host = "0.0.0.0"
+	config.Port = 8080
 
-	// Register routes
-	router.InitRouter(r)
-
-	// Setup graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Handle signals
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-	// Start server in goroutine
-	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: r,
+	// Add example routes
+	config.Routes = []gateway.RouteConfig{
+		{
+			Path:        "/api/users",
+			Method:      "GET",
+			Service:     "user-service",
+			StripPrefix: false,
+			Timeout:     30 * time.Second,
+			Retries:     3,
+		},
+		{
+			Path:        "/api/users",
+			Method:      "POST",
+			Service:     "user-service",
+			StripPrefix: false,
+			Timeout:     30 * time.Second,
+			Retries:     3,
+		},
 	}
 
+	// Create gateway instance
+	gw := gateway.NewGateway(config)
+
+	// Initialize gateway
+	if err := gw.Initialize(); err != nil {
+		logger.Errorf("Failed to initialize gateway", logger.Error(err))
+		os.Exit(1)
+	}
+
+	// Setup Gin engine
+	gin.SetMode(gin.ReleaseMode)
+	engine := gin.New()
+
+	// Setup gateway routes and middleware
+	gw.SetupRoutes(engine)
+
+	// Create HTTP server
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: engine,
+	}
+
+	// Start gateway
+	if err := gw.Start(); err != nil {
+		logger.Errorf("Failed to start gateway", logger.Error(err))
+		os.Exit(1)
+	}
+
+	logger.Info("HTTP Gateway starting on :8080")
+
+	// Handle graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start server in goroutine
 	go func() {
-		log.Println("HTTP Gateway starting on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Errorf("Failed to start server", logger.Error(err))
+			os.Exit(1)
 		}
 	}()
 
-	// Wait for signal
-	<-sigCh
-	log.Println("Shutting down HTTP Gateway...")
+	// Wait for shutdown signal
+	<-quit
+	logger.Info("Shutting down HTTP Gateway...")
 
-	// Shutdown server
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer shutdownCancel()
-	
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Error during shutdown: %v", err)
+	// Shutdown gateway
+	if err := gw.Stop(); err != nil {
+		logger.Errorf("Error stopping gateway", logger.Error(err))
 	}
 
-	log.Println("HTTP Gateway shutdown complete")
+	// Shutdown HTTP server
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Errorf("Error during server shutdown", logger.Error(err))
+	}
+
+	logger.Info("HTTP Gateway shutdown complete")
 }

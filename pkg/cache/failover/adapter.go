@@ -48,14 +48,14 @@ func (a *QueryCacheAdapter) GetFailoverCache() *FailoverCache {
 	return a.failoverCache
 }
 
+// Close closes the underlying failover cache.
+func (a *QueryCacheAdapter) Close() error {
+	return a.failoverCache.Close()
+}
+
 // GetStorageStatus returns the health status of all storage backends.
 func (a *QueryCacheAdapter) GetStorageStatus() map[string]bool {
 	return a.failoverCache.GetStorageStatus()
-}
-
-// Close closes the adapter and underlying failover cache.
-func (a *QueryCacheAdapter) Close() error {
-	return a.failoverCache.Close()
 }
 
 // ORM-compatible interface (matches the existing QueryCache interface)
@@ -65,6 +65,7 @@ type ORMQueryCache interface {
 	Delete(key string)
 	Clear()
 	Keys() []string
+	Close() error
 }
 
 // Ensure QueryCacheAdapter implements ORMQueryCache

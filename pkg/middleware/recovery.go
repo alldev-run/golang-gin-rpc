@@ -14,27 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// RecoveryConfig holds configuration for recovery middleware
-type RecoveryConfig struct {
-	// StackSize is the stack size to be printed
-	StackSize int
-	// Logger is the logger to use for logging panics
-	Logger func(c *gin.Context, err interface{})
-	// LogAllRequests logs all requests, not just panics
-	LogAllRequests bool
-	// RequestBodyLimit limits the size of request body to log
-	RequestBodyLimit int64
-}
-
-// DefaultRecoveryConfig returns a default recovery configuration
-func DefaultRecoveryConfig() RecoveryConfig {
-	return RecoveryConfig{
-		StackSize:        4 * 1024, // 4KB
-		Logger:           defaultLogger,
-		LogAllRequests:   false,
-		RequestBodyLimit: 1024, // 1KB
-	}
-}
 
 // Recovery creates a recovery middleware that recovers from any panics
 func Recovery(config ...RecoveryConfig) gin.HandlerFunc {

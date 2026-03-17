@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"alldev-gin-rpc/pkg/tracing"
 )
 
 // ServerType represents the type of RPC server
@@ -73,10 +74,12 @@ type GRPCServer struct {
 
 // JSONRPCServer wraps JSON-RPC server
 type JSONRPCServer struct {
-	config *Config
-	server *http.Server
-	engine *gin.Engine
-	services map[string]interface{}
+	config     *Config
+	server     *http.Server
+	engine     *gin.Engine
+	services   map[string]interface{}
+	tracing    *tracing.JSONRPCInterceptor // Add tracing interceptor
+	auth       *RPCAuth                     // Add authentication
 }
 
 // NewServer creates a new RPC server based on configuration
@@ -114,11 +117,23 @@ func NewJSONRPCServer(config Config) *JSONRPCServer {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
+	// Initialize tracing interceptor
+	tracingInterceptor := tracing.NewJSONRPCInterceptor(tracing.GlobalTracer())
+	
+	// Add tracing middleware
+	engine.Use(tracingInterceptor.Middleware())
+
+	// Initialize authentication
+	authConfig := DefaultAuthConfig()
+	auth := NewRPCAuth(authConfig)
+
 	return &JSONRPCServer{
-		config:    &config,
-		server:    &http.Server{Addr: config.Host},
-		engine:    engine,
-		services: make(map[string]interface{}),
+		config:     &config,
+		server:     &http.Server{Addr: config.Host},
+		engine:     engine,
+		services:   make(map[string]interface{}),
+		tracing:    tracingInterceptor,
+		auth:       auth,
 	}
 }
 
@@ -193,12 +208,34 @@ func (s *JSONRPCServer) Type() ServerType {
 
 // setupRoutes sets up JSON-RPC routes
 func (s *JSONRPCServer) setupRoutes() {
-	s.engine.POST("/rpc", s.handleJSONRPC)
-	s.engine.GET("/rpc", s.handleJSONRPC) // Support GET for simple requests
+	// Wrap the handler with tracing
+	s.engine.POST("/rpc", s.tracing.WrapHandler("jsonrpc.request", s.handleJSONRPC))
+	s.engine.GET("/rpc", s.tracing.WrapHandler("jsonrpc.request", s.handleJSONRPC)) // Support GET for simple requests
 }
 
 // handleJSONRPC handles JSON-RPC requests
 func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
+	// Extract API key from request
+	apiKey := c.GetHeader("X-API-Key")
+	if apiKey == "" {
+		apiKey = c.Query("api_key")
+	}
+
+	// Set API key in context for RPC authentication
+	ctx := c.Request.Context()
+	if apiKey != "" {
+		ctx = SetAPIKeyInContext(ctx, apiKey)
+		// Set user info if key is valid
+		if s.auth.HasAPIKey(apiKey) {
+			if user, exists := s.auth.config.APIKeys[apiKey]; exists {
+				ctx = SetAPIUserInContext(ctx, user)
+			}
+		}
+	}
+
+	// Update request context
+	c.Request = c.Request.WithContext(ctx)
+
 	// TODO: Implement JSON-RPC 2.0 protocol handler
 	c.JSON(http.StatusOK, gin.H{
 		"jsonrpc": "2.0",
@@ -215,6 +252,38 @@ func (s *GRPCServer) GetServices() []Service {
 // GetServices returns all registered services
 func (s *JSONRPCServer) GetServices() map[string]interface{} {
 	return s.services
+}
+
+// SetAuthConfig sets the authentication configuration
+func (s *JSONRPCServer) SetAuthConfig(config AuthConfig) {
+	s.auth = NewRPCAuth(config)
+}
+
+// GetAuthConfig returns the current authentication configuration
+func (s *JSONRPCServer) GetAuthConfig() *RPCAuth {
+	return s.auth
+}
+
+// AddAPIKey adds an API key for authentication
+func (s *JSONRPCServer) AddAPIKey(key, description string) {
+	s.auth.AddAPIKey(key, description)
+}
+
+// RemoveAPIKey removes an API key from authentication
+func (s *JSONRPCServer) RemoveAPIKey(key string) {
+	s.auth.RemoveAPIKey(key)
+}
+
+// EnableAuth enables authentication with default configuration
+func (s *JSONRPCServer) EnableAuth() {
+	config := DefaultAuthConfig()
+	config.Enabled = true
+	s.auth = NewRPCAuth(config)
+}
+
+// DisableAuth disables authentication
+func (s *JSONRPCServer) DisableAuth() {
+	s.auth.config.Enabled = false
 }
 
 // ServiceInfo provides information about registered services

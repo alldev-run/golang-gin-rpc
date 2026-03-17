@@ -63,8 +63,8 @@ func NewServiceDiscoveryManager(config ManagerConfig) (*ServiceDiscoveryManager,
 
 	// Create discovery client
 	discoveryConfig := Config{
-		Type:    config.RegistryType,
-		Addr:    config.RegistryAddress,
+		Type:    RegistryType(config.RegistryType),
+		Address: config.RegistryAddress,
 		Timeout: config.Timeout,
 	}
 

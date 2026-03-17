@@ -2,19 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"go.uber.org/zap"
 	"alldev-gin-rpc/pkg/logger"
 	"alldev-gin-rpc/pkg/rpc"
 	"alldev-gin-rpc/pkg/rpc/examples"
 	"alldev-gin-rpc/pkg/rpc/grpc"
 	"alldev-gin-rpc/pkg/rpc/jsonrpc"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -115,14 +114,14 @@ func runDemoClients() {
 	}()
 }
 
-func demoGRPCClient() {
+func demoGRPCClient() error {
 	logger.Info("Demo gRPC client")
 
 	config := grpc.DefaultClientConfig()
 	client, err := grpc.NewClient(config)
 	if err != nil {
 		logger.Errorf("Failed to create gRPC client", zap.Error(err))
-		return
+		return err
 	}
 	defer client.Close()
 
@@ -131,19 +130,23 @@ func demoGRPCClient() {
 	// In a real implementation, you would use the generated gRPC client stubs
 	// For this demo, we'll just show the connection
 	logger.Info("gRPC client demo completed")
+	return nil
 }
 
-func demoJSONRPCClient() {
+func demoJSONRPCClient() error {
 	logger.Info("Demo JSON-RPC client")
 
 	config := jsonrpc.DefaultClientConfig()
-	client := jsonrpc.NewClient(config)
+
+	// Use traced client for distributed tracing
+	client := jsonrpc.NewTracedClient(config)
 
 	// Test system.ping
 	var pingResult interface{}
 	err := client.Call(context.Background(), "system.ping", nil, &pingResult)
 	if err != nil {
 		logger.Errorf("JSON-RPC ping failed", zap.Error(err))
+		return err
 	} else {
 		logger.Info("JSON-RPC ping successful", zap.Any("result", pingResult))
 	}
@@ -157,6 +160,7 @@ func demoJSONRPCClient() {
 	err = client.Call(context.Background(), "calculator.add", addReq, &addResp)
 	if err != nil {
 		logger.Errorf("JSON-RPC add failed", zap.Error(err))
+		return err
 	} else {
 		logger.Info("JSON-RPC add successful", zap.Float64("result", addResp.Result))
 	}
@@ -170,6 +174,7 @@ func demoJSONRPCClient() {
 	err = client.Call(context.Background(), "calculator.multiply", mulReq, &mulResp)
 	if err != nil {
 		logger.Errorf("JSON-RPC multiply failed", zap.Error(err))
+		return err
 	} else {
 		logger.Info("JSON-RPC multiply successful", zap.Float64("result", mulResp.Result))
 	}
@@ -183,8 +188,9 @@ func demoJSONRPCClient() {
 	err = client.Call(context.Background(), "echo.echo", echoReq, &echoResp)
 	if err != nil {
 		logger.Errorf("JSON-RPC echo failed", zap.Error(err))
+		return err
 	} else {
-		logger.Info("JSON-RPC echo successful", 
+		logger.Info("JSON-RPC echo successful",
 			zap.String("message", echoResp.Message),
 			zap.Int("count", echoResp.Count))
 	}
@@ -197,6 +203,7 @@ func demoJSONRPCClient() {
 	err = client.Call(context.Background(), "echo.reverse", reverseReq, &reverseResp)
 	if err != nil {
 		logger.Errorf("JSON-RPC reverse failed", zap.Error(err))
+		return err
 	} else {
 		logger.Info("JSON-RPC reverse successful", zap.String("reversed", reverseResp.Reversed))
 	}
@@ -209,13 +216,15 @@ func demoJSONRPCClient() {
 	err = client.Call(context.Background(), "calculator.getHistory", historyReq, &historyResp)
 	if err != nil {
 		logger.Errorf("JSON-RPC getHistory failed", zap.Error(err))
+		return err
 	} else {
-		logger.Info("JSON-RPC getHistory successful", 
+		logger.Info("JSON-RPC getHistory successful",
 			zap.Int("total", historyResp.Total),
 			zap.Int("returned", len(historyResp.History)))
 	}
 
 	logger.Info("JSON-RPC client demo completed")
+	return nil
 }
 
 // Example of creating a custom service
@@ -244,9 +253,9 @@ func (s *CustomService) HelloWorld(ctx context.Context, req interface{}) (interf
 
 func (s *CustomService) GetInfo(ctx context.Context, req interface{}) (interface{}, error) {
 	return map[string]interface{}{
-		"name":        s.Name(),
-		"uptime":      s.Uptime().String(),
-		"started_at":  s.StartTime(),
-		"metadata":    s.GetAllMetadata(),
+		"name":       s.Name(),
+		"uptime":     s.Uptime().String(),
+		"started_at": s.StartTime(),
+		"metadata":   s.GetAllMetadata(),
 	}, nil
 }

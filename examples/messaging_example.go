@@ -1,4 +1,4 @@
-package examples
+package main
 
 import (
 	"context"
@@ -22,9 +22,9 @@ type UserEvent struct {
 func RabbitMQExample() {
 	// RabbitMQ configuration using MessageType constant
 	config := messaging.Config{
-		Type:     messaging.RabbitMQ.String(),
+		Type:     messaging.MessageTypeRabbitMQ,
 		Host:     "localhost",
-		Port:     messaging.RabbitMQ.DefaultPort(),
+		Port:     messaging.MessageTypeRabbitMQ.DefaultPort(),
 		Username: "guest",
 		Password: "guest",
 		Database: "/",
@@ -36,14 +36,14 @@ func RabbitMQExample() {
 	}
 
 	// Create RabbitMQ client
-	client, err := messaging.CreateClientByType(messaging.RabbitMQ, config)
+	client, err := messaging.CreateClientByType(messaging.MessageTypeRabbitMQ, config)
 	if err != nil {
 		log.Fatalf("Failed to create RabbitMQ client: %v", err)
 	}
 	defer client.Close()
 
 	// Show capabilities
-	capabilities := messaging.GetClientCapabilities(messaging.RabbitMQ)
+	capabilities := messaging.GetClientCapabilities(messaging.MessageTypeRabbitMQ)
 	log.Printf("RabbitMQ capabilities: %+v", capabilities)
 
 	// Create context
@@ -106,9 +106,9 @@ func RabbitMQExample() {
 func KafkaExample() {
 	// Kafka configuration using MessageType constant
 	config := messaging.Config{
-		Type:     messaging.Kafka.String(),
+		Type:     messaging.MessageTypeKafka,
 		Host:     "localhost",
-		Port:     messaging.Kafka.DefaultPort(),
+		Port:     messaging.MessageTypeKafka.DefaultPort(),
 		Username: "",
 		Password: "",
 	}
@@ -119,14 +119,14 @@ func KafkaExample() {
 	}
 
 	// Create Kafka client
-	client, err := messaging.CreateClientByType(messaging.Kafka, config)
+	client, err := messaging.CreateClientByType(messaging.MessageTypeKafka, config)
 	if err != nil {
 		log.Fatalf("Failed to create Kafka client: %v", err)
 	}
 	defer client.Close()
 
 	// Show capabilities
-	capabilities := messaging.GetClientCapabilities(messaging.Kafka)
+	capabilities := messaging.GetClientCapabilities(messaging.MessageTypeKafka)
 	log.Printf("Kafka capabilities: %+v", capabilities)
 
 	// Create context
@@ -190,9 +190,9 @@ func KafkaExample() {
 func MessagingFactoryExample() {
 	// RabbitMQ example using factory and type constants
 	rabbitMQConfig := messaging.Config{
-		Type:     messaging.RabbitMQ.String(),
+		Type:     messaging.MessageTypeRabbitMQ,
 		Host:     "localhost",
-		Port:     messaging.RabbitMQ.DefaultPort(),
+		Port:     messaging.MessageTypeRabbitMQ.DefaultPort(),
 		Username: "guest",
 		Password: "guest",
 		Database: "/",
@@ -202,7 +202,7 @@ func MessagingFactoryExample() {
 	if err := messaging.ValidateConfig(rabbitMQConfig); err != nil {
 		log.Printf("Invalid RabbitMQ config: %v", err)
 	} else {
-		rabbitClient, err := messaging.CreateClientByType(messaging.RabbitMQ, rabbitMQConfig)
+		rabbitClient, err := messaging.CreateClientByType(messaging.MessageTypeRabbitMQ, rabbitMQConfig)
 		if err != nil {
 			log.Printf("Failed to create RabbitMQ client: %v", err)
 		} else {
@@ -213,16 +213,16 @@ func MessagingFactoryExample() {
 
 	// Kafka example using factory and type constants
 	kafkaConfig := messaging.Config{
-		Type: messaging.Kafka.String(),
+		Type: messaging.MessageTypeKafka,
 		Host: "localhost",
-		Port: messaging.Kafka.DefaultPort(),
+		Port: messaging.MessageTypeKafka.DefaultPort(),
 	}
 
 	// Validate configuration
 	if err := messaging.ValidateConfig(kafkaConfig); err != nil {
 		log.Printf("Invalid Kafka config: %v", err)
 	} else {
-		kafkaClient, err := messaging.CreateClientByType(messaging.Kafka, kafkaConfig)
+		kafkaClient, err := messaging.CreateClientByType(messaging.MessageTypeKafka, kafkaConfig)
 		if err != nil {
 			log.Printf("Failed to create Kafka client: %v", err)
 		} else {

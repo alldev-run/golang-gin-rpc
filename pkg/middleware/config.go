@@ -1,6 +1,6 @@
 package middleware
 
-import "time"
+import "github.com/gin-gonic/gin"
 
 // AuthConfig holds configuration for authentication middleware
 type AuthConfig struct {
@@ -21,6 +21,12 @@ type AuthConfig struct {
 	
 	// CookieName is the cookie name for token
 	CookieName string `yaml:"cookie_name" json:"cookie_name"`
+	
+	// TokenLookup is how to look for the token (default: "header:Authorization:Bearer ")
+	TokenLookup string `yaml:"token_lookup" json:"token_lookup"`
+	
+	// KeyFunc is a function to extract user ID from claims (default: claims.UserID)
+	KeyFunc func(*interface{}) string `yaml:"-" json:"-"`
 	
 	// Enabled indicates if auth middleware is enabled
 	Enabled bool `yaml:"enabled" json:"enabled"`
@@ -46,6 +52,9 @@ type CORSConfig struct {
 	// MaxAge indicates how long the results of a preflight request can be cached
 	MaxAge int `yaml:"max_age" json:"max_age"`
 	
+	// OptionsPassthrough passes through the OPTIONS request to the next handler
+	OptionsPassthrough bool `yaml:"options_passthrough" json:"options_passthrough"`
+	
 	// Enabled indicates if CORS middleware is enabled
 	Enabled bool `yaml:"enabled" json:"enabled"`
 }
@@ -64,6 +73,12 @@ type RateLimiterConfig struct {
 	// KeyGenerator function for generating rate limit keys
 	KeyGenerator func(string) string `yaml:"-" json:"-"`
 	
+	// SkipSuccessful skips counting successful requests (2xx status codes)
+	SkipSuccessful bool `yaml:"skip_successful" json:"skip_successful"`
+	
+	// Message to return when rate limited
+	Message string `yaml:"message" json:"message"`
+	
 	// Enabled indicates if rate limiting middleware is enabled
 	Enabled bool `yaml:"enabled" json:"enabled"`
 }
@@ -74,7 +89,13 @@ type RecoveryConfig struct {
 	StackSize int `yaml:"stack_size" json:"stack_size"`
 	
 	// Logger is the logger to use for logging panics
-	Logger interface{} `yaml:"-" json:"-"`
+	Logger func(c *gin.Context, err interface{}) `yaml:"-" json:"-"`
+	
+	// LogAllRequests logs all requests, not just panics
+	LogAllRequests bool `yaml:"log_all_requests" json:"log_all_requests"`
+	
+	// RequestBodyLimit limits the size of request body to log
+	RequestBodyLimit int64 `yaml:"request_body_limit" json:"request_body_limit"`
 	
 	// DisableStackAll disables printing stack trace for all errors
 	DisableStackAll bool `yaml:"disable_stack_all" json:"disable_stack_all"`

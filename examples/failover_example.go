@@ -83,8 +83,8 @@ func main() {
 	}
 	defer memoryFileCache.Close()
 	
-	memoryFileCache.Set("backup_key", "backup_value", 20*time.Minute)
-	if value, found := memoryFileCache.Get("backup_key"); found {
+	memoryFileCache.Set(context.Background(), "backup_key", "backup_value", 20*time.Minute)
+	if value, found := memoryFileCache.Get(context.Background(), "backup_key"); found {
 		fmt.Printf("Retrieved from memory-file failover: %v\n", value)
 	}
 	

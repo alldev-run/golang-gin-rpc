@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"alldev-gin-rpc/pkg/db/orm"
@@ -24,7 +23,7 @@ func main() {
 		MaxRetryDelay:      10 * time.Second,
 		
 		// Transaction configuration
-		IsolationLevel: orm.LevelReadCommitted,
+		IsolationLevel: sql.LevelReadCommitted,
 		ReadOnly:       false,
 		Timeout:        30 * time.Second,
 		
@@ -145,7 +144,7 @@ func main() {
 		RetryDelay:         25 * time.Millisecond,
 		RetryBackoffFactor: 1.5,
 		MaxRetryDelay:      2 * time.Second,
-		IsolationLevel:     orm.LevelReadCommitted,
+		IsolationLevel:     sql.LevelReadCommitted,
 		Timeout:            10 * time.Second,
 		EnableMetrics:      true,
 		LogSlowQueries:     true,
@@ -237,10 +236,11 @@ func main() {
 // mockDB provides a mock database implementation for testing
 type mockDB struct{}
 
-// BeginTx implements the DB interface for mock
-func (m *mockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
-	// Mock implementation - in real usage, this would return an actual transaction
-	return nil, fmt.Errorf("mock database - not implemented")
+// Begin implements the DB interface for mock
+func (m *mockDB) Begin(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	// Mock implementation
+	fmt.Printf("    Begin transaction\n")
+	return nil, fmt.Errorf("mock database - transaction not implemented")
 }
 
 // Exec implements the DB interface for mock
