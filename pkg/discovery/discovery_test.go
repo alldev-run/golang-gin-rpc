@@ -52,7 +52,7 @@ func TestNewDiscovery(t *testing.T) {
 	// Test consul discovery
 	consulConfig := Config{
 		Type:    "consul",
-		Addr:    "127.0.0.1:8500",
+		Address: "127.0.0.1:8500",
 		Timeout: 5 * time.Second,
 	}
 	
@@ -69,7 +69,7 @@ func TestNewDiscovery(t *testing.T) {
 	// Test etcd discovery
 	etcdConfig := Config{
 		Type:    "etcd",
-		Addr:    "127.0.0.1:2379",
+		Address: "127.0.0.1:2379",
 		Timeout: 5 * time.Second,
 	}
 	
@@ -86,7 +86,7 @@ func TestNewDiscovery(t *testing.T) {
 	// Test invalid type
 	invalidConfig := Config{
 		Type:    "invalid",
-		Addr:    "127.0.0.1:1234",
+		Address: "127.0.0.1:1234",
 		Timeout: 5 * time.Second,
 	}
 	
@@ -101,7 +101,7 @@ func TestNewDiscovery(t *testing.T) {
 	// Test empty type
 	emptyConfig := Config{
 		Type:    "",
-		Addr:    "127.0.0.1:1234",
+		Address: "127.0.0.1:1234",
 		Timeout: 5 * time.Second,
 	}
 	
@@ -364,15 +364,15 @@ func TestConcurrentDiscoveryOperations(t *testing.T) {
 func TestDiscoveryConfig(t *testing.T) {
 	config := Config{
 		Type:    "consul",
-		Addr:    "127.0.0.1:8500",
+		Address: "127.0.0.1:8500",
 		Timeout: 5 * time.Second,
 	}
 
 	if config.Type != "consul" {
 		t.Errorf("Expected Type 'consul', got '%s'", config.Type)
 	}
-	if config.Addr != "127.0.0.1:8500" {
-		t.Errorf("Expected Addr '127.0.0.1:8500', got '%s'", config.Addr)
+	if config.Address != "127.0.0.1:8500" {
+		t.Errorf("Expected Address '127.0.0.1:8500', got '%s'", config.Address)
 	}
 	if config.Timeout != 5*time.Second {
 		t.Errorf("Expected Timeout 5s, got %v", config.Timeout)

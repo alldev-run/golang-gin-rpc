@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"alldev-gin-rpc/pkg/ratelimiter"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 	"alldev-gin-rpc/pkg/tracing"
 )
@@ -89,29 +90,39 @@ type JSONRPCServer struct {
 }
 
 // NewServer creates a new RPC server based on configuration
-func NewServer(config Config) Server {
+func NewServer(config Config) (Server, error) {
 	switch config.Type {
 	case ServerTypeGRPC:
 		return NewGRPCServer(config)
 	case ServerTypeJSONRPC:
-		return NewJSONRPCServer(config)
+		return NewJSONRPCServer(config), nil
 	default:
-		panic(fmt.Sprintf("unsupported server type: %s", config.Type))
+		return nil, fmt.Errorf("unsupported server type: %s", config.Type)
 	}
 }
 
 // NewGRPCServer creates a new gRPC server
-func NewGRPCServer(config Config) *GRPCServer {
+func NewGRPCServer(config Config) (*GRPCServer, error) {
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	}
+	if config.EnableTLS {
+		if config.CertFile == "" || config.KeyFile == "" {
+			return nil, fmt.Errorf("grpc TLS enabled but cert_file/key_file not configured")
+		}
+		creds, err := credentials.NewServerTLSFromFile(config.CertFile, config.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load grpc TLS certs: %w", err)
+		}
+		opts = append(opts, grpc.Creds(creds))
 	}
 
 	return &GRPCServer{
 		config:    &config,
 		server:    grpc.NewServer(opts...),
 		services: []Service{},
-	}
+	}, nil
 }
 
 // NewJSONRPCServer creates a new JSON-RPC server
@@ -179,6 +190,12 @@ func (s *GRPCServer) Start() error {
 // Start starts the JSON-RPC server
 func (s *JSONRPCServer) Start() error {
 	s.setupRoutes()
+	if s.config.EnableTLS {
+		if s.config.CertFile == "" || s.config.KeyFile == "" {
+			return fmt.Errorf("jsonrpc TLS enabled but cert_file/key_file not configured")
+		}
+		return s.server.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
+	}
 	return s.server.ListenAndServe()
 }
 

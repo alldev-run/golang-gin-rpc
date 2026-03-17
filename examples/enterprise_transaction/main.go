@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Enterprise Transaction Manager Examples ===\n")
+	fmt.Println("=== Enterprise Transaction Manager Examples ===")
 
 	// Example 1: Basic enterprise transaction manager setup
 	fmt.Println("1. Basic Enterprise Transaction Manager:")

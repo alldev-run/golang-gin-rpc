@@ -74,7 +74,13 @@ func NewManager(config ManagerConfig) *Manager {
 	
 	// Initialize servers from config
 	for name, serverConfig := range config.Servers {
-		server := NewServer(serverConfig)
+		server, err := NewServer(serverConfig)
+		if err != nil {
+			logger.Errorf("Failed to create RPC server from config",
+				zap.String("name", name),
+				zap.Error(err))
+			continue
+		}
 		if setter, ok := server.(interface{ SetDegradationManager(*DegradationManager) }); ok {
 			setter.SetDegradationManager(manager.degradationManager)
 		}
@@ -100,7 +106,10 @@ func (m *Manager) AddServer(name string, config Config) error {
 		return fmt.Errorf("server %s already exists", name)
 	}
 	
-	server := NewServer(config)
+	server, err := NewServer(config)
+	if err != nil {
+		return fmt.Errorf("failed to create server %s: %w", name, err)
+	}
 	if setter, ok := server.(interface{ SetDegradationManager(*DegradationManager) }); ok {
 		setter.SetDegradationManager(m.degradationManager)
 	}
@@ -281,16 +290,29 @@ func (m *Manager) Stop() error {
 	logger.Info("Stopping RPC manager...")
 	
 	// Create context with timeout for graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), m.config.GracefulShutdownTimeout)
+	shutdownTimeout := m.config.GracefulShutdownTimeout
+	if shutdownTimeout <= 0 {
+		shutdownTimeout = 10 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	
 	// Stop all servers
-	var errors []error
+	var (
+		errors []error
+		errMu  sync.Mutex
+		wg     sync.WaitGroup
+	)
 	for name, server := range m.servers {
+		wg.Add(1)
 		go func(serverName string, rpcServer Server) {
+			defer wg.Done()
 			logger.Info("Stopping RPC server", zap.String("name", serverName))
 			
 			if err := rpcServer.Stop(); err != nil {
+				errMu.Lock()
+				errors = append(errors, fmt.Errorf("server %s stop failed: %w", serverName, err))
+				errMu.Unlock()
 				logger.Errorf("Failed to stop RPC server", 
 					zap.String("name", serverName),
 					zap.Error(err))
@@ -303,8 +325,7 @@ func (m *Manager) Stop() error {
 	// Wait for all servers to stop or timeout
 	done := make(chan struct{})
 	go func() {
-		// In a real implementation, you would wait for actual server shutdown
-		time.Sleep(1 * time.Second)
+		wg.Wait()
 		close(done)
 	}()
 	
@@ -313,7 +334,9 @@ func (m *Manager) Stop() error {
 		logger.Info("All RPC servers stopped gracefully")
 	case <-ctx.Done():
 		logger.Warn("Graceful shutdown timeout, forcing stop")
+		errMu.Lock()
 		errors = append(errors, fmt.Errorf("graceful shutdown timeout"))
+		errMu.Unlock()
 	}
 	
 	m.started = false

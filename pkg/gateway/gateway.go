@@ -55,8 +55,12 @@ type LoadBalancer interface {
 // NewGateway creates a new gateway instance
 func NewGateway(config *Config) *Gateway {
 	ctx, cancel := context.WithCancel(context.Background())
-	
-	return &Gateway{
+	router := &Router{
+		routes: make(map[string]*Route),
+	}
+	balancer := NewLoadBalancerFactory().Create(config.LoadBalancer.Strategy)
+
+	gateway := &Gateway{
 		config: config,
 		server: &Server{
 			host:         config.Host,
@@ -65,12 +69,27 @@ func NewGateway(config *Config) *Gateway {
 			writeTimeout: config.WriteTimeout,
 			idleTimeout:  config.IdleTimeout,
 		},
-		router: &Router{
-			routes: make(map[string]*Route),
-		},
-		ctx:    ctx,
-		cancel: cancel,
+		router:   router,
+		balancer: balancer,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
+
+	for _, routeConfig := range config.Routes {
+		route := &Route{
+			config:  routeConfig,
+			targets: append([]string(nil), routeConfig.Targets...),
+			timeout: routeConfig.Timeout,
+			retries: routeConfig.Retries,
+		}
+		key := gateway.routeKey(routeConfig.Path, routeConfig.Method)
+		router.routes[key] = route
+		if len(route.targets) > 0 && balancer != nil {
+			balancer.UpdateTargets(route.targets)
+		}
+	}
+
+	return gateway
 }
 
 // Initialize initializes the gateway
@@ -186,7 +205,7 @@ func (g *Gateway) initRoutes() error {
 	for _, routeConfig := range g.config.Routes {
 		route := &Route{
 			config:   routeConfig,
-			targets:  []string{},
+			targets:  append([]string(nil), routeConfig.Targets...),
 			timeout:  routeConfig.Timeout,
 			retries:  routeConfig.Retries,
 		}
@@ -198,7 +217,7 @@ func (g *Gateway) initRoutes() error {
 				logger.Errorf("Failed to get endpoints for service", 
 					logger.String("service", routeConfig.Service), logger.Error(err))
 				// Continue with empty targets, will be refreshed later
-			} else {
+			} else if len(endpoints) > 0 {
 				route.targets = endpoints
 			}
 		}

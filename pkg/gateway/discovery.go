@@ -37,20 +37,20 @@ type ServiceInstance struct {
 // NewServiceDiscovery creates a new service discovery instance using existing discovery package
 func NewServiceDiscovery(config DiscoveryConfig) (*ServiceDiscovery, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	
-	// Create discovery instance using existing factory
-	discoveryConfig := discovery.Config{
-		Type:    discovery.RegistryType(config.Type),
-		Address: config.Endpoints[0], // Use first endpoint for now
-		Timeout: config.Timeout,
-	}
-	
+
 	if config.Type == "static" || len(config.Endpoints) == 0 {
 		// For static discovery, return a mock implementation
 		return &ServiceDiscovery{
 			ctx:    ctx,
 			cancel: cancel,
 		}, nil
+	}
+	
+	// Create discovery instance using existing factory
+	discoveryConfig := discovery.Config{
+		Type:    discovery.RegistryType(config.Type),
+		Address: config.Endpoints[0], // Use first endpoint for now
+		Timeout: config.Timeout,
 	}
 	
 	disc, err := discovery.NewDiscovery(discoveryConfig)

@@ -23,6 +23,9 @@ func Recovery(config ...RecoveryConfig) gin.HandlerFunc {
 	} else {
 		cfg = DefaultRecoveryConfig()
 	}
+	if cfg.Logger == nil {
+		cfg.Logger = defaultLogger
+	}
 
 	return func(c *gin.Context) {
 		defer func() {

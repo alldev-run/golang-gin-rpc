@@ -232,6 +232,16 @@ type MockClient struct {
 	*MockSubscriber
 }
 
+func (m *MockClient) Close() error {
+	if m.MockPublisher != nil {
+		m.MockPublisher.closeCalled = true
+	}
+	if m.MockSubscriber != nil {
+		m.MockSubscriber.closeCalled = true
+	}
+	return nil
+}
+
 func TestClientInterface(t *testing.T) {
 	mock := &MockClient{
 		MockPublisher: &MockPublisher{},
@@ -274,6 +284,12 @@ func TestClientInterface(t *testing.T) {
 	err = mock.Close()
 	if err != nil {
 		t.Errorf("Client.Close() error = %v, want nil", err)
+	}
+	if !mock.MockPublisher.closeCalled {
+		t.Error("Client.Close() should close publisher")
+	}
+	if !mock.MockSubscriber.closeCalled {
+		t.Error("Client.Close() should close subscriber")
 	}
 }
 

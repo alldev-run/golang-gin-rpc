@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func TestNewMetricsCollector(t *testing.T) {
@@ -162,27 +164,21 @@ func TestMetricsCollector_UpdateGoroutineCount(t *testing.T) {
 }
 
 func TestMetricsCollector_MetricsHandler(t *testing.T) {
-	// Test metrics handler - use promhttp.Handler()
+	NewMetricsCollector()
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	w := httptest.NewRecorder()
-	
-	// Create a simple server to test the handler
+
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// This would normally use promhttp.Handler()
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("# HELP test_metric Test metric\ntest_metric 1\n"))
-	}))
-	
+	mux.Handle("/metrics", promhttp.Handler())
 	mux.ServeHTTP(w, req)
-	
+
 	resp := w.Result()
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("MetricsHandler() should return 200, got %d", resp.StatusCode)
 	}
-	
+
 	// Check content type
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "text/plain") {
@@ -550,7 +546,7 @@ func BenchmarkSystemMetricsCollector_collectSystemMetrics(b *testing.B) {
 // Integration test for metrics flow
 func TestMetricsFlow(t *testing.T) {
 	collector := NewMetricsCollector()
-	
+
 	// Simulate application activity
 	for i := 0; i < 100; i++ {
 		collector.RecordHTTPRequest("GET", "/api/users", "200", time.Duration(i)*time.Millisecond)
@@ -561,19 +557,15 @@ func TestMetricsFlow(t *testing.T) {
 	
 	// Test metrics handler
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("# HELP test_metric Test metric\ntest_metric 1\n"))
-	}))
-	
+	mux.Handle("/metrics", promhttp.Handler())
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	w := httptest.NewRecorder()
-	
+
 	mux.ServeHTTP(w, req)
-	
+
 	resp := w.Result()
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Metrics flow test: handler should return 200, got %d", resp.StatusCode)
 	}

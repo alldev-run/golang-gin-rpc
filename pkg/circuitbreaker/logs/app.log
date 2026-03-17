@@ -1,0 +1,7 @@
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T13:59:43+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T14:20:35+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T14:21:53+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T14:23:28+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T14:24:27+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T14:35:31+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T14:35:45+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}

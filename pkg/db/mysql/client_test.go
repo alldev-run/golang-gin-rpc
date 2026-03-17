@@ -108,7 +108,7 @@ func TestClientMethods(t *testing.T) {
 }
 
 func TestWhereBuilder(t *testing.T) {
-	wb := orm.NewWhereBuilder()
+	wb := orm.NewWhereBuilder(orm.NewDefaultDialect())
 
 	// Test empty builder
 	where, args := wb.Build()
@@ -148,7 +148,7 @@ func TestSelectBuilder(t *testing.T) {
 
 	// Test basic SELECT
 	query, args := sb.Build()
-	expectedQuery := "SELECT * FROM users"
+	expectedQuery := "SELECT * FROM `users`"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
@@ -156,7 +156,7 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with columns
 	sb.Columns("id", "name", "email")
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users`"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)
 	}
@@ -164,7 +164,7 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with WHERE
 	sb.Where("id = ?", 1).And("status = ?", "active")
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE id = ? AND status = ?"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? AND status = ?"
 	expectedArgs := []interface{}{1, "active"}
 	if query != expectedQuery || len(args) != 2 || args[0] != 1 || args[1] != "active" {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -173,7 +173,7 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with ORDER BY
 	sb.OrderBy("created_at DESC")
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE id = ? AND status = ? ORDER BY created_at DESC"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? AND status = ? ORDER BY created_at DESC"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)
 	}
@@ -181,7 +181,7 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with LIMIT
 	sb.Limit(10)
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE id = ? AND status = ? ORDER BY created_at DESC LIMIT 10"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? AND status = ? ORDER BY created_at DESC LIMIT 10"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)
 	}
@@ -189,7 +189,7 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with OFFSET
 	sb.Offset(20)
 	query, args = sb.Build()
-	expectedQuery = "SELECT id, name, email FROM users WHERE id = ? AND status = ? ORDER BY created_at DESC LIMIT 10 OFFSET 20"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? AND status = ? ORDER BY created_at DESC LIMIT 10 OFFSET 20"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)
 	}
@@ -210,7 +210,7 @@ func TestSelectBuilderWithJoins(t *testing.T) {
 		OrderBy("u.created_at DESC")
 
 	query, args := sb.Build()
-	expectedQuery := "SELECT u.id, u.name, p.title FROM users INNER JOIN posts p ON u.id = p.user_id LEFT JOIN comments c ON p.id = c.post_id RIGHT JOIN categories cat ON p.category_id = cat.id FULL OUTER JOIN tags t ON p.id = t.post_id WHERE u.status = ? GROUP BY u.id, u.name HAVING COUNT(p.id) > ? ORDER BY u.created_at DESC"
+	expectedQuery := "SELECT `u.id`, `u.name`, `p.title` FROM `users` INNER JOIN `posts p` ON u.id = p.user_id LEFT JOIN `comments c` ON p.id = c.post_id RIGHT JOIN `categories cat` ON p.category_id = cat.id FULL OUTER JOIN `tags t` ON p.id = t.post_id WHERE u.status = ? GROUP BY `u.id`, `u.name` HAVING COUNT(p.id) > ? ORDER BY u.created_at DESC"
 	expectedArgs := []interface{}{"active", 5}
 
 	if query != expectedQuery {
@@ -231,7 +231,7 @@ func TestJoinWithType(t *testing.T) {
 		Where("u.status = ?", "active")
 
 	query, args := sb.Build()
-	expectedQuery := "SELECT u.id, u.name, p.title FROM users CROSS JOIN posts p ON true WHERE u.status = ?"
+	expectedQuery := "SELECT `u.id`, `u.name`, `p.title` FROM `users` CROSS JOIN `posts p` ON true WHERE u.status = ?"
 	expectedArgs := []interface{}{"active"}
 
 	if query != expectedQuery {
@@ -248,42 +248,42 @@ func TestAggregationFunctions(t *testing.T) {
 
 	// Test COUNT
 	countQuery, countArgs := client.Count("users").Where("status = ?", "active").Build()
-	expectedCountQuery := "SELECT COUNT(*) FROM users WHERE status = ?"
+	expectedCountQuery := "SELECT `COUNT(*)` FROM `users` WHERE status = ?"
 	if countQuery != expectedCountQuery || len(countArgs) != 1 || countArgs[0] != "active" {
 		t.Errorf("COUNT query failed: got query='%s', args=%v", countQuery, countArgs)
 	}
 
 	// Test COUNT with column
 	countColQuery, countColArgs := client.CountColumn("orders", "id").Where("status = ?", "completed").Build()
-	expectedCountColQuery := "SELECT COUNT(id) FROM orders WHERE status = ?"
+	expectedCountColQuery := "SELECT `COUNT(id)` FROM `orders` WHERE status = ?"
 	if countColQuery != expectedCountColQuery || len(countColArgs) != 1 || countColArgs[0] != "completed" {
 		t.Errorf("COUNT column query failed: got query='%s', args=%v", countColQuery, countColArgs)
 	}
 
 	// Test SUM
 	sumQuery, sumArgs := client.Sum("orders", "total_amount").Where("created_at >= ?", "2023-01-01").Build()
-	expectedSumQuery := "SELECT SUM(total_amount) FROM orders WHERE created_at >= ?"
+	expectedSumQuery := "SELECT `SUM(total_amount)` FROM `orders` WHERE created_at >= ?"
 	if sumQuery != expectedSumQuery || len(sumArgs) != 1 || sumArgs[0] != "2023-01-01" {
 		t.Errorf("SUM query failed: got query='%s', args=%v", sumQuery, sumArgs)
 	}
 
 	// Test AVG
 	avgQuery, avgArgs := client.Avg("products", "price").Where("category = ?", "electronics").Build()
-	expectedAvgQuery := "SELECT AVG(price) FROM products WHERE category = ?"
+	expectedAvgQuery := "SELECT `AVG(price)` FROM `products` WHERE category = ?"
 	if avgQuery != expectedAvgQuery || len(avgArgs) != 1 || avgArgs[0] != "electronics" {
 		t.Errorf("AVG query failed: got query='%s', args=%v", avgQuery, avgArgs)
 	}
 
 	// Test MAX
 	maxQuery, maxArgs := client.Max("temperatures", "value").Where("sensor_id = ?", 1).Build()
-	expectedMaxQuery := "SELECT MAX(value) FROM temperatures WHERE sensor_id = ?"
+	expectedMaxQuery := "SELECT `MAX(value)` FROM `temperatures` WHERE sensor_id = ?"
 	if maxQuery != expectedMaxQuery || len(maxArgs) != 1 || maxArgs[0] != 1 {
 		t.Errorf("MAX query failed: got query='%s', args=%v", maxQuery, maxArgs)
 	}
 
 	// Test MIN
 	minQuery, minArgs := client.Min("products", "stock_quantity").Where("supplier_id = ?", 123).Build()
-	expectedMinQuery := "SELECT MIN(stock_quantity) FROM products WHERE supplier_id = ?"
+	expectedMinQuery := "SELECT `MIN(stock_quantity)` FROM `products` WHERE supplier_id = ?"
 	if minQuery != expectedMinQuery || len(minArgs) != 1 || minArgs[0] != 123 {
 		t.Errorf("MIN query failed: got query='%s', args=%v", minQuery, minArgs)
 	}
@@ -301,7 +301,7 @@ func TestSelectBuilderTransactionMethods(t *testing.T) {
 	// Test that QueryTx and QueryRowTx methods exist and can be called
 	// (We can't test actual execution without a real transaction, but we can verify method signatures)
 	query, args := sb.Build()
-	expectedQuery := "SELECT id, name, email FROM users WHERE status = ? ORDER BY created_at DESC LIMIT 10"
+	expectedQuery := "SELECT `id`, `name`, `email` FROM `users` WHERE status = ? ORDER BY created_at DESC LIMIT 10"
 
 	if query != expectedQuery || len(args) != 1 || args[0] != "active" {
 		t.Errorf("SelectBuilder build failed: got query='%s', args=%v", query, args)
@@ -324,7 +324,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 		ForUpdate()
 
 	query1, args1 := sb1.Build()
-	expectedQuery1 := "SELECT id, balance FROM accounts WHERE user_id = ? FOR UPDATE"
+	expectedQuery1 := "SELECT `id`, `balance` FROM `accounts` WHERE user_id = ? FOR UPDATE"
 	if query1 != expectedQuery1 || len(args1) != 1 || args1[0] != 123 {
 		t.Errorf("FOR UPDATE query failed: got query='%s', args=%v", query1, args1)
 	}
@@ -336,7 +336,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 		LockInShareMode()
 
 	query2, args2 := sb2.Build()
-	expectedQuery2 := "SELECT id, name, stock FROM products WHERE category = ? LOCK IN SHARE MODE"
+	expectedQuery2 := "SELECT `id`, `name`, `stock` FROM `products` WHERE category = ? LOCK IN SHARE MODE"
 	if query2 != expectedQuery2 || len(args2) != 1 || args2[0] != "electronics" {
 		t.Errorf("LOCK IN SHARE MODE query failed: got query='%s', args=%v", query2, args2)
 	}
@@ -348,7 +348,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 		Lock("FOR UPDATE NOWAIT")
 
 	query3, args3 := sb3.Build()
-	expectedQuery3 := "SELECT id, total FROM orders WHERE status = ? FOR UPDATE NOWAIT"
+	expectedQuery3 := "SELECT `id`, `total` FROM `orders` WHERE status = ? FOR UPDATE NOWAIT"
 	if query3 != expectedQuery3 || len(args3) != 1 || args3[0] != "pending" {
 		t.Errorf("Custom lock query failed: got query='%s', args=%v", query3, args3)
 	}
@@ -361,7 +361,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 		ForUpdate()
 
 	query4, args4 := sb4.Build()
-	expectedQuery4 := "SELECT u.id, u.name, a.balance FROM users u LEFT JOIN accounts a ON u.id = a.user_id WHERE u.status = ? FOR UPDATE"
+	expectedQuery4 := "SELECT `u.id`, `u.name`, `a.balance` FROM `users u` LEFT JOIN `accounts a` ON u.id = a.user_id WHERE u.status = ? FOR UPDATE"
 	if query4 != expectedQuery4 || len(args4) != 1 || args4[0] != "active" {
 		t.Errorf("Lock with JOIN query failed: got query='%s', args=%v", query4, args4)
 	}

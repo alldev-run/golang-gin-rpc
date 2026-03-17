@@ -4,11 +4,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"alldev-gin-rpc/pkg/logger"
 )
+
+var requestIDCounter uint64
 
 // corsMiddleware provides CORS middleware
 func corsMiddleware(config CORSConfig) gin.HandlerFunc {
@@ -149,8 +152,9 @@ func parseDuration(s string) time.Duration {
 
 // generateRequestID generates a unique request ID
 func generateRequestID() string {
-	// Simple implementation - in production you'd want something more robust
-	return strconv.FormatInt(time.Now().UnixNano(), 36)
+	ts := time.Now().UnixNano()
+	seq := atomic.AddUint64(&requestIDCounter, 1)
+	return strconv.FormatInt(ts, 36) + strconv.FormatUint(seq, 36)
 }
 
 // IsTimeout checks if error is a timeout error

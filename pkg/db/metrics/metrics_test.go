@@ -16,7 +16,7 @@ func TestDBQueryDuration(t *testing.T) {
 	DBQueryDuration.WithLabelValues("mysql", "select", "users").Observe(0.5)
 
 	// Verify the metric was recorded
-	metricChan := make(chan prometheus.Metric, 1)
+	metricChan := make(chan prometheus.Metric, 10)
 	DBQueryDuration.Collect(metricChan)
 	metric := <-metricChan
 
@@ -29,9 +29,9 @@ func TestDBQueryDuration(t *testing.T) {
 	hist := DBQueryDuration.WithLabelValues(labels...)
 	hist.Observe(1.0)
 
-	// Verify histogram has correct label values
-	metricChan = make(chan prometheus.Metric, 1)
-	DBQueryDuration.WithLabelValues(labels...).Collect(metricChan)
+	// Verify histogram collector is still available after recording with another label set
+	metricChan = make(chan prometheus.Metric, 10)
+	DBQueryDuration.Collect(metricChan)
 	metric = <-metricChan
 
 	if metric == nil {
@@ -49,7 +49,7 @@ func TestDBQueryTotal(t *testing.T) {
 	DBQueryTotal.WithLabelValues("mysql", "select", "success").Inc()
 
 	// Verify the counter was incremented
-	metricChan := make(chan prometheus.Metric, 1)
+	metricChan := make(chan prometheus.Metric, 10)
 	DBQueryTotal.Collect(metricChan)
 	metric := <-metricChan
 
@@ -61,8 +61,8 @@ func TestDBQueryTotal(t *testing.T) {
 	DBQueryTotal.WithLabelValues("mysql", "select", "success").Inc()
 	DBQueryTotal.WithLabelValues("mysql", "select", "success").Inc()
 
-	metricChan = make(chan prometheus.Metric, 1)
-	DBQueryTotal.WithLabelValues("mysql", "select", "success").Collect(metricChan)
+	metricChan = make(chan prometheus.Metric, 10)
+	DBQueryTotal.Collect(metricChan)
 	metric = <-metricChan
 
 	if metric == nil {
@@ -80,7 +80,7 @@ func TestDBConnectionPoolSize(t *testing.T) {
 	DBConnectionPoolSize.WithLabelValues("mysql", "master").Set(10.0)
 
 	// Verify the gauge was set
-	metricChan := make(chan prometheus.Metric, 1)
+	metricChan := make(chan prometheus.Metric, 10)
 	DBConnectionPoolSize.Collect(metricChan)
 	metric := <-metricChan
 
@@ -91,8 +91,8 @@ func TestDBConnectionPoolSize(t *testing.T) {
 	// Test updating gauge value
 	DBConnectionPoolSize.WithLabelValues("mysql", "master").Set(15.0)
 
-	metricChan = make(chan prometheus.Metric, 1)
-	DBConnectionPoolSize.WithLabelValues("mysql", "master").Collect(metricChan)
+	metricChan = make(chan prometheus.Metric, 10)
+	DBConnectionPoolSize.Collect(metricChan)
 	metric = <-metricChan
 
 	if metric == nil {
@@ -110,7 +110,7 @@ func TestDBConnectionActive(t *testing.T) {
 	DBConnectionActive.WithLabelValues("mysql", "master").Set(5.0)
 
 	// Verify the gauge was set
-	metricChan := make(chan prometheus.Metric, 1)
+	metricChan := make(chan prometheus.Metric, 10)
 	DBConnectionActive.Collect(metricChan)
 	metric := <-metricChan
 
@@ -129,7 +129,7 @@ func TestDBSlowQueryTotal(t *testing.T) {
 	DBSlowQueryTotal.WithLabelValues("mysql", "1s").Inc()
 
 	// Verify the counter was incremented
-	metricChan := make(chan prometheus.Metric, 1)
+	metricChan := make(chan prometheus.Metric, 10)
 	DBSlowQueryTotal.Collect(metricChan)
 	metric := <-metricChan
 
@@ -148,7 +148,7 @@ func TestCircuitBreakerState(t *testing.T) {
 	CircuitBreakerState.WithLabelValues("test-breaker").Set(1.0)
 
 	// Verify the gauge was set
-	metricChan := make(chan prometheus.Metric, 1)
+	metricChan := make(chan prometheus.Metric, 10)
 	CircuitBreakerState.Collect(metricChan)
 	metric := <-metricChan
 
@@ -161,8 +161,8 @@ func TestCircuitBreakerState(t *testing.T) {
 	for _, state := range states {
 		CircuitBreakerState.WithLabelValues("test-breaker").Set(state)
 
-		metricChan = make(chan prometheus.Metric, 1)
-		CircuitBreakerState.WithLabelValues("test-breaker").Collect(metricChan)
+		metricChan = make(chan prometheus.Metric, 10)
+		CircuitBreakerState.Collect(metricChan)
 		metric = <-metricChan
 
 		if metric == nil {
@@ -181,7 +181,7 @@ func TestCircuitBreakerFailures(t *testing.T) {
 	CircuitBreakerFailures.WithLabelValues("test-breaker").Inc()
 
 	// Verify the counter was incremented
-	metricChan := make(chan prometheus.Metric, 1)
+	metricChan := make(chan prometheus.Metric, 10)
 	CircuitBreakerFailures.Collect(metricChan)
 	metric := <-metricChan
 
@@ -193,8 +193,8 @@ func TestCircuitBreakerFailures(t *testing.T) {
 	CircuitBreakerFailures.WithLabelValues("test-breaker").Inc()
 	CircuitBreakerFailures.WithLabelValues("test-breaker").Inc()
 
-	metricChan = make(chan prometheus.Metric, 1)
-	CircuitBreakerFailures.WithLabelValues("test-breaker").Collect(metricChan)
+	metricChan = make(chan prometheus.Metric, 10)
+	CircuitBreakerFailures.Collect(metricChan)
 	metric = <-metricChan
 
 	if metric == nil {
@@ -251,6 +251,7 @@ func TestMetricsWithDifferentLabels(t *testing.T) {
 	for _, metric := range metrics {
 		metricChan := make(chan prometheus.Metric, 10)
 		metric.Collect(metricChan)
+		close(metricChan)
 		
 		count := 0
 		for range metricChan {
@@ -285,8 +286,8 @@ func TestMetricsConcurrentAccess(t *testing.T) {
 	}
 
 	// Verify metrics are still functional
-	metricChan := make(chan prometheus.Metric, 1)
-	DBQueryTotal.WithLabelValues("test", "operation", "success").Collect(metricChan)
+	metricChan := make(chan prometheus.Metric, 10)
+	DBQueryTotal.Collect(metricChan)
 	metric := <-metricChan
 
 	if metric == nil {

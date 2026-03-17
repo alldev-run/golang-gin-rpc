@@ -182,7 +182,7 @@ func TestSelectBuilder(t *testing.T) {
 	// Test with ORDER BY
 	sb.OrderBy("created_at DESC")
 	query, args = sb.Build()
-	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? ORDER BY created_at DESC"
+	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? ORDER BY created_at DESC LIMIT 10"
 	expectedArgs = []interface{}{1}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -223,7 +223,7 @@ func TestSelectBuilderJoins(t *testing.T) {
 	// Test INNER JOIN
 	sb.Join("profiles", "users.id = profiles.user_id")
 	query, args := sb.Build()
-	expectedQuery := "SELECT * FROM users INNER JOIN profiles ON users.id = profiles.user_id"
+	expectedQuery := "SELECT * FROM `users` INNER JOIN `profiles` ON users.id = profiles.user_id"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
@@ -232,7 +232,7 @@ func TestSelectBuilderJoins(t *testing.T) {
 	sb2 := NewSelectBuilder(mockDB, "users")
 	sb2.LeftJoin("profiles", "users.id = profiles.user_id")
 	query, args = sb2.Build()
-	expectedQuery = "SELECT * FROM users LEFT JOIN profiles ON users.id = profiles.user_id"
+	expectedQuery = "SELECT * FROM `users` LEFT JOIN `profiles` ON users.id = profiles.user_id"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
@@ -241,7 +241,7 @@ func TestSelectBuilderJoins(t *testing.T) {
 	sb3 := NewSelectBuilder(mockDB, "users")
 	sb3.RightJoin("profiles", "users.id = profiles.user_id")
 	query, args = sb3.Build()
-	expectedQuery = "SELECT * FROM users RIGHT JOIN profiles ON users.id = profiles.user_id"
+	expectedQuery = "SELECT * FROM `users` RIGHT JOIN `profiles` ON users.id = profiles.user_id"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
@@ -250,7 +250,7 @@ func TestSelectBuilderJoins(t *testing.T) {
 	sb4 := NewSelectBuilder(mockDB, "users")
 	sb4.FullOuterJoin("profiles", "users.id = profiles.user_id")
 	query, args = sb4.Build()
-	expectedQuery = "SELECT * FROM users FULL OUTER JOIN profiles ON users.id = profiles.user_id"
+	expectedQuery = "SELECT * FROM `users` FULL OUTER JOIN `profiles` ON users.id = profiles.user_id"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
@@ -265,7 +265,7 @@ func TestSelectBuilderGroupByHaving(t *testing.T) {
 	sb.Having("COUNT(*) > ?", 5)
 
 	query, args := sb.Build()
-	expectedQuery := "SELECT status, COUNT(*) FROM orders GROUP BY status HAVING COUNT(*) > ?"
+	expectedQuery := "SELECT `status`, `COUNT(*)` FROM `orders` GROUP BY `status` HAVING COUNT(*) > ?"
 	expectedArgs := []interface{}{5}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -274,7 +274,7 @@ func TestSelectBuilderGroupByHaving(t *testing.T) {
 	// Test HAVING with AND
 	sb.HavingAnd("status != ?", "cancelled")
 	query, args = sb.Build()
-	expectedQuery = "SELECT status, COUNT(*) FROM orders GROUP BY status HAVING COUNT(*) > ? AND status != ?"
+	expectedQuery = "SELECT `status`, `COUNT(*)` FROM `orders` GROUP BY `status` HAVING COUNT(*) > ? AND status != ?"
 	expectedArgs = []interface{}{5, "cancelled"}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -288,7 +288,7 @@ func TestDeleteBuilder(t *testing.T) {
 
 	// Test basic DELETE
 	query, args := db.Build()
-	expectedQuery := "DELETE FROM users"
+	expectedQuery := "DELETE FROM `users`"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
@@ -296,7 +296,7 @@ func TestDeleteBuilder(t *testing.T) {
 	// Test with WHERE
 	db.Where("status = ?", "inactive")
 	query, args = db.Build()
-	expectedQuery = "DELETE FROM users WHERE status = ?"
+	expectedQuery = "DELETE FROM `users` WHERE status = ?"
 	expectedArgs = []interface{}{"inactive"}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -305,7 +305,7 @@ func TestDeleteBuilder(t *testing.T) {
 	// Test with LIMIT
 	db.Limit(100)
 	query, args = db.Build()
-	expectedQuery = "DELETE FROM users WHERE status = ? LIMIT 100"
+	expectedQuery = "DELETE FROM `users` WHERE status = ? LIMIT 100"
 	expectedArgs = []interface{}{"inactive"}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)

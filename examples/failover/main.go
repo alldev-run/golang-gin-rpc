@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Failover Cache Examples ===\n")
+	fmt.Println("=== Failover Cache Examples ===")
 
 	// Example 1: Using the new failover package directly
 	fmt.Println("1. Direct Failover Package Usage:")

@@ -46,6 +46,9 @@ type MessageError struct {
 }
 
 func (e *MessageError) Error() string {
+	if e.Err == nil {
+		return e.Operation + " failed for topic " + e.Topic + ": "
+	}
 	return e.Operation + " failed for topic " + e.Topic + ": " + e.Err.Error()
 }
 

@@ -74,6 +74,7 @@ type MetricsCollector struct {
 // NewMetricsCollector creates a new metrics collector
 func NewMetricsCollector() *MetricsCollector {
 	collector := &MetricsCollector{
+		customMetrics: make(map[string]prometheus.Metric),
 		// HTTP metrics
 		httpRequestsTotal: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -195,23 +196,71 @@ func NewMetricsCollector() *MetricsCollector {
 		),
 	}
 
-	// Register metrics with Prometheus
-	prometheus.MustRegister(collector.httpRequestsTotal)
-	prometheus.MustRegister(collector.httpRequestDuration)
-	prometheus.MustRegister(collector.rpcRequestsTotal)
-	prometheus.MustRegister(collector.rpcRequestDuration)
-	prometheus.MustRegister(collector.rpcErrorsTotal)
-	prometheus.MustRegister(collector.dbConnectionsActive)
-	prometheus.MustRegister(collector.dbQueryDuration)
-	prometheus.MustRegister(collector.dbErrorsTotal)
-	prometheus.MustRegister(collector.cacheOperationsTotal)
-	prometheus.MustRegister(collector.cacheHitRatio)
-	prometheus.MustRegister(collector.discoveryServicesTotal)
-	prometheus.MustRegister(collector.discoveryOperationsTotal)
-	prometheus.MustRegister(collector.activeConnections)
-	prometheus.MustRegister(collector.memoryUsage)
-	prometheus.MustRegister(collector.goroutineCount)
+	// Register metrics with Prometheus and reuse already-registered collectors
+	collector.httpRequestsTotal = registerCounterVec(collector.httpRequestsTotal)
+	collector.httpRequestDuration = registerHistogramVec(collector.httpRequestDuration)
+	collector.rpcRequestsTotal = registerCounterVec(collector.rpcRequestsTotal)
+	collector.rpcRequestDuration = registerHistogramVec(collector.rpcRequestDuration)
+	collector.rpcErrorsTotal = registerCounterVec(collector.rpcErrorsTotal)
+	collector.dbConnectionsActive = registerGaugeVec(collector.dbConnectionsActive)
+	collector.dbQueryDuration = registerHistogramVec(collector.dbQueryDuration)
+	collector.dbErrorsTotal = registerCounterVec(collector.dbErrorsTotal)
+	collector.cacheOperationsTotal = registerCounterVec(collector.cacheOperationsTotal)
+	collector.cacheHitRatio = registerGaugeVec(collector.cacheHitRatio)
+	collector.discoveryServicesTotal = registerGaugeVec(collector.discoveryServicesTotal)
+	collector.discoveryOperationsTotal = registerCounterVec(collector.discoveryOperationsTotal)
+	collector.activeConnections = registerGaugeVec(collector.activeConnections)
+	collector.memoryUsage = registerGaugeVec(collector.memoryUsage)
+	collector.goroutineCount = registerGaugeVec(collector.goroutineCount)
 
+	return collector
+}
+
+func registerCollector(collector prometheus.Collector) {
+	if err := prometheus.Register(collector); err != nil {
+		if _, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			return
+		}
+		panic(err)
+	}
+}
+
+func registerCounterVec(collector *prometheus.CounterVec) *prometheus.CounterVec {
+	if err := prometheus.Register(collector); err != nil {
+		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			if registered, ok := existing.ExistingCollector.(*prometheus.CounterVec); ok {
+				return registered
+			}
+			panic(err)
+		}
+		panic(err)
+	}
+	return collector
+}
+
+func registerHistogramVec(collector *prometheus.HistogramVec) *prometheus.HistogramVec {
+	if err := prometheus.Register(collector); err != nil {
+		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			if registered, ok := existing.ExistingCollector.(*prometheus.HistogramVec); ok {
+				return registered
+			}
+			panic(err)
+		}
+		panic(err)
+	}
+	return collector
+}
+
+func registerGaugeVec(collector *prometheus.GaugeVec) *prometheus.GaugeVec {
+	if err := prometheus.Register(collector); err != nil {
+		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			if registered, ok := existing.ExistingCollector.(*prometheus.GaugeVec); ok {
+				return registered
+			}
+			panic(err)
+		}
+		panic(err)
+	}
 	return collector
 }
 
@@ -322,10 +371,19 @@ func (m *MetricsCollector) MetricsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(wrapped, r)
 
+		method := ""
+		path := ""
+		if r != nil {
+			method = r.Method
+			if r.URL != nil {
+				path = r.URL.Path
+			}
+		}
+
 		duration := time.Since(start)
 		m.RecordHTTPRequest(
-			r.Method,
-			r.URL.Path,
+			method,
+			path,
 			fmt.Sprintf("%d", wrapped.statusCode),
 			duration,
 		)

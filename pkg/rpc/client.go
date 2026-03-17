@@ -4,6 +4,7 @@ package rpc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"alldev-gin-rpc/pkg/ratelimiter"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -71,14 +73,14 @@ type JSONRPCClient struct {
 }
 
 // NewClient creates a new RPC client based on configuration
-func NewClient(config ClientConfig) Client {
+func NewClient(config ClientConfig) (Client, error) {
 	switch config.Type {
 	case ClientTypeGRPC:
-		return NewGRPCClient(config)
+		return NewGRPCClient(config), nil
 	case ClientTypeJSONRPC:
-		return NewJSONRPCClient(config)
+		return NewJSONRPCClient(config), nil
 	default:
-		panic(fmt.Sprintf("unsupported client type: %s", config.Type))
+		return nil, fmt.Errorf("unsupported client type: %s", config.Type)
 	}
 }
 
@@ -99,6 +101,11 @@ func (c *GRPCClient) Connect() error {
 
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
+	if c.config.EnableTLS {
+		opts[0] = grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			ServerName: c.config.Host,
+		}))
 	}
 
 	if c.config.MaxMsgSize > 0 {
@@ -180,6 +187,9 @@ func NewJSONRPCClient(config ClientConfig) *JSONRPCClient {
 	}
 
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
+	if config.EnableTLS {
+		baseURL = fmt.Sprintf("https://%s:%d", config.Host, config.Port)
+	}
 
 	return &JSONRPCClient{
 		config:      config,
@@ -333,5 +343,8 @@ type apiKeyTransport struct {
 
 func (t *apiKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("X-API-Key", t.APIKey)
+	if t.Base == nil {
+		t.Base = http.DefaultTransport
+	}
 	return t.Base.RoundTrip(req)
 }

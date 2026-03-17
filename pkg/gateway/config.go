@@ -65,6 +65,7 @@ type RouteConfig struct {
 	Path        string            `yaml:"path" json:"path"`
 	Method      string            `yaml:"method" json:"method"`
 	Service     string            `yaml:"service" json:"service"`
+	Targets     []string          `yaml:"targets" json:"targets"`
 	StripPrefix bool              `yaml:"strip_prefix" json:"strip_prefix"`
 	Timeout     time.Duration     `yaml:"timeout" json:"timeout"`
 	Retries     int               `yaml:"retries" json:"retries"`
