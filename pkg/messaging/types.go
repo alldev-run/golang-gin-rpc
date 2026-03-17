@@ -5,51 +5,15 @@ import (
 	"strings"
 )
 
-// MessageType represents the type of messaging system
-type MessageType string
-
-// Supported messaging types
-const (
-	// RabbitMQ messaging system
-	RabbitMQ MessageType = "rabbitmq"
-	
-	// Apache Kafka messaging system  
-	Kafka MessageType = "kafka"
-	
-	// Redis Streams (future implementation)
-	RedisStreams MessageType = "redis_streams"
-	
-	// NATS messaging system (future implementation)
-	NATS MessageType = "nats"
-	
-	// ActiveMQ messaging system (future implementation)
-	ActiveMQ MessageType = "activemq"
-	
-	// Amazon SQS (future implementation)
-	AmazonSQS MessageType = "sqs"
-	
-	// Google Pub/Sub (future implementation)
-	GooglePubSub MessageType = "pubsub"
-	
-	// Azure Service Bus (future implementation)
-	AzureServiceBus MessageType = "servicebus"
-	
-	// Pulsar messaging system (future implementation)
-	Pulsar MessageType = "pulsar"
-)
 
 // IsValid checks if the message type is supported
 func (mt MessageType) IsValid() bool {
 	supportedTypes := []MessageType{
-		RabbitMQ,
-		Kafka,
-		RedisStreams,
-		NATS,
-		ActiveMQ,
-		AmazonSQS,
-		GooglePubSub,
-		AzureServiceBus,
-		Pulsar,
+		MessageTypeRabbitMQ,
+		MessageTypeKafka,
+		MessageTypeNATS,
+		MessageTypeRedis,
+		MessageTypeMemory,
 	}
 	
 	for _, supportedType := range supportedTypes {
@@ -68,24 +32,16 @@ func (mt MessageType) String() string {
 // DisplayName returns a human-readable display name
 func (mt MessageType) DisplayName() string {
 	switch mt {
-	case RabbitMQ:
+	case MessageTypeRabbitMQ:
 		return "RabbitMQ"
-	case Kafka:
+	case MessageTypeKafka:
 		return "Apache Kafka"
-	case RedisStreams:
-		return "Redis Streams"
-	case NATS:
+	case MessageTypeNATS:
 		return "NATS"
-	case ActiveMQ:
-		return "ActiveMQ"
-	case AmazonSQS:
-		return "Amazon SQS"
-	case GooglePubSub:
-		return "Google Pub/Sub"
-	case AzureServiceBus:
-		return "Azure Service Bus"
-	case Pulsar:
-		return "Apache Pulsar"
+	case MessageTypeRedis:
+		return "Redis"
+	case MessageTypeMemory:
+		return "Memory"
 	default:
 		return "Unknown"
 	}
@@ -94,24 +50,14 @@ func (mt MessageType) DisplayName() string {
 // DefaultPort returns the default port for the messaging type
 func (mt MessageType) DefaultPort() int {
 	switch mt {
-	case RabbitMQ:
+	case MessageTypeRabbitMQ:
 		return 5672
-	case Kafka:
+	case MessageTypeKafka:
 		return 9092
-	case RedisStreams:
-		return 6379
-	case NATS:
+	case MessageTypeNATS:
 		return 4222
-	case ActiveMQ:
-		return 61616
-	case AmazonSQS:
-		return 443 // HTTPS
-	case GooglePubSub:
-		return 443 // HTTPS
-	case AzureServiceBus:
-		return 5671 // AMQPS
-	case Pulsar:
-		return 6650 // Binary protocol
+	case MessageTypeRedis:
+		return 6379
 	default:
 		return 0
 	}
@@ -119,18 +65,14 @@ func (mt MessageType) DefaultPort() int {
 
 // IsCloudBased returns true if the messaging type is a cloud service
 func (mt MessageType) IsCloudBased() bool {
-	switch mt {
-	case AmazonSQS, GooglePubSub, AzureServiceBus:
-		return true
-	default:
-		return false
-	}
+	// No cloud-based types in current implementation
+	return false
 }
 
 // IsOpenSource returns true if the messaging type is open source
 func (mt MessageType) IsOpenSource() bool {
 	switch mt {
-	case RabbitMQ, Kafka, RedisStreams, NATS, ActiveMQ, Pulsar:
+	case MessageTypeRabbitMQ, MessageTypeKafka, MessageTypeNATS, MessageTypeRedis:
 		return true
 	default:
 		return false
@@ -140,36 +82,27 @@ func (mt MessageType) IsOpenSource() bool {
 // GetSupportedTypes returns all supported messaging types
 func GetSupportedTypes() []MessageType {
 	return []MessageType{
-		RabbitMQ,
-		Kafka,
-		RedisStreams,
-		NATS,
-		ActiveMQ,
-		AmazonSQS,
-		GooglePubSub,
-		AzureServiceBus,
-		Pulsar,
+		MessageTypeRabbitMQ,
+		MessageTypeKafka,
+		MessageTypeNATS,
+		MessageTypeRedis,
+		MessageTypeMemory,
 	}
 }
 
 // GetImplementedTypes returns messaging types that are currently implemented
 func GetImplementedTypes() []MessageType {
 	return []MessageType{
-		RabbitMQ,
-		Kafka,
+		MessageTypeRabbitMQ,
+		MessageTypeKafka,
 	}
 }
 
 // GetFutureTypes returns messaging types planned for future implementation
 func GetFutureTypes() []MessageType {
 	return []MessageType{
-		RedisStreams,
-		NATS,
-		ActiveMQ,
-		AmazonSQS,
-		GooglePubSub,
-		AzureServiceBus,
-		Pulsar,
+		MessageTypeNATS,
+		MessageTypeRedis,
 	}
 }
 
@@ -179,23 +112,15 @@ func ParseMessageType(s string) (MessageType, error) {
 	
 	switch s {
 	case "rabbitmq", "amqp":
-		return RabbitMQ, nil
+		return MessageTypeRabbitMQ, nil
 	case "kafka":
-		return Kafka, nil
-	case "redis_streams", "redis-streams", "redisstreams":
-		return RedisStreams, nil
+		return MessageTypeKafka, nil
 	case "nats":
-		return NATS, nil
-	case "activemq", "active-mq":
-		return ActiveMQ, nil
-	case "sqs", "amazon-sqs", "amazonsqs":
-		return AmazonSQS, nil
-	case "pubsub", "google-pubsub", "gcp-pubsub":
-		return GooglePubSub, nil
-	case "servicebus", "azure-servicebus", "azure-service-bus":
-		return AzureServiceBus, nil
-	case "pulsar", "apache-pulsar":
-		return Pulsar, nil
+		return MessageTypeNATS, nil
+	case "redis":
+		return MessageTypeRedis, nil
+	case "memory":
+		return MessageTypeMemory, nil
 	default:
 		return "", fmt.Errorf("unsupported messaging type: %s", s)
 	}
@@ -218,7 +143,7 @@ type MessagingCapabilities struct {
 // GetCapabilities returns the capabilities for a given messaging type
 func GetCapabilities(mt MessageType) MessagingCapabilities {
 	switch mt {
-	case RabbitMQ:
+	case MessageTypeRabbitMQ:
 		return MessagingCapabilities{
 			SupportsPublish:      true,
 			SupportsSubscribe:    true,
@@ -231,7 +156,7 @@ func GetCapabilities(mt MessageType) MessagingCapabilities {
 			SupportsReplay:       false,
 			SupportsCompression:  false,
 		}
-	case Kafka:
+	case MessageTypeKafka:
 		return MessagingCapabilities{
 			SupportsPublish:      true,
 			SupportsSubscribe:    true,
@@ -244,7 +169,20 @@ func GetCapabilities(mt MessageType) MessagingCapabilities {
 			SupportsReplay:       true,
 			SupportsCompression:  true,
 		}
-	case RedisStreams:
+	case MessageTypeNATS:
+		return MessagingCapabilities{
+			SupportsPublish:      true,
+			SupportsSubscribe:    true,
+			SupportsHeaders:      true,
+			SupportsPartitioning: false,
+			SupportsOrdering:     false,
+			SupportsPersistence:  true,
+			SupportsTransactions: false,
+			SupportsDLQ:          false,
+			SupportsReplay:       false,
+			SupportsCompression:  false,
+		}
+	case MessageTypeRedis:
 		return MessagingCapabilities{
 			SupportsPublish:      true,
 			SupportsSubscribe:    true,
@@ -257,83 +195,18 @@ func GetCapabilities(mt MessageType) MessagingCapabilities {
 			SupportsReplay:       true,
 			SupportsCompression:  false,
 		}
-	case NATS:
+	case MessageTypeMemory:
 		return MessagingCapabilities{
 			SupportsPublish:      true,
 			SupportsSubscribe:    true,
-			SupportsHeaders:      true,
+			SupportsHeaders:      false,
 			SupportsPartitioning: false,
 			SupportsOrdering:     false,
-			SupportsPersistence:  true,
+			SupportsPersistence:  false,
 			SupportsTransactions: false,
 			SupportsDLQ:          false,
 			SupportsReplay:       false,
 			SupportsCompression:  false,
-		}
-	case ActiveMQ:
-		return MessagingCapabilities{
-			SupportsPublish:      true,
-			SupportsSubscribe:    true,
-			SupportsHeaders:      true,
-			SupportsPartitioning: false,
-			SupportsOrdering:     true,
-			SupportsPersistence:  true,
-			SupportsTransactions: true,
-			SupportsDLQ:          true,
-			SupportsReplay:       true,
-			SupportsCompression:  false,
-		}
-	case AmazonSQS:
-		return MessagingCapabilities{
-			SupportsPublish:      true,
-			SupportsSubscribe:    true,
-			SupportsHeaders:      true,
-			SupportsPartitioning: false,
-			SupportsOrdering:     false,
-			SupportsPersistence:  true,
-			SupportsTransactions: false,
-			SupportsDLQ:          true,
-			SupportsReplay:       false,
-			SupportsCompression:  false,
-		}
-	case GooglePubSub:
-		return MessagingCapabilities{
-			SupportsPublish:      true,
-			SupportsSubscribe:    true,
-			SupportsHeaders:      true,
-			SupportsPartitioning: false,
-			SupportsOrdering:     false,
-			SupportsPersistence:  true,
-			SupportsTransactions: true,
-			SupportsDLQ:          true,
-			SupportsReplay:       true,
-			SupportsCompression:  false,
-		}
-	case AzureServiceBus:
-		return MessagingCapabilities{
-			SupportsPublish:      true,
-			SupportsSubscribe:    true,
-			SupportsHeaders:      true,
-			SupportsPartitioning: true,
-			SupportsOrdering:     true,
-			SupportsPersistence:  true,
-			SupportsTransactions: true,
-			SupportsDLQ:          true,
-			SupportsReplay:       true,
-			SupportsCompression:  false,
-		}
-	case Pulsar:
-		return MessagingCapabilities{
-			SupportsPublish:      true,
-			SupportsSubscribe:    true,
-			SupportsHeaders:      true,
-			SupportsPartitioning: true,
-			SupportsOrdering:     true,
-			SupportsPersistence:  true,
-			SupportsTransactions: true,
-			SupportsDLQ:          true,
-			SupportsReplay:       true,
-			SupportsCompression:  true,
 		}
 	default:
 		return MessagingCapabilities{}
@@ -354,12 +227,10 @@ func (mt MessageType) IsImplemented() bool {
 // RequiresAuthentication returns true if the messaging type typically requires authentication
 func (mt MessageType) RequiresAuthentication() bool {
 	switch mt {
-	case RabbitMQ, Kafka, ActiveMQ, AzureServiceBus, Pulsar:
+	case MessageTypeRabbitMQ, MessageTypeKafka:
 		return true
-	case RedisStreams, NATS:
-		return false // Optional
-	case AmazonSQS, GooglePubSub:
-		return true // Required for cloud services
+	case MessageTypeNATS, MessageTypeRedis, MessageTypeMemory:
+		return false
 	default:
 		return false
 	}

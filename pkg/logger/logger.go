@@ -16,43 +16,19 @@ var (
 	defaultL *zap.Logger
 )
 
-// Config 日志配置参数
-type Config struct {
-	Level      string // "debug", "info", "warn", "error", "fatal", "panic"
-	Env        string // "dev" 或 "prod"（或其他）
-	LogPath    string // 日志文件路径，例如 "./logs/app.log" 或 "/var/log/myapp/app.log"
-	MaxSize    int    // 单个文件最大 MB（默认 100）
-	MaxBackups int    // 最多保留旧文件数（默认 30）
-	MaxAge     int    // 最多保留天数（默认 28）
-	Compress   bool   // 是否压缩旧文件（默认 true）
-}
 
 // Init 初始化全局 logger（建议在 main 最开始调用一次）
 func Init(cfg Config) {
 	once.Do(func() {
-		// 默认值补全
-		if cfg.Level == "" {
-			cfg.Level = "info"
-		}
-		if cfg.Env == "" {
-			cfg.Env = "prod"
-		}
-		if cfg.MaxSize == 0 {
-			cfg.MaxSize = 100
-		}
-		if cfg.MaxBackups == 0 {
-			cfg.MaxBackups = 30
-		}
-		if cfg.MaxAge == 0 {
-			cfg.MaxAge = 28
-		}
-		if cfg.Compress == false { // 默认开启压缩
-			cfg.Compress = true
+		// Validate configuration
+		if err := cfg.Validate(); err != nil {
+			// Use default config if validation fails
+			cfg = DefaultConfig()
 		}
 
 		// 确定日志级别
 		var zapLevel zapcore.Level
-		switch cfg.Level {
+		switch string(cfg.Level) {
 		case "debug":
 			zapLevel = zapcore.DebugLevel
 		case "info":
@@ -69,38 +45,58 @@ func Init(cfg Config) {
 
 		// 编码器配置
 		encoderConfig := zap.NewProductionEncoderConfig()
-		encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-		encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-		encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+		if cfg.TimeFormat != "" {
+			encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+				enc.AppendString(t.Format(cfg.TimeFormat))
+			}
+		} else {
+			encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+		}
+		
+		if cfg.EnableConsoleColors && cfg.Output != LogOutputFile {
+			encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		} else {
+			encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+		}
+		
+		if cfg.EnableCaller {
+			encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+		}
 
 		// 输出目标
 		var cores []zapcore.Core
 
-		// 控制台输出（始终开启，便于本地调试）
-		consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
-		if cfg.Env == "dev" {
-			// 开发模式：彩色 + 更人性化
-			encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-			consoleEncoder = zapcore.NewConsoleEncoder(encoderConfig)
+		// 控制台输出
+		if cfg.Output == LogOutputStdout || cfg.Output == LogOutputStderr {
+			var encoder zapcore.Encoder
+			if cfg.Format == LogFormatJSON {
+				encoder = zapcore.NewJSONEncoder(encoderConfig)
+			} else {
+				encoder = zapcore.NewConsoleEncoder(encoderConfig)
+			}
+			
+			var writer zapcore.WriteSyncer
+			if cfg.Output == LogOutputStderr {
+				writer = zapcore.AddSync(os.Stderr)
+			} else {
+				writer = zapcore.AddSync(os.Stdout)
+			}
+			
+			cores = append(cores, zapcore.NewCore(encoder, writer, zapLevel))
 		}
-		cores = append(cores, zapcore.NewCore(
-			consoleEncoder,
-			zapcore.AddSync(os.Stdout),
-			zapLevel,
-		))
 
-		// 文件输出（如果指定了路径）
-		if cfg.LogPath != "" {
+		// 文件输出
+		if cfg.Output == LogOutputFile || cfg.LogPath != "" {
 			fileWriter := &lumberjack.Logger{
 				Filename:   cfg.LogPath,
 				MaxSize:    cfg.MaxSize,
 				MaxBackups: cfg.MaxBackups,
 				MaxAge:     cfg.MaxAge,
 				Compress:   cfg.Compress,
-				LocalTime:  true,
+				LocalTime:  cfg.LocalTime,
 			}
 
-			// 生产环境用 JSON 格式写文件，便于日志收集系统解析
+			// 生产环境用 JSON 格式写文件
 			fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
 			cores = append(cores, zapcore.NewCore(
 				fileEncoder,
@@ -113,19 +109,27 @@ func Init(cfg Config) {
 		core := zapcore.NewTee(cores...)
 
 		// 构建 logger
-		defaultL = zap.New(core,
-			zap.AddCaller(),                       // 记录调用文件+行号
-			zap.AddStacktrace(zapcore.ErrorLevel), // error 以上带栈追踪
-			zap.AddCallerSkip(1),                  // 跳过 wrapper 层
-		)
+		options := []zap.Option{
+			zap.AddCallerSkip(1), // 跳过 wrapper 层
+		}
+		
+		if cfg.EnableCaller {
+			options = append(options, zap.AddCaller())
+		}
+		
+		if cfg.EnableStacktrace {
+			options = append(options, zap.AddStacktrace(zapcore.ErrorLevel))
+		}
+
+		defaultL = zap.New(core, options...)
 	})
 }
 
 // L 获取全局 logger（如果未初始化，会用默认配置兜底）
 func L() *zap.Logger {
 	if defaultL == nil {
-		// 兜底：未调用 Init 时自动初始化为 info + dev 模式 + 无文件
-		Init(Config{Level: "info", Env: "dev"})
+		// 兜底：未调用 Init 时自动初始化为默认配置
+		Init(DefaultConfig())
 	}
 	return defaultL
 }

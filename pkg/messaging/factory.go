@@ -7,7 +7,7 @@ import (
 // NewClient creates a new messaging client based on the configuration
 func NewClient(config Config) (Client, error) {
 	// Parse message type from config string
-	msgType, err := ParseMessageType(config.Type)
+	msgType, err := ParseMessageType(string(config.Type))
 	if err != nil {
 		return nil, fmt.Errorf("invalid messaging type '%s': %w", config.Type, err)
 	}
@@ -20,9 +20,9 @@ func NewClient(config Config) (Client, error) {
 
 	// Create client based on type
 	switch msgType {
-	case RabbitMQ:
+	case MessageTypeRabbitMQ:
 		return NewRabbitMQClient(config)
-	case Kafka:
+	case MessageTypeKafka:
 		return NewKafkaClient(config)
 	default:
 		return nil, fmt.Errorf("unsupported messaging type: %s", msgType.DisplayName())
@@ -52,7 +52,7 @@ func CreateClientByType(msgType MessageType, config Config) (Client, error) {
 	}
 
 	// Update config type
-	config.Type = msgType.String()
+	config.Type = msgType
 
 	return NewClient(config)
 }
@@ -65,7 +65,7 @@ func GetClientCapabilities(msgType MessageType) MessagingCapabilities {
 // ValidateConfig validates the messaging configuration
 func ValidateConfig(config Config) error {
 	// Parse message type
-	msgType, err := ParseMessageType(config.Type)
+	msgType, err := ParseMessageType(string(config.Type))
 	if err != nil {
 		return fmt.Errorf("invalid messaging type: %w", err)
 	}
@@ -77,7 +77,7 @@ func ValidateConfig(config Config) error {
 
 	// Validate required fields based on type
 	switch msgType {
-	case RabbitMQ:
+	case MessageTypeRabbitMQ:
 		if config.Host == "" {
 			return fmt.Errorf("RabbitMQ requires host")
 		}
@@ -90,7 +90,7 @@ func ValidateConfig(config Config) error {
 		if config.Password == "" {
 			return fmt.Errorf("RabbitMQ requires password")
 		}
-	case Kafka:
+	case MessageTypeKafka:
 		if config.Host == "" {
 			return fmt.Errorf("Kafka requires host")
 		}

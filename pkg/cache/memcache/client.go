@@ -9,12 +9,6 @@ import (
 	"time"
 )
 
-// Config holds Memcached connection configuration.
-type Config struct {
-	Hosts        []string      `yaml:"hosts" json:"hosts"` // List of memcached servers
-	MaxIdleConns int           `yaml:"max_idle_conns" json:"max_idle_conns"`
-	Timeout      time.Duration `yaml:"timeout" json:"timeout"` // Connection timeout
-}
 
 // Item represents an item to be stored in memcache.
 type Item struct {
@@ -22,15 +16,6 @@ type Item struct {
 	Value      []byte
 	Flags      uint32
 	Expiration int32 // seconds
-}
-
-// DefaultConfig returns default Memcached configuration.
-func DefaultConfig() Config {
-	return Config{
-		Hosts:        []string{"localhost:11211"},
-		MaxIdleConns: 2,
-		Timeout:      5 * time.Second,
-	}
 }
 
 // Client provides a simple memcache client implementation.

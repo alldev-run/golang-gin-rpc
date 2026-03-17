@@ -48,66 +48,47 @@ cache:
 
 # Logger Configuration
 logger:
-  level: "info"  # debug, info, warn, error
-  env: "dev"      # dev, prod, test
+  level: "info"  # debug, info, warn, error, fatal, panic
+  env: "development"  # development, production, test, docker
   log_path: "./logs/app.log"
+  output: "stdout"  # stdout, stderr, file
+  format: "json"  # json, text
+  enable_console_colors: true
+  enable_caller: true
+  enable_stacktrace: true
+  time_format: "2006-01-02T15:04:05Z07:00"
+  max_size: 100  # MB
+  max_backups: 10
+  max_age: 30  # days
+  compress: true
+  local_time: false
+  fields:
+    service: "alldev-gin-rpc"
+  sampling:
+    enabled: false
+    rate: 0.1
+    tick: "1s"
+    initial: 10
+    thereafter: 100
 
 # Tracing Configuration
 tracing:
-  zipkin:
-    type: "zipkin"
-    service_name: "alldev-gin-rpc"
-    service_version: "1.0.0"
-    environment: "development"
-    enabled: false
-    host: "localhost"
-    port: 9411
-    endpoint: "/api/v2/spans"
-    username: ""
-    password: ""
-    sample_rate: 1.0
-    batch_timeout: "5s"
-    max_export_batch_size: 512
-    options:
-      timeout: "10s"
-      max_attempts: 3
-  
-  jaeger:
-    type: "jaeger"
-    service_name: "alldev-gin-rpc"
-    service_version: "1.0.0"
-    environment: "development"
-    enabled: false
-    host: "localhost"
-    port: 14268
-    endpoint: "/api/traces"
-    username: ""
-    password: ""
-    sample_rate: 1.0
-    batch_timeout: "5s"
-    max_export_batch_size: 512
-    options:
-      timeout: "10s"
-      max_attempts: 3
-  
-  otlp:
-    type: "otlp"
-    service_name: "alldev-gin-rpc"
-    service_version: "1.0.0"
-    environment: "development"
-    enabled: false
-    host: "localhost"
-    port: 4317
-    endpoint: ""
-    username: ""
-    password: ""
-    sample_rate: 1.0
-    batch_timeout: "5s"
-    max_export_batch_size: 512
-    options:
-      timeout: "10s"
-      max_attempts: 3
-      insecure: true
+  type: "zipkin"
+  service_name: "alldev-gin-rpc"
+  service_version: "1.0.0"
+  environment: "development"
+  enabled: false
+  host: "localhost"
+  port: 9411
+  endpoint: "/api/v2/spans"
+  username: ""
+  password: ""
+  sample_rate: 1.0
+  batch_timeout: "5s"
+  max_export_batch_size: 512
+  options:
+    timeout: "10s"
+    max_attempts: 3
 
 # RPC Configuration
 rpc:

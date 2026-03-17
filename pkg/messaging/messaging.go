@@ -37,16 +37,6 @@ type Client interface {
 	Subscriber
 }
 
-// Config represents the configuration for a messaging client
-type Config struct {
-	Type     string                 `yaml:"type"`     // rabbitmq, kafka
-	Host     string                 `yaml:"host"`
-	Port     int                    `yaml:"port"`
-	Username string                 `yaml:"username"`
-	Password string                 `yaml:"password"`
-	Database string                 `yaml:"database"` // for rabbitmq vhost
-	Options  map[string]interface{} `yaml:"options"`
-}
 
 // MessageError represents an error in messaging operations
 type MessageError struct {

@@ -47,9 +47,28 @@ type Config struct {
 	} `yaml:"cache"`
 
 	Logger struct {
-		Level   string `yaml:"level"`
-		Env     string `yaml:"env"`
-		LogPath string `yaml:"log_path"`
+		Level               string `yaml:"level"`
+		Env                 string `yaml:"env"`
+		LogPath             string `yaml:"log_path"`
+		Output              string `yaml:"output"`
+		Format              string `yaml:"format"`
+		EnableConsoleColors bool   `yaml:"enable_console_colors"`
+		EnableCaller        bool   `yaml:"enable_caller"`
+		EnableStacktrace    bool   `yaml:"enable_stacktrace"`
+		TimeFormat          string `yaml:"time_format"`
+		MaxSize             int    `yaml:"max_size"`
+		MaxBackups          int    `yaml:"max_backups"`
+		MaxAge              int    `yaml:"max_age"`
+		Compress            bool   `yaml:"compress"`
+		LocalTime           bool   `yaml:"local_time"`
+		Fields              map[string]interface{} `yaml:"fields"`
+		Sampling            struct {
+			Enabled    bool          `yaml:"enabled"`
+			Rate       float64       `yaml:"rate"`
+			Tick       string        `yaml:"tick"`
+			Initial    int           `yaml:"initial"`
+			Thereafter int           `yaml:"thereafter"`
+		} `yaml:"sampling"`
 	} `yaml:"logger"`
 
 	RPC rpc.ManagerConfig `yaml:"rpc"`
@@ -135,11 +154,71 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 	}
 
 	// Initialize logger
-	logger.Init(logger.Config{
-		Level:   config.Logger.Level,
-		Env:     config.Logger.Env,
-		LogPath: config.Logger.LogPath,
-	})
+	loggerConfig := logger.DefaultConfig()
+	
+	// Override with config file values
+	if config.Logger.Level != "" {
+		loggerConfig.Level = logger.LogLevel(config.Logger.Level)
+	}
+	if config.Logger.Env != "" {
+		loggerConfig.Env = config.Logger.Env
+	}
+	if config.Logger.LogPath != "" {
+		loggerConfig.LogPath = config.Logger.LogPath
+	}
+	if config.Logger.Output != "" {
+		loggerConfig.Output = logger.LogOutput(config.Logger.Output)
+	}
+	if config.Logger.Format != "" {
+		loggerConfig.Format = logger.LogFormat(config.Logger.Format)
+	}
+	
+	// Boolean flags
+	loggerConfig.EnableConsoleColors = config.Logger.EnableConsoleColors
+	loggerConfig.EnableCaller = config.Logger.EnableCaller
+	loggerConfig.EnableStacktrace = config.Logger.EnableStacktrace
+	loggerConfig.Compress = config.Logger.Compress
+	loggerConfig.LocalTime = config.Logger.LocalTime
+	
+	// Numeric values
+	if config.Logger.MaxSize > 0 {
+		loggerConfig.MaxSize = config.Logger.MaxSize
+	}
+	if config.Logger.MaxBackups > 0 {
+		loggerConfig.MaxBackups = config.Logger.MaxBackups
+	}
+	if config.Logger.MaxAge > 0 {
+		loggerConfig.MaxAge = config.Logger.MaxAge
+	}
+	
+	// Time format
+	if config.Logger.TimeFormat != "" {
+		loggerConfig.TimeFormat = config.Logger.TimeFormat
+	}
+	
+	// Fields
+	if config.Logger.Fields != nil {
+		loggerConfig.Fields = config.Logger.Fields
+	}
+	
+	// Sampling configuration
+	if config.Logger.Sampling.Enabled {
+		loggerConfig.Sampling.Enabled = config.Logger.Sampling.Enabled
+		loggerConfig.Sampling.Rate = config.Logger.Sampling.Rate
+		if config.Logger.Sampling.Tick != "" {
+			if duration, err := time.ParseDuration(config.Logger.Sampling.Tick); err == nil {
+				loggerConfig.Sampling.Tick = duration
+			}
+		}
+		if config.Logger.Sampling.Initial > 0 {
+			loggerConfig.Sampling.Initial = config.Logger.Sampling.Initial
+		}
+		if config.Logger.Sampling.Thereafter > 0 {
+			loggerConfig.Sampling.Thereafter = config.Logger.Sampling.Thereafter
+		}
+	}
+	
+	logger.Init(loggerConfig)
 
 	// Ensure log directory exists
 	if err := os.MkdirAll(filepath.Dir(config.Logger.LogPath), 0755); err != nil {
@@ -202,6 +281,11 @@ func (b *Bootstrap) InitializeAll() error {
 
 // InitializeDatabases initializes all database connections
 func (b *Bootstrap) InitializeDatabases() error {
+	if len(b.config.Database) == 0 {
+		logger.Info("No database configuration found, skipping database initialization")
+		return nil
+	}
+
 	factory := db.NewFactory()
 
 	for name, dbConfig := range b.config.Database {
@@ -215,6 +299,9 @@ func (b *Bootstrap) InitializeDatabases() error {
 		case "redis":
 			config.Redis = dbConfig.Redis
 			// Add other database types
+		default:
+			logger.Warn("Unsupported database type %s for %s, skipping", logger.String("type", dbConfig.Type), logger.String("name", name))
+			continue
 		}
 
 		client, err := factory.Create(config)
@@ -238,8 +325,17 @@ func (b *Bootstrap) InitializeDatabases() error {
 
 // InitializeCache initializes cache
 func (b *Bootstrap) InitializeCache() error {
+	if b.config.Cache.Type == "" {
+		logger.Info("No cache configuration found, skipping cache initialization")
+		return nil
+	}
+
 	switch b.config.Cache.Type {
 	case "redis":
+		if b.config.Cache.Redis.Host == "" {
+			logger.Warn("Redis cache configuration incomplete, skipping cache initialization")
+			return nil
+		}
 		cacheInstance, err := cache.NewRedisCache(b.config.Cache.Redis)
 		if err != nil {
 			return fmt.Errorf("failed to create redis cache: %w", err)
@@ -255,6 +351,11 @@ func (b *Bootstrap) InitializeCache() error {
 
 // InitializeRPC initializes RPC services
 func (b *Bootstrap) InitializeRPC() error {
+	if len(b.config.RPC.Servers) == 0 {
+		logger.Info("No RPC servers configured, skipping RPC initialization")
+		return nil
+	}
+
 	// Create RPC manager
 	b.rpcManager = rpc.NewManager(b.config.RPC)
 
@@ -273,6 +374,16 @@ func (b *Bootstrap) InitializeRPC() error {
 
 // InitializeDiscovery initializes service discovery
 func (b *Bootstrap) InitializeDiscovery() error {
+	if !b.config.Discovery.Enabled {
+		logger.Info("Service discovery disabled, skipping discovery initialization")
+		return nil
+	}
+
+	if b.config.Discovery.RegistryAddress == "" {
+		logger.Warn("Service discovery enabled but no registry address configured, skipping discovery initialization")
+		return nil
+	}
+
 	// Create discovery manager
 	manager, err := discovery.NewServiceDiscoveryManager(b.config.Discovery)
 	if err != nil {

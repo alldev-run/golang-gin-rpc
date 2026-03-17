@@ -1,10 +1,18 @@
 # Tracing Configuration
 tracing:
+  type: "zipkin"
   service_name: "alldev-gin-rpc"
   service_version: "1.0.0"
   environment: "development"
   enabled: true
-  zipkin_url: "http://localhost:9411/api/v2/spans"
+  host: "localhost"
+  port: 9411
+  endpoint: "/api/v2/spans"
+  username: ""
+  password: ""
   sample_rate: 1.0
-  batch_timeout: 5s
+  batch_timeout: "5s"
   max_export_batch_size: 512
+  options:
+    timeout: "10s"
+    max_attempts: 3

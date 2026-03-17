@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -217,41 +216,7 @@ func (tt TracerType) RequiresAuthentication() bool {
 	}
 }
 
-// Config holds tracing configuration
-type Config struct {
-	Type            string         `yaml:"type" json:"type"`
-	ServiceName     string         `yaml:"service_name" json:"service_name"`
-	ServiceVersion  string         `yaml:"service_version" json:"service_version"`
-	Environment     string         `yaml:"environment" json:"environment"`
-	Enabled         bool           `yaml:"enabled" json:"enabled"`
-	Host            string         `yaml:"host" json:"host"`
-	Port            int            `yaml:"port" json:"port"`
-	Endpoint        string         `yaml:"endpoint" json:"endpoint"`
-	Username        string         `yaml:"username" json:"username"`
-	Password        string         `yaml:"password" json:"password"`
-	SampleRate      float64        `yaml:"sample_rate" json:"sample_rate"`
-	BatchTimeout    time.Duration  `yaml:"batch_timeout" json:"batch_timeout"`
-	MaxExportBatchSize int         `yaml:"max_export_batch_size" json:"max_export_batch_size"`
-	Options         map[string]interface{} `yaml:"options" json:"options"`
-}
 
-// DefaultConfig returns default tracing configuration
-func DefaultConfig() Config {
-	return Config{
-		Type:               "zipkin",
-		ServiceName:        "alldev-gin-rpc",
-		ServiceVersion:     "1.0.0",
-		Environment:        "development",
-		Enabled:            false,
-		Host:               "localhost",
-		Port:               9411,
-		Endpoint:           "/api/v2/spans",
-		SampleRate:         1.0, // Sample 100% of traces in development
-		BatchTimeout:       5 * time.Second,
-		MaxExportBatchSize: 512,
-		Options:            make(map[string]interface{}),
-	}
-}
 
 // GetURL returns the full URL for the tracing backend
 func (c Config) GetURL() string {

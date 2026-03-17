@@ -10,36 +10,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Config holds Redis connection configuration.
-type Config struct {
-	Host         string        `yaml:"host" json:"host"`
-	Port         int           `yaml:"port" json:"port"`
-	Password     string        `yaml:"password" json:"password"`
-	Database     int           `yaml:"database" json:"database"`
-	PoolSize     int           `yaml:"pool_size" json:"pool_size"`
-	MinIdleConns int           `yaml:"min_idle_conns" json:"min_idle_conns"`
-	MaxRetries   int           `yaml:"max_retries" json:"max_retries"`
-	DialTimeout  time.Duration `yaml:"dial_timeout" json:"dial_timeout"`
-	ReadTimeout  time.Duration `yaml:"read_timeout" json:"read_timeout"`
-	WriteTimeout time.Duration `yaml:"write_timeout" json:"write_timeout"`
-	PoolTimeout  time.Duration `yaml:"pool_timeout" json:"pool_timeout"`
-}
-
-// DefaultConfig returns default Redis configuration.
-func DefaultConfig() Config {
-	return Config{
-		Host:         "localhost",
-		Port:         6379,
-		Database:     0,
-		PoolSize:     10,
-		MinIdleConns: 2,
-		MaxRetries:   3,
-		DialTimeout:  5 * time.Second,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
-		PoolTimeout:  4 * time.Second,
-	}
-}
 
 // Client wraps redis.Client with additional functionality.
 type Client struct {
