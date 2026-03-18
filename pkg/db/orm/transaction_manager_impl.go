@@ -68,12 +68,12 @@ func (tm *TransactionManager) updateMetrics(result *TransactionResult) {
 }
 
 // GetMetrics returns current transaction metrics.
-func (tm *TransactionManager) GetMetrics() TransactionMetrics {
+func (tm *TransactionManager) GetMetrics() *TransactionMetrics {
 	tm.metrics.mu.RLock()
 	defer tm.metrics.mu.RUnlock()
 	
 	// Create a copy to avoid race conditions
-	metrics := TransactionMetrics{
+	metrics := &TransactionMetrics{
 		TotalTransactions:     tm.metrics.TotalTransactions,
 		SuccessfulTransactions: tm.metrics.SuccessfulTransactions,
 		FailedTransactions:     tm.metrics.FailedTransactions,
