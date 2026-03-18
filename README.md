@@ -19,6 +19,8 @@
    - JSON 输出不会写入 ANSI 颜色码
  - **链路追踪**
    - 支持 Zipkin、Jaeger、OTLP
+ - **WebSocket 多节点**
+   - 集群事件同步，支持 RabbitMQ / Kafka 消息总线
  - **消息队列**
    - RabbitMQ、Kafka
  - **网关能力**
@@ -161,7 +163,30 @@
  ./start.sh help
  ```
  
- ## 服务发现
+ ## Makefile 命令
+
+项目同时提供 Makefile 支持：
+
+```bash
+make run           # 构建并运行
+make build         # 仅构建应用
+make test          # 运行测试
+make test-coverage # 测试覆盖率
+make fmt           # 格式化代码
+make vet           # 代码检查
+make lint          # 代码 lint
+make docker-build  # 构建 Docker 镜像
+```
+
+使用 Docker Compose 启动依赖服务：
+
+```bash
+docker-compose up -d    # 启动 MySQL、Redis、RabbitMQ 等
+docker-compose logs -f  # 查看日志
+docker-compose down     # 停止服务
+```
+
+## 服务发现
  
  项目内的服务发现模块位于：
  
@@ -291,6 +316,84 @@
  ```
  
  ## 开发建议
+
+- **优先修改 `configs/config.yaml`**
+  - 统一通过 bootstrap 加载配置
+- **新增服务发现后端时**
+  - 同步更新 `pkg/discovery` 与根 README
+- **新增模块时**
+  - 尽量接入 bootstrap 统一初始化流程
+- **输出结构化日志时**
+  - 推荐使用 `pkg/logger`
+
+## Docker 部署
+
+### 构建并运行
+
+```bash
+# 构建 Docker 镜像
+make docker-build
+
+# 运行容器
+docker run -p 8080:8080 alldev-gin-rpc:latest
+```
+
+### 使用 Docker Compose
+
+项目提供 `docker-compose.yml`，可一键启动所有依赖服务：
+
+```bash
+# 启动所有服务（MySQL、Redis、RabbitMQ 等）
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+## 开发指南
+
+### 添加新的 API
+
+在 `internal/router/router.go` 中添加路由：
+
+```go
+v1 := router.Group("/api/v1")
+{
+    v1.GET("/users", r.getUsers)
+    v1.POST("/users", r.createUser)
+}
+```
+
+### 数据库操作
+
+```go
+// 使用查询构建器
+client := mysqlClient // 从 bootstrap 获取
+rows, err := client.NewSelectBuilder("users").
+    Where("status = ?", "active").
+    Limit(10).
+    Query(ctx)
+```
+
+### 缓存使用
+
+```go
+cache := bootstrap.GetCache()
+err = cache.Set(ctx, "key", "value", time.Hour)
+```
+
+### 日志使用
+
+```go
+import "alldev-gin-rpc/pkg/logger"
+
+logger.Info("Request processed", logger.String("path", "/api/users"))
+logger.Error("Database failed", logger.ErrorField(err))
+```
+
  
  - **优先修改 `configs/config.yaml`**
    - 统一通过 bootstrap 加载配置
