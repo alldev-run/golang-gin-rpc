@@ -9,3 +9,5 @@
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T16:09:07+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T16:27:05+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:20+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"INFO","ts":"2026-03-18T10:30:20+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}
+{"level":"INFO","ts":"2026-03-18T10:45:29+08:00","caller":"circuitbreaker/circuitbreaker.go:57","msg":"Circuit breaker state changed","name":"test","from":"closed","to":"open"}

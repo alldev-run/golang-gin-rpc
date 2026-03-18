@@ -76,3 +76,15 @@
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:26+08:00","caller":"metrics/prometheus.go:413","msg":"Starting metrics server","address":":9997"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:26+08:00","caller":"metrics/prometheus.go:427","msg":"Starting metrics server","address":":9996"}
 {"level":"\u001b[34mINFO\u001b[0m","ts":"2026-03-17T17:55:27+08:00","caller":"metrics/prometheus.go:431","msg":"Shutting down metrics server"}
+{"level":"INFO","ts":"2026-03-18T10:30:28+08:00","caller":"metrics/prometheus.go:413","msg":"Starting metrics server","address":":9999"}
+{"level":"INFO","ts":"2026-03-18T10:30:28+08:00","caller":"metrics/prometheus.go:427","msg":"Starting metrics server","address":":9998"}
+{"level":"INFO","ts":"2026-03-18T10:30:28+08:00","caller":"metrics/prometheus.go:431","msg":"Shutting down metrics server"}
+{"level":"INFO","ts":"2026-03-18T10:30:28+08:00","caller":"metrics/prometheus.go:413","msg":"Starting metrics server","address":":9997"}
+{"level":"INFO","ts":"2026-03-18T10:30:28+08:00","caller":"metrics/prometheus.go:427","msg":"Starting metrics server","address":":9996"}
+{"level":"INFO","ts":"2026-03-18T10:30:29+08:00","caller":"metrics/prometheus.go:431","msg":"Shutting down metrics server"}
+{"level":"INFO","ts":"2026-03-18T10:45:34+08:00","caller":"metrics/prometheus.go:413","msg":"Starting metrics server","address":":9999"}
+{"level":"INFO","ts":"2026-03-18T10:45:34+08:00","caller":"metrics/prometheus.go:427","msg":"Starting metrics server","address":":9998"}
+{"level":"INFO","ts":"2026-03-18T10:45:34+08:00","caller":"metrics/prometheus.go:431","msg":"Shutting down metrics server"}
+{"level":"INFO","ts":"2026-03-18T10:45:35+08:00","caller":"metrics/prometheus.go:413","msg":"Starting metrics server","address":":9997"}
+{"level":"INFO","ts":"2026-03-18T10:45:35+08:00","caller":"metrics/prometheus.go:427","msg":"Starting metrics server","address":":9996"}
+{"level":"INFO","ts":"2026-03-18T10:45:35+08:00","caller":"metrics/prometheus.go:431","msg":"Shutting down metrics server"}

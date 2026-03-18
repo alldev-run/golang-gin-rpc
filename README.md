@@ -1,52 +1,310 @@
 # alldev-gin-rpc
-
-A lightweight Go project showcasing a MySQL client with fluent query builders, connection pooling, and transaction support.
-
-## Usage
-
-### 1) Create a MySQL client
-
-```go
-import (
-    "time"
-
-    "github.com/your/repo/pkg/db/mysql"
-)
-
-cfg := mysql.DefaultConfig()
-cfg.Host = "127.0.0.1"
-cfg.Port = 3306
-cfg.Username = "root"
-cfg.Password = "password"
-cfg.Database = "example"
-
-client, err := mysql.New(cfg)
-if err != nil {
-    // handle error
-}
-defer client.Close()
-```
-
-### 2) Build queries with `SelectBuilder`
-
-The query builder supports `Where`, `And`, `Or` and automatically binds arguments.
-
-> **Note:** SQL `AND` has higher precedence than `OR`. If you need `(a OR b) AND c`, wrap the `OR` part in parentheses.
-
-```go
-rows, err := client.NewSelectBuilder("users").
-    Where("(status = ? OR status = ?)", "active", "pending").
-    And("tenant_id = ?", 42).
-    OrderBy("created_at DESC").
-    Limit(10).
-    Query(ctx)
-```
-
-### 3) Transactions
-
-```go
-err := client.Transaction(ctx, func(tx *sql.Tx) error {
-    // use tx.QueryContext, tx.ExecContext, etc.
-    return nil
-})
-```
+ 
+ `alldev-gin-rpc` 是一个基于 Go 的服务端项目骨架，集成了 HTTP、gRPC / JSON-RPC、数据库、缓存、服务发现、日志、链路追踪、消息队列和网关能力，适合作为微服务或 RPC 服务的基础框架。
+ 
+ ## 功能概览
+ 
+ - **HTTP 服务**
+   - 基于 Gin 的 Web 应用与路由注册
+ - **RPC 服务**
+   - 支持 `gRPC` 和 `JSON-RPC`
+ - **数据库支持**
+   - MySQL、PostgreSQL、MongoDB、ClickHouse、Elasticsearch
+ - **缓存支持**
+   - Redis
+ - **服务发现**
+   - 支持 `consul`、`etcd`、`zookeeper`、`static`
+ - **日志系统**
+   - 基于 Zap 的结构化日志
+   - JSON 输出不会写入 ANSI 颜色码
+ - **链路追踪**
+   - 支持 Zipkin、Jaeger、OTLP
+ - **消息队列**
+   - RabbitMQ、Kafka
+ - **网关能力**
+   - 路由转发、服务发现、负载均衡
+ - **优雅关闭**
+   - 应用退出时统一执行资源回收与 tracer shutdown
+ 
+ ## 项目结构
+ 
+ ```text
+ alldev-gin-rpc/
+ ├── configs/                  # 配置文件
+ ├── internal/
+ │   ├── app/                  # 应用启动与 HTTP Server 封装
+ │   ├── bootstrap/            # 配置加载与模块初始化
+ │   └── router/               # 路由注册
+ ├── pkg/
+ │   ├── auth/                 # 认证
+ │   ├── cache/                # 缓存
+ │   ├── config/               # 全局配置加载
+ │   ├── db/                   # 数据库与客户端工厂
+ │   ├── discovery/            # 服务发现
+ │   ├── gateway/              # 网关
+ │   ├── health/               # 健康检查
+ │   ├── logger/               # 结构化日志
+ │   ├── messaging/            # 消息队列
+ │   ├── metrics/              # 指标
+ │   ├── rpc/                  # RPC 服务管理
+ │   └── tracing/              # 链路追踪
+ ├── main.go                   # 主入口
+ ├── start.sh                  # 启动脚本
+ └── README.md                 # 项目说明
+ ```
+ 
+ ## 启动流程
+ 
+ 当前主程序入口是 `main.go`，整体启动顺序大致如下：
+ 
+ - **初始化 tracing**
+   - 读取 `configs/tracing.yaml`
+ - **加载主配置**
+   - 通过 `bootstrap.NewBootstrap("./configs/config.yaml")`
+ - **初始化核心依赖**
+   - 数据库
+   - Redis 缓存
+   - RPC 服务
+   - 服务发现
+ - **启动 HTTP 应用**
+   - 注册路由
+   - 监听退出信号
+ - **执行优雅关闭**
+ 
+ ## 配置文件
+ 
+ 项目当前主要使用：
+ 
+ - `configs/config.yaml`
+ - `configs/tracing.yaml`
+ - `configs/discovery.yaml`
+ 
+ 其中，应用主流程实际读取的是：
+ 
+ - `configs/config.yaml`
+ 
+ ## `configs/config.yaml` 主要模块
+ 
+ 当前主配置覆盖以下能力：
+ 
+ - **server**
+   - HTTP / gRPC 服务监听地址与超时
+ - **database**
+   - 主从数据库与连接池
+ - **redis**
+   - Redis 连接配置
+ - **rpc**
+   - gRPC / JSON-RPC 服务配置
+ - **discovery**
+   - 服务发现注册信息
+ - **messaging**
+   - RabbitMQ / Kafka
+ - **observability**
+   - logging / tracing / metrics
+ - **security**
+   - JWT 等安全配置
+ 
+ ## 快速开始
+ 
+ ### 环境要求
+ 
+ - **Go**
+   - 建议使用当前 `go.mod` 声明的版本或兼容版本
+ - **Redis**
+   - 若启用缓存
+ - **MySQL / PostgreSQL / MongoDB / ClickHouse / Elasticsearch**
+   - 按需启用
+ - **Consul / Etcd / Zookeeper**
+   - 若启用服务发现
+ - **Zipkin / Jaeger / OTLP Collector**
+   - 若启用 tracing
+ 
+ ### 安装依赖
+ 
+ ```bash
+ go mod download
+ go mod tidy
+ ```
+ 
+ ### 启动应用
+ 
+ 方式一：直接运行
+ 
+ ```bash
+ go run .
+ ```
+ 
+ 方式二：使用启动脚本
+ 
+ ```bash
+ ./start.sh
+ ```
+ 
+ 方式三：分步骤执行
+ 
+ ```bash
+ ./start.sh deps
+ ./start.sh build
+ ./start.sh run
+ ```
+ 
+ ## 启动脚本命令
+ 
+ `start.sh` 当前支持：
+ 
+ ```bash
+ ./start.sh
+ ./start.sh build
+ ./start.sh run
+ ./start.sh clean
+ ./start.sh deps
+ ./start.sh help
+ ```
+ 
+ ## 服务发现
+ 
+ 项目内的服务发现模块位于：
+ 
+ - `pkg/discovery`
+ 
+ 当前支持的后端：
+ 
+ - `consul`
+ - `etcd`
+ - `zookeeper`
+ - `static`
+ 
+ ### Zookeeper 支持
+ 
+ 当前 `zookeeper` discovery 已实现：
+ 
+ - **服务注册**
+   - 使用 `ephemeral` 节点保存实例
+ - **服务注销**
+   - 删除实例节点
+ - **服务查询**
+   - 读取服务路径下的实例列表
+ - **自定义根路径**
+   - 使用 `Options["base_path"]`
+ 
+ 示例：
+ 
+ ```go
+ cfg := discovery.Config{
+     Type:    discovery.RegistryTypeZk,
+     Address: "127.0.0.1:2181",
+     Timeout: 5 * time.Second,
+     Options: map[string]interface{}{
+         "base_path": "/services",
+     },
+ }
+ 
+ d, err := discovery.NewDiscovery(cfg)
+ if err != nil {
+     panic(err)
+ }
+ _ = d
+ ```
+ 
+ 更详细的说明见：
+ 
+ - `pkg/discovery/README.md`
+ 
+ ## RPC 能力
+ 
+ `bootstrap.InitializeRPC()` 当前会根据配置选择：
+ 
+ - **gRPC**
+ - **JSON-RPC**
+ 
+ 并支持：
+ 
+ - 服务管理器统一启动与关闭
+ - 降级管理
+ - 与服务发现集成注册
+ 
+ ## 日志
+ 
+ 日志模块位于：
+ 
+ - `pkg/logger`
+ 
+ 当前特性：
+ 
+ - **结构化日志**
+ - **支持 stdout / stderr / file 输出**
+ - **支持 JSON / console 两种格式**
+ - **JSON 日志中的 `level` 字段不包含 ANSI 颜色码**
+ 
+ 常见配置项包括：
+ 
+ - `level`
+ - `output`
+ - `format`
+ - `log_path`
+ - `enable_console_colors`
+ - `enable_caller`
+ - `enable_stacktrace`
+ 
+ ## Tracing
+ 
+ tracing 模块位于：
+ 
+ - `pkg/tracing`
+ 
+ 当前支持：
+ 
+ - `zipkin`
+ - `jaeger`
+ - `otlp`
+ 
+ 启动时会优先读取：
+ 
+ - `configs/tracing.yaml`
+ 
+ 若 tracing 未启用，应用会继续运行。
+ 
+ ## 健康检查与网关
+ 
+ 项目中已包含：
+ 
+ - `pkg/health`
+ - `pkg/gateway`
+ 
+ 可用于：
+ 
+ - 服务健康状态管理
+ - API 路由代理
+ - 基于服务发现的转发
+ - 负载均衡策略集成
+ 
+ ## 常用测试命令
+ 
+ 针对不同模块可以执行：
+ 
+ ```bash
+ go test ./...
+ go test ./pkg/discovery/...
+ go test ./pkg/logger/...
+ go test ./pkg/tracing/...
+ go test ./pkg/rpc/...
+ ```
+ 
+ ## 开发建议
+ 
+ - **优先修改 `configs/config.yaml`**
+   - 统一通过 bootstrap 加载配置
+ - **新增服务发现后端时**
+   - 同步更新 `pkg/discovery` 与根 README
+ - **新增模块时**
+   - 尽量接入 bootstrap 统一初始化流程
+ - **输出结构化日志时**
+   - 推荐使用 `pkg/logger`
+ 
+ ## 相关文档
+ 
+ - `pkg/discovery/README.md`
+ 
+ ## 总结
+ 
+ `alldev-gin-rpc` 现在已经不只是一个数据库示例项目，而是一个包含 HTTP、RPC、缓存、日志、tracing、服务发现和网关能力的 Go 服务端基础框架。
