@@ -32,7 +32,8 @@ func Logging() Middleware {
 }
 
 func httpLog(sw *statusWriter, r *http.Request, latency time.Duration, requestID string) {
-	httplog.Log(httplog.Fields{
+	// 使用增强的日志函数，根据状态码记录不同级别的日志
+	httplog.LogWithLevel(httplog.Fields{
 		Method:    r.Method,
 		Path:      r.URL.Path,
 		ClientIP:  r.RemoteAddr,
@@ -41,4 +42,17 @@ func httpLog(sw *statusWriter, r *http.Request, latency time.Duration, requestID
 		Latency:   latency,
 		RequestID: requestID,
 	})
+	
+	// 如果是慢请求，额外记录慢请求日志
+	if latency > 1*time.Second {
+		httplog.LogSlowRequest(httplog.Fields{
+			Method:    r.Method,
+			Path:      r.URL.Path,
+			ClientIP:  r.RemoteAddr,
+			UserAgent: r.UserAgent(),
+			Status:    sw.status,
+			Latency:   latency,
+			RequestID: requestID,
+		}, 1*time.Second)
+	}
 }
