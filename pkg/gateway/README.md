@@ -318,6 +318,47 @@ discovery:
 ### 加权（Weighted）
 根据权重选择目标服务，权重越高被选中的概率越大。
 
+**使用示例：**
+
+```go
+import (
+    "alldev-gin-rpc/pkg/gateway"
+)
+
+// 创建带权重的负载均衡器
+lb := gateway.NewWeightedLoadBalancer()
+
+// 设置带权重的目标（权重越高，被选中的概率越大）
+weightedTargets := []gateway.WeightedTarget{
+    {Address: "http://server-a:8080", Weight: 5},  // 50% 概率
+    {Address: "http://server-b:8080", Weight: 3},  // 30% 概率
+    {Address: "http://server-c:8080", Weight: 2},  // 20% 概率
+}
+lb.SetWeights(weightedTargets)
+
+// 选择目标（按权重概率分布）
+target, err := lb.Select(nil)
+if err != nil {
+    log.Printf("Failed to select target: %v", err)
+    return
+}
+
+// 使用选中的目标转发请求
+fmt.Printf("Selected target: %s\n", target)
+```
+
+**配置示例：**
+
+```yaml
+gateway:
+  load_balancer:
+    strategy: "weighted"
+  routes:
+    - path: "/api/*"
+      service: "api-service"
+      # 权重通过服务发现的 metadata 或静态配置指定
+```
+
 ### 最少连接（Least Connections）
 选择当前连接数最少的目标服务。
 
