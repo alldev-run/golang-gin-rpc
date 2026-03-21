@@ -36,6 +36,9 @@ func NewProxy(gateway *Gateway) *Proxy {
 func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 	proxy := NewProxy(g)
 
+	// Add tracing middleware first (to trace all requests)
+	engine.Use(g.TracingMiddleware())
+
 	// Add CORS middleware
 	if g.config.CORS.AllowedOrigins != nil {
 		engine.Use(corsMiddleware(g.config.CORS))
@@ -57,7 +60,54 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 	// Setup proxy routes
 	for _, route := range g.config.Routes {
 		route.Path = normalizeGinRoutePath(route.Path)
-		engine.Any(route.Path, proxy.handleRoute(route))
+		
+		// Create handler based on protocol
+		var handler gin.HandlerFunc
+		switch route.Protocol {
+		case "grpc":
+			handler = func(c *gin.Context) {
+				c.Set("route", route.Service)
+				routeObj := &Route{
+					config:   route,
+					targets:  route.Targets,
+					timeout:  route.Timeout,
+					retries:  route.Retries,
+				}
+				if g.grpcProxy != nil {
+					if err := g.grpcProxy.ProxyGRPC(c, routeObj); err != nil {
+						logger.Errorf("gRPC proxy error", logger.Error(err))
+					}
+				} else {
+					c.JSON(http.StatusNotImplemented, gin.H{"error": "gRPC proxy not initialized"})
+				}
+			}
+		case "jsonrpc":
+			handler = func(c *gin.Context) {
+				c.Set("route", route.Service)
+				routeObj := &Route{
+					config:   route,
+					targets:  route.Targets,
+					timeout:  route.Timeout,
+					retries:  route.Retries,
+				}
+				if g.jsonProxy != nil {
+					if err := g.jsonProxy.ProxyJSONRPC(c, routeObj); err != nil {
+						logger.Errorf("JSON-RPC proxy error", logger.Error(err))
+					}
+				} else {
+					c.JSON(http.StatusNotImplemented, gin.H{"error": "JSON-RPC proxy not initialized"})
+				}
+			}
+		default: // HTTP
+			handler = proxy.handleRoute(route)
+		}
+
+		// Register route based on method
+		if route.Method == "*" || route.Method == "ANY" {
+			engine.Any(route.Path, handler)
+		} else {
+			engine.Handle(route.Method, route.Path, handler)
+		}
 	}
 
 	// Health check endpoint
@@ -165,6 +215,9 @@ func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string,
 	if c.Request.TLS != nil {
 		proxyReq.Header.Set("X-Forwarded-Proto", "https")
 	}
+
+	// Inject tracing context into proxy request
+	p.gateway.InjectTracingHeaders(proxyReq, c.Request.Context())
 
 	// Execute request with retries
 	var resp *http.Response

@@ -157,7 +157,8 @@ func GetSupportedTypes() []TracerType {
 func GetImplementedTypes() []TracerType {
 	return []TracerType{
 		Zipkin,
-		// Jaeger and OTLP can be added here when implemented
+		Jaeger,
+		// OTLP can be added here when implemented
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 
 	"alldev-gin-rpc/pkg/health"
 	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/tracing"
 )
 
 // Gateway represents the HTTP gateway
@@ -19,6 +20,9 @@ type Gateway struct {
 	discovery  *ServiceDiscovery
 	balancer   LoadBalancer
 	health     *health.HealthManager
+	tracer     *tracing.TracerProvider
+	grpcProxy  *GRPCProxy
+	jsonProxy  *JSONRPCProxy
 	mu         sync.RWMutex
 	started    bool
 	ctx        context.Context
@@ -122,6 +126,7 @@ func (g *Gateway) Initialize() error {
 	}
 
 	g.initHealth()
+	g.initTracing()
 
 	logger.Info("Gateway initialized successfully")
 	return nil
@@ -134,6 +139,24 @@ func (g *Gateway) initHealth() {
 	cfg.Timeout = 2 * time.Second
 	hm.RegisterChecker(&upstreamHealthChecker{gw: g}, cfg)
 	g.health = hm
+}
+
+func (g *Gateway) initTracing() {
+	if g.config.Tracing != nil && g.config.Tracing.Enabled {
+		// Initialize tracing with the provided configuration
+		if err := tracing.InitGlobalTracer(*g.config.Tracing); err != nil {
+			logger.Errorf("Failed to initialize tracing", logger.Error(err))
+			return
+		}
+		g.tracer = tracing.GlobalTracer()
+		logger.Info("Tracing initialized successfully",
+			logger.String("type", g.config.Tracing.Type),
+			logger.String("service", g.config.Tracing.ServiceName))
+	}
+	
+	// Initialize protocol proxies
+	g.grpcProxy = NewGRPCProxy(g)
+	g.jsonProxy = NewJSONRPCProxy(g)
 }
 
 // Start starts the gateway server
@@ -167,6 +190,20 @@ func (g *Gateway) Stop() error {
 	}
 
 	g.cancel()
+	
+	// Close protocol proxies
+	if g.grpcProxy != nil {
+		if err := g.grpcProxy.Close(); err != nil {
+			logger.Errorf("Failed to close gRPC proxy", logger.Error(err))
+		}
+	}
+	
+	if g.jsonProxy != nil {
+		if err := g.jsonProxy.Close(); err != nil {
+			logger.Errorf("Failed to close JSON-RPC proxy", logger.Error(err))
+		}
+	}
+	
 	g.started = false
 	logger.Info("Gateway stopped successfully")
 
