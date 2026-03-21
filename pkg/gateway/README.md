@@ -136,7 +136,85 @@ func main() {
     gw.SetupRoutes(r)
     r.Run(":8080")
 }
+
 ```
+
+## HTTPService（开箱即用 HTTP 网关服务封装）
+
+为了让业务层不需要理解 Gin 细节，同时保持未来可替换底层 HTTP 框架，本项目在 `pkg/gateway` 内提供了一个标准库 `net/http` 形态的服务封装：
+
+- `NewHTTPServiceWithOptions(cfg, opt)`
+- 返回一个实现 `http.Handler` 的入口：`svc.Handler()`
+
+典型用法：将 Gateway 路由（代理/健康检查等）与业务路由（`net/http`）组合在一个端口上。
+
+```go
+bizHandler := httpapi.NewRouter(gwCfg).Handler()
+
+svc, err := gateway.NewHTTPServiceWithOptions(gwCfg, gateway.HTTPServiceOptions{
+    BizHandler:     bizHandler,
+    IsBusinessPath: httpapi.IsBusinessPath,
+    Middlewares:    nil,
+})
+if err != nil {
+    panic(err)
+}
+defer func() { _ = svc.Close() }()
+
+srv := &http.Server{Addr: ":8080", Handler: svc.Handler()}
+_ = srv.ListenAndServe()
+```
+
+### 自定义中间件注入（net/http 形态）
+
+`HTTPServiceOptions.Middlewares` 支持注入自定义中间件，类型为：
+
+- `type Middleware func(http.Handler) http.Handler`
+
+它会包裹在服务入口最外层，对业务路由与网关路由同时生效。
+
+## 模板与脚手架
+
+为了快速创建新的 API 项目，模板位于：
+
+- `pkg/gateway/templates/<template>/`
+
+### 模板目录结构
+
+```
+pkg/gateway/templates/http-gateway/
+├── config/
+│   └── config.yaml          # 配置文件模板
+├── internal/
+│   ├── httpapi/
+│   │   └── router.go.gotmpl # 业务路由模板
+│   └── mw/
+│       ├── demo.go.gotmpl   # 自定义中间件示例
+│       └── registry.go.gotmpl # 中间件注册中心
+└── main.go.gotmpl          # 入口文件模板
+```
+
+### 模板 Token
+
+| Token | 说明 |
+|-------|------|
+| `__MODULE__` | go.mod 中的模块名称 |
+| `__API_NAME__` | API 项目名称 |
+| `__API_PATH__` | API 目录路径（如 `api/my-gateway`） |
+
+### 使用脚手架
+
+推荐使用 `cmd/scaffold`：
+
+```bash
+# 从模板生成新项目
+go run ./cmd/scaffold create-api --name my-api --template http-gateway
+
+# 将修改后的项目同步回模板
+go run ./cmd/scaffold export-template --name my-api --template http-gateway
+```
+
+更多说明请参考 `cmd/scaffold/README.md`。
 
 ## 配置说明
 
@@ -167,6 +245,8 @@ func main() {
 | enabled | bool | 是否启用限流 |
 | requests | int | 请求数量限制 |
 | window | string | 时间窗口 |
+
+限流器已内置 **TTL 清理** 和 **最大 key 数限制**（默认 10 万 key），防止被随机 IP/key 攻击导致内存无限增长。
 
 ### 服务发现配置
 
@@ -276,24 +356,46 @@ gateway:
 
 ## 中间件
 
-Gateway提供了以下中间件：
+Gateway 提供了以下中间件（均复用 `pkg` 基础包实现）：
 
-- **CORS中间件**: 处理跨域请求
-- **限流中间件**: 基于IP的请求限流
-- **请求ID中间件**: 为每个请求生成唯一ID
-- **日志中间件**: 记录请求日志
+- **CORS 中间件**: 处理跨域请求（复用 `pkg/cors`）
+- **限流中间件**: 基于 IP 的请求限流（复用 `pkg/ratelimit`，内置 TTL/LRU 自我保护）
+- **请求ID 中间件**: 为每个请求生成唯一 ID（复用 `pkg/requestid`）
+- **日志中间件**: 记录请求日志（复用 `pkg/httplog`）
+- **Recovery 中间件**: 捕获 panic（复用 `pkg/panicx`）
 
 ## 健康检查
 
-Gateway提供以下健康检查端点：
+Gateway 提供以下健康检查端点：
 
-- `GET /health`: 基本健康检查
-- `GET /ready`: 就绪检查
-- `GET /info`: Gateway信息
+- `GET /health` - 基本健康检查
+- `GET /ready` - 就绪检查（反映 upstream 健康状态）
+- `GET /info` - Gateway 信息
 
-## 示例
+### 实现细节
 
-参考 `examples/gateway_example.go` 查看完整的使用示例。
+健康检查复用 `pkg/health` 基础包：
+
+- 使用 `HealthManager` 管理健康检查
+- 自定义 `upstreamHealthChecker` 探活 upstream 目标
+- 探活结果写入 `route.healthyTargets`，proxy 优先选择健康实例
+- `/ready` 在无健康 upstream 时返回 503
+
+## 指标监控
+
+Gateway 暴露 Prometheus 格式的指标端点：
+
+- `GET /metrics` - Prometheus 指标
+
+### 实现细节
+
+指标系统复用 `pkg/metrics` 基础包：
+
+- `gateway_http_requests_total` - HTTP 请求数（按 method, path, status）
+- `gateway_http_request_duration_seconds` - HTTP 请求耗时
+- `gateway_upstream_errors_total` - Upstream 错误数（按 service, type）
+
+可通过 `pkg/metrics.Handler()` 获取指标 handler。
 
 ## 注意事项
 

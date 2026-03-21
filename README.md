@@ -178,6 +178,37 @@ make lint          # 代码 lint
 make docker-build  # 构建 Docker 镜像
 ```
 
+### API 项目脚手架（基于 Gateway 模板）
+
+模板存放在：
+
+- `pkg/gateway/templates/`
+
+通过脚手架命令可以：
+
+- 从模板生成一个新的 API 项目目录：`api/<name>`
+- 将你修改后的 `api/<name>` 反向导出回模板（用于维护模板演进）
+
+Makefile：
+
+```bash
+make create-api NAME=<new-api> [TEMPLATE=http-gateway]
+make export-template NAME=<api-name> [TEMPLATE=http-gateway]
+```
+
+Windows PowerShell（不依赖 make，推荐）：
+
+```powershell
+# 生成 api/demo-api
+go run .\cmd\scaffold create-api --name demo-api --template http-gateway
+
+# 启动生成的项目
+go run .\api\demo-api
+
+# 将 api/demo-api 导出回模板（写入 pkg/gateway/templates/http-gateway，Go 文件会变成 .gotmpl）
+go run .\cmd\scaffold export-template --name demo-api --template http-gateway
+```
+
 使用 Docker Compose 启动依赖服务：
 
 ```bash

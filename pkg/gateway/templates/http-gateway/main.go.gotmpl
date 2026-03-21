@@ -9,17 +9,17 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	
+
 	"gopkg.in/yaml.v3"
 
-	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
-	"alldev-gin-rpc/api/http-gateway/internal/mw"
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/logger"
+	"__MODULE__/__API_PATH__/internal/httpapi"
+	"__MODULE__/__API_PATH__/internal/mw"
+	"__MODULE__/pkg/gateway"
+	"__MODULE__/pkg/logger"
 )
 
 func main() {
-	configPath := "./api/http-gateway/config/config.yaml"
+	configPath := "./__API_PATH__/config/config.yaml"
 	if len(os.Args) > 1 {
 		configPath = os.Args[1]
 	}
@@ -32,7 +32,6 @@ func main() {
 	logger.Init(logger.DefaultConfig())
 
 	bizHandler := httpapi.NewRouter(gwCfg).Handler()
-
 	gwSvc, err := gateway.NewHTTPServiceWithOptions(gwCfg, gateway.HTTPServiceOptions{
 		BizHandler:     bizHandler,
 		IsBusinessPath: httpapi.IsBusinessPath,
@@ -55,15 +54,14 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		logger.Info("http-gateway starting",
-			logger.String("addr", srv.Addr))
+		logger.Info("__API_NAME__ starting", logger.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Errorf("http server failed", logger.Error(err))
 		}
 	}()
 
 	<-sigCh
-	logger.Info("http-gateway shutting down")
+	logger.Info("__API_NAME__ shutting down")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

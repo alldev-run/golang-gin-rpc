@@ -7,6 +7,7 @@ import (
 	"time"
 	"strings"
 
+	"alldev-gin-rpc/pkg/health"
 	"alldev-gin-rpc/pkg/logger"
 )
 
@@ -17,6 +18,7 @@ type Gateway struct {
 	router     *Router
 	discovery  *ServiceDiscovery
 	balancer   LoadBalancer
+	health     *health.HealthManager
 	mu         sync.RWMutex
 	started    bool
 	ctx        context.Context
@@ -42,6 +44,8 @@ type Router struct {
 type Route struct {
 	config    RouteConfig
 	targets   []string
+	healthyTargets []string
+	lastHealthCheck time.Time
 	balancer  LoadBalancer
 	timeout   time.Duration
 	retries   int
@@ -117,8 +121,19 @@ func (g *Gateway) Initialize() error {
 		return err
 	}
 
+	g.initHealth()
+
 	logger.Info("Gateway initialized successfully")
 	return nil
+}
+
+func (g *Gateway) initHealth() {
+	hm := health.NewHealthManager()
+	cfg := health.DefaultHealthCheckConfig()
+	cfg.Enabled = true
+	cfg.Timeout = 2 * time.Second
+	hm.RegisterChecker(&upstreamHealthChecker{gw: g}, cfg)
+	g.health = hm
 }
 
 // Start starts the gateway server
@@ -270,7 +285,9 @@ func (g *Gateway) healthCheckLoop() {
 		case <-g.ctx.Done():
 			return
 		case <-ticker.C:
-			g.checkHealth()
+			if g.health != nil {
+				g.health.CheckHealth(context.Background())
+			}
 		}
 	}
 }
@@ -295,15 +312,15 @@ func (g *Gateway) refreshServices() {
 		
 		// Update route targets
 		route.targets = endpoints
+		route.healthyTargets = nil
 		
 		// Update load balancer targets
 		if g.balancer != nil {
 			g.balancer.UpdateTargets(endpoints)
 		}
 	}
-}
 
-// checkHealth checks health of service endpoints
-func (g *Gateway) checkHealth() {
-	// Implementation for health checking
+	if g.health != nil {
+		go g.health.CheckHealth(context.Background())
+	}
 }

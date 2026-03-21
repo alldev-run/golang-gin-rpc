@@ -1,0 +1,49 @@
+package mw
+
+import (
+	"sort"
+	"sync"
+
+	"__MODULE__/pkg/gateway"
+)
+
+type Middleware = gateway.Middleware
+
+type entry struct {
+	order int
+	name  string
+	mw    Middleware
+}
+
+var (
+	mu      sync.Mutex
+	entries []entry
+)
+
+func Register(name string, order int, m Middleware) {
+	if m == nil {
+		return
+	}
+	mu.Lock()
+	entries = append(entries, entry{order: order, name: name, mw: m})
+	mu.Unlock()
+}
+
+func Middlewares() []Middleware {
+	mu.Lock()
+	copyEntries := append([]entry(nil), entries...)
+	mu.Unlock()
+
+	sort.SliceStable(copyEntries, func(i, j int) bool {
+		if copyEntries[i].order != copyEntries[j].order {
+			return copyEntries[i].order < copyEntries[j].order
+		}
+		return copyEntries[i].name < copyEntries[j].name
+	})
+
+	out := make([]Middleware, 0, len(copyEntries))
+	for _, e := range copyEntries {
+		out = append(out, e.mw)
+	}
+	return out
+}

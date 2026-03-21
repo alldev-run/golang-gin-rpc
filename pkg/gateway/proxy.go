@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/metrics"
 )
 
 // Proxy handles HTTP proxying
@@ -51,6 +52,8 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 	// Add logging middleware
 	engine.Use(loggingMiddleware())
 
+	engine.Use(metricsMiddleware())
+
 	// Setup proxy routes
 	for _, route := range g.config.Routes {
 		route.Path = normalizeGinRoutePath(route.Path)
@@ -63,6 +66,7 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 
 	// Gateway info endpoint
 	engine.GET("/info", g.gatewayInfo)
+	engine.GET("/metrics", gin.WrapH(metrics.Handler()))
 }
 
 // handleRoute handles a specific route
@@ -87,8 +91,13 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 		}
 
 		// Select target using load balancer
-		target, err := p.gateway.balancer.Select(route.targets)
+		selectTargets := route.targets
+		if len(route.healthyTargets) > 0 {
+			selectTargets = route.healthyTargets
+		}
+		target, err := p.gateway.balancer.Select(selectTargets)
 		if err != nil {
+			observeUpstreamError(route.config.Service, "select")
 			logger.Errorf("Failed to select target", logger.Error(err))
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Service unavailable"})
 			return
@@ -96,6 +105,7 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 
 		// Proxy request
 		if err := p.proxyRequest(ctx, c, target, route); err != nil {
+			observeUpstreamError(route.config.Service, "proxy")
 			logger.Errorf("Proxy request failed", logger.Error(err))
 			p.handleProxyError(c, err)
 			return
@@ -236,9 +246,14 @@ func (g *Gateway) readinessCheck(c *gin.Context) {
 		return
 	}
 
-	// Check if routes are configured
 	g.router.mu.RLock()
 	routeCount := len(g.router.routes)
+	healthyRouteCount := 0
+	for _, r := range g.router.routes {
+		if len(r.healthyTargets) > 0 {
+			healthyRouteCount++
+		}
+	}
 	g.router.mu.RUnlock()
 
 	if routeCount == 0 {
@@ -249,9 +264,20 @@ func (g *Gateway) readinessCheck(c *gin.Context) {
 		return
 	}
 
+	if healthyRouteCount == 0 {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status": "not ready",
+			"reason": "no healthy upstream",
+			"routes": routeCount,
+			"timestamp": time.Now().Unix(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":     "ready",
 		"routes":     routeCount,
+		"healthy_routes": healthyRouteCount,
 		"timestamp":  time.Now().Unix(),
 	})
 }
