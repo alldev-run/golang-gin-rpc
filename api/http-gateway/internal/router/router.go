@@ -1,16 +1,31 @@
 package router
 
 import (
-	"alldev-gin-rpc/api/http-gateway/internal/handler"
-
 	"github.com/gin-gonic/gin"
+
+	"alldev-gin-rpc/api/http-gateway/internal/handler"
+	"alldev-gin-rpc/api/http-gateway/internal/service"
 )
 
-func InitRouter(r *gin.Engine) {
+type Router struct {
+	hello *handler.HelloHandler
+	debug *handler.DebugHandler
+}
 
-	api := r.Group("/api")
+func NewRouter() *Router {
+	helloSvc := service.NewHelloService()
+	return &Router{
+		hello: handler.NewHelloHandler(helloSvc),
+		debug: handler.NewDebugHandler(),
+	}
+}
 
+func (r *Router) Register(engine *gin.Engine) {
+	engine.GET("/", r.hello.Root)
+
+	debug := engine.Group("/debug")
 	{
-		api.GET("/user", handler.GetUser)
+		debug.GET("/request-id", r.debug.RequestID)
+		debug.GET("/ok", r.debug.OK)
 	}
 }

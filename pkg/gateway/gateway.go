@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"strings"
 
 	"alldev-gin-rpc/pkg/logger"
 )
@@ -76,6 +77,7 @@ func NewGateway(config *Config) *Gateway {
 	}
 
 	for _, routeConfig := range config.Routes {
+		routeConfig.Path = normalizeGinRoutePath(routeConfig.Path)
 		route := &Route{
 			config:  routeConfig,
 			targets: append([]string(nil), routeConfig.Targets...),
@@ -203,6 +205,7 @@ func (g *Gateway) initRoutes() error {
 	defer g.router.mu.Unlock()
 
 	for _, routeConfig := range g.config.Routes {
+		routeConfig.Path = normalizeGinRoutePath(routeConfig.Path)
 		route := &Route{
 			config:   routeConfig,
 			targets:  append([]string(nil), routeConfig.Targets...),
@@ -232,6 +235,13 @@ func (g *Gateway) initRoutes() error {
 
 // routeKey generates a unique key for a route
 func (g *Gateway) routeKey(path, method string) string {
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = "*"
+	}
+	if method == "ANY" {
+		method = "*"
+	}
 	return method + ":" + path
 }
 

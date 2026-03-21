@@ -53,6 +53,7 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 
 	// Setup proxy routes
 	for _, route := range g.config.Routes {
+		route.Path = normalizeGinRoutePath(route.Path)
 		engine.Any(route.Path, proxy.handleRoute(route))
 	}
 
@@ -70,9 +71,14 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 		ctx := c.Request.Context()
 		
 		// Find route targets
-		routeKey := p.gateway.routeKey(routeConfig.Path, c.Request.Method)
+		routePath := normalizeGinRoutePath(routeConfig.Path)
+		routeKey := p.gateway.routeKey(routePath, c.Request.Method)
 		p.gateway.router.mu.RLock()
 		route, exists := p.gateway.router.routes[routeKey]
+		if !exists {
+			wildcardKey := p.gateway.routeKey(routePath, "*")
+			route, exists = p.gateway.router.routes[wildcardKey]
+		}
 		p.gateway.router.mu.RUnlock()
 
 		if !exists {
