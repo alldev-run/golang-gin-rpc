@@ -19,20 +19,39 @@ import (
 )
 
 func main() {
+	// 配置文件路径
 	configPath := "./api/http-gateway/config/config.yaml"
 	if len(os.Args) > 1 {
 		configPath = os.Args[1]
 	}
 
+	// 加载配置
 	gwCfg, err := loadGatewayConfig(configPath)
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	logger.Init(logger.DefaultConfig())
+	// 初始化日志
+	loggerCfg := logger.DefaultConfig()
+	if gwCfg.Logging.Level != "" {
+		loggerCfg.Level = logger.LogLevel(gwCfg.Logging.Level)
+	}
+	if gwCfg.Logging.Format != "" {
+		loggerCfg.Format = logger.LogFormat(gwCfg.Logging.Format)
+	}
+	logger.Init(loggerCfg)
 
+	logger.Info("http-gateway starting", 
+		logger.String("version", "1.0.0"),
+		logger.String("config", configPath),
+		logger.String("service", gwCfg.ServiceName),
+		logger.String("protocols", getEnabledProtocols(gwCfg)),
+	)
+
+	// 创建业务处理器
 	bizHandler := httpapi.NewRouter(gwCfg).Handler()
 
+	// 创建网关服务
 	gwSvc, err := gateway.NewHTTPServiceWithOptions(gwCfg, gateway.HTTPServiceOptions{
 		BizHandler:     bizHandler,
 		IsBusinessPath: httpapi.IsBusinessPath,
@@ -41,8 +60,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to init gateway service: %v", err)
 	}
-	defer func() { _ = gwSvc.Close() }()
+	defer func() { 
+		logger.Info("gateway service closing")
+		_ = gwSvc.Close() 
+	}()
 
+	// 创建 HTTP 服务器
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", gwCfg.Host, gwCfg.Port),
 		Handler:      gwSvc.Handler(),
@@ -51,35 +74,76 @@ func main() {
 		IdleTimeout:  gwCfg.IdleTimeout,
 	}
 
+	// 启动服务器
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		logger.Info("http-gateway starting",
-			logger.String("addr", srv.Addr))
+		logger.Info("http-gateway server starting", 
+			logger.String("addr", srv.Addr),
+			logger.String("protocols", getEnabledProtocols(gwCfg)),
+		)
+		
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Errorf("http server failed", logger.Error(err))
 		}
 	}()
 
+	// 等待信号
 	<-sigCh
 	logger.Info("http-gateway shutting down")
 
+	// 优雅关闭
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	_ = srv.Shutdown(shutdownCtx)
+	
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Errorf("server shutdown failed", logger.Error(err))
+	}
+	
+	logger.Info("http-gateway stopped")
 }
 
+// loadGatewayConfig 加载网关配置
 func loadGatewayConfig(path string) (*gateway.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	cfg := gateway.DefaultConfig()
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	return cfg, nil
+}
+
+// getEnabledProtocols 获取启用的协议列表
+func getEnabledProtocols(cfg *gateway.Config) string {
+	var protocols []string
+	
+	if cfg.Protocols.HTTP {
+		protocols = append(protocols, "HTTP")
+	}
+	if cfg.Protocols.HTTP2 {
+		protocols = append(protocols, "HTTP2")
+	}
+	if cfg.Protocols.GRPC {
+		protocols = append(protocols, "gRPC")
+	}
+	if cfg.Protocols.JSONRPC {
+		protocols = append(protocols, "JSON-RPC")
+	}
+	
+	if len(protocols) == 0 {
+		return "HTTP"
+	}
+	
+	result := protocols[0]
+	for i := 1; i < len(protocols); i++ {
+		result += "/" + protocols[i]
+	}
+	
+	return result
 }

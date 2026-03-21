@@ -8,6 +8,7 @@ import (
 	"alldev-gin-rpc/api/http-gateway/internal/service"
 	"alldev-gin-rpc/pkg/gateway"
 	"alldev-gin-rpc/pkg/middleware/nethttp"
+	"alldev-gin-rpc/pkg/tracing"
 )
 
 type Router struct {
@@ -24,15 +25,33 @@ func (r *Router) Handler() http.Handler {
 	mux.HandleFunc("/", r.root)
 	mux.HandleFunc("/debug/request-id", r.debugRequestID)
 	mux.HandleFunc("/debug/ok", r.debugOK)
+	mux.HandleFunc("/debug/tracing", r.debugTracing)
+	// 注意：不要注册 /health，Gateway 已经提供了这个端点
 
-	return nethttp.Chain(
-		mux,
+	// 创建中间件链
+	middlewares := []nethttp.Middleware{
 		nethttp.Recovery(),
 		nethttp.RequestID(),
 		nethttp.CORSFromGatewayConfig(r.cfg),
 		nethttp.RateLimitFromGatewayConfig(r.cfg),
 		nethttp.Logging(),
-	)
+	}
+
+	// 如果启用了追踪，添加追踪中间件
+	if r.cfg.Tracing != nil && r.cfg.Tracing.Enabled {
+		httpMiddleware := tracing.NewHTTPMiddleware(tracing.GlobalTracer())
+		tracedHandler := httpMiddleware.Wrap("http-gateway", mux)
+		return nethttp.Chain(
+			tracedHandler,
+			nethttp.Recovery(),
+			nethttp.RequestID(),
+			nethttp.CORSFromGatewayConfig(r.cfg),
+			nethttp.RateLimitFromGatewayConfig(r.cfg),
+			nethttp.Logging(),
+		)
+	}
+
+	return nethttp.Chain(mux, middlewares...)
 }
 
 func (r *Router) root(w http.ResponseWriter, req *http.Request) {
@@ -52,6 +71,22 @@ func (r *Router) debugRequestID(w http.ResponseWriter, req *http.Request) {
 		"request_id_hdr":  req.Header.Get("X-Request-ID"),
 		"request_id_resp": w.Header().Get("X-Request-ID"),
 	})
+}
+
+func (r *Router) debugTracing(w http.ResponseWriter, req *http.Request) {
+	traceInfo := map[string]any{
+		"tracing_enabled": r.cfg.Tracing != nil && r.cfg.Tracing.Enabled,
+		"trace_id":       req.Header.Get("X-Trace-ID"),
+		"span_id":        req.Header.Get("X-Span-ID"),
+	}
+	
+	if r.cfg.Tracing != nil {
+		traceInfo["tracing_type"] = r.cfg.Tracing.Type
+		traceInfo["tracing_service"] = r.cfg.Tracing.ServiceName
+		traceInfo["tracing_sample_rate"] = r.cfg.Tracing.SampleRate
+	}
+	
+	writeJSON(w, http.StatusOK, traceInfo)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

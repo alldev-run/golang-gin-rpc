@@ -1,0 +1,13 @@
+package service
+
+import "__MODULE__/__API_PATH__/internal/model"
+
+type HelloService struct{}
+
+func NewHelloService() *HelloService {
+	return &HelloService{}
+}
+
+func (s *HelloService) Hello() model.HelloResponse {
+	return model.HelloResponse{Message: "Hello World"}
+}

@@ -37,6 +37,9 @@ type Config struct {
 
 	// Routes
 	Routes []RouteConfig `yaml:"routes" json:"routes"`
+
+	// Logging configuration
+	Logging LoggingConfig `yaml:"logging" json:"logging"`
 }
 
 // CORSConfig holds CORS configuration
@@ -204,5 +207,18 @@ func DefaultConfig() *Config {
 				Protocol: "http",
 			},
 		},
+		Logging: LoggingConfig{
+			Level:  "info",
+			Format: "json",
+		},
 	}
+}
+
+// LoggingConfig holds logging configuration
+type LoggingConfig struct {
+	// Log level (debug, info, warn, error)
+	Level string `yaml:"level" json:"level"`
+	
+	// Log format (json, console)
+	Format string `yaml:"format" json:"format"`
 }
