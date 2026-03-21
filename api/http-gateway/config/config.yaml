@@ -154,6 +154,62 @@ protocols:
     server_name: ""
     insecure: false
     timeout: "30s"
+    
+    # gRPC 安全配置
+    # 注意: 当前代码结构只支持基础的 auth 和 tls 配置
+    # 以下高级安全配置为未来扩展预留 (代码中暂未实现)
+    security:
+      # 认证配置 (代码支持)
+      auth:
+        enabled: false
+        type: "apikey"  # apikey, jwt, oauth2
+        header_name: "X-API-Key"
+        query_name: "api_key"
+        skip_paths:
+          - "/grpc/health"
+          - "/grpc/ready"
+          - "/grpc/info"
+        skip_methods:
+          - "OPTIONS"
+        api_keys: {}  # 需要手动添加 API Keys
+        
+        # 未来扩展配置 (代码中暂未实现)
+        # api_key_config:
+        #   hash_algorithm: "SHA256"
+        #   include_prefix: true
+        #   min_length: 32
+        # jwt_config:
+        #   secret: ""
+        #   algorithm: "HS256"
+        #   expiration: "24h"
+        #   issuer: "http-gateway"
+      
+      # 未来扩展安全配置 (代码中暂未实现)
+      # mTLS 配置
+      # mtls:
+      #   enabled: false
+      #   client_ca_file: ""
+      #   verify_client: true
+      
+      # 限流配置
+      # rate_limit:
+      #   enabled: false
+      #   requests: 100
+      #   window: "1m"
+      
+      # IP 白名单
+      # ip_whitelist:
+      #   enabled: false
+      #   ips: []
+      
+      # 请求签名验证
+      # signature:
+      #   enabled: false
+      #   secret: ""
+      #   algorithm: "HMAC-SHA256"
+      #   header_name: "X-Signature"
+      #   timestamp_header: "X-Timestamp"
+      #   max_skew: "300s"
 
   # JSON-RPC 配置
   jsonrpc_config:
@@ -161,6 +217,62 @@ protocols:
     enable_batch: false
     timeout: "30s"
     headers: {}
+    
+    # JSON-RPC 安全配置
+    # 注意: 当前代码结构只支持基础的 auth 和 tls 配置
+    # 以下高级安全配置为未来扩展预留 (代码中暂未实现)
+    security:
+      # 认证配置 (代码支持)
+      auth:
+        enabled: false
+        type: "apikey"  # apikey, jwt, oauth2
+        header_name: "X-API-Key"
+        query_name: "api_key"
+        skip_paths:
+          - "/rpc/health"
+          - "/rpc/ready"
+          - "/rpc/info"
+        skip_methods:
+          - "OPTIONS"
+        api_keys: {}  # 需要手动添加 API Keys
+        
+        # 未来扩展配置 (代码中暂未实现)
+        # api_key_config:
+        #   hash_algorithm: "SHA256"
+        #   include_prefix: true
+        #   min_length: 32
+        # jwt_config:
+        #   secret: ""
+        #   algorithm: "HS256"
+        #   expiration: "24h"
+        #   issuer: "http-gateway"
+      
+      # 未来扩展安全配置 (代码中暂未实现)
+      # 请求签名验证
+      # signature:
+      #   enabled: false
+      #   secret: ""
+      #   algorithm: "HMAC-SHA256"
+      #   header_name: "X-Signature"
+      #   timestamp_header: "X-Timestamp"
+      #   max_skew: "300s"
+      
+      # 限流配置
+      # rate_limit:
+      #   enabled: false
+      #   requests: 100
+      #   window: "1m"
+      
+      # IP 白名单
+      # ip_whitelist:
+      #   enabled: false
+      #   ips: []
+      
+      # 方法权限控制
+      # method_permissions:
+      #   "getUser": ["user", "admin"]
+      #   "createUser": ["admin"]
+      #   "deleteUser": ["admin"]
 
   # RPC 安全配置
   security:
