@@ -48,6 +48,14 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 	// Add tracing middleware first (to trace all requests)
 	engine.Use(g.TracingMiddleware())
 
+	// Add authentication middleware
+	if g.config.Protocols.Security.Auth.Enabled {
+		engine.Use(g.auth.Execute())
+		logger.Info("Authentication middleware enabled",
+			logger.String("type", g.config.Protocols.Security.Auth.Type),
+			logger.Int("api_keys_count", len(g.config.Protocols.Security.Auth.APIKeys)))
+	}
+
 	// Add CORS middleware
 	if g.config.CORS.AllowedOrigins != nil {
 		engine.Use(corsMiddleware(g.config.CORS))
@@ -113,9 +121,19 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 
 		// Register route based on method
 		if route.Method == "*" || route.Method == "ANY" {
-			engine.Any(route.Path, handler)
+			engine.Any(route.Path, func(c *gin.Context) {
+				// 设置协议信息到上下文
+				c.Set("protocol", route.Protocol)
+				c.Set("service", route.Service)
+				handler(c)
+			})
 		} else {
-			engine.Handle(route.Method, route.Path, handler)
+			engine.Handle(route.Method, route.Path, func(c *gin.Context) {
+				// 设置协议信息到上下文
+				c.Set("protocol", route.Protocol)
+				c.Set("service", route.Service)
+				handler(c)
+			})
 		}
 	}
 

@@ -24,6 +24,7 @@ type Gateway struct {
 	grpcProxy  *GRPCProxy
 	jsonProxy  *JSONRPCProxy
 	proxy      *Proxy           // HTTP proxy
+	auth       *GatewayAuth     // Authentication middleware
 	mu         sync.RWMutex
 	started    bool
 	ctx        context.Context
@@ -158,6 +159,9 @@ func (g *Gateway) initTracing() {
 	// Initialize protocol proxies
 	g.grpcProxy = NewGRPCProxy(g)
 	g.jsonProxy = NewJSONRPCProxy(g)
+	
+	// Initialize authentication
+	g.auth = NewGatewayAuth(g.config.Protocols.Security.Auth)
 }
 
 // Start starts the gateway server
@@ -260,6 +264,38 @@ func (g *Gateway) GetConfig() *Config {
 	return g.config
 }
 
+// GetAuth returns the gateway authentication middleware
+func (g *Gateway) GetAuth() *GatewayAuth {
+	return g.auth
+}
+
+// AddAPIKey adds an API key to the gateway authentication
+func (g *Gateway) AddAPIKey(key, description string) {
+	if g.auth != nil {
+		g.auth.AddAPIKey(key, description)
+		logger.Info("API key added",
+			logger.String("key", key[:min(len(key), 8)]+"..."),
+			logger.String("description", description))
+	}
+}
+
+// RemoveAPIKey removes an API key from the gateway authentication
+func (g *Gateway) RemoveAPIKey(key string) {
+	if g.auth != nil {
+		g.auth.RemoveAPIKey(key)
+		logger.Info("API key removed",
+			logger.String("key", key[:min(len(key), 8)]+"..."))
+	}
+}
+
+// HasAPIKey checks if an API key exists in the gateway authentication
+func (g *Gateway) HasAPIKey(key string) bool {
+	if g.auth != nil {
+		return g.auth.HasAPIKey(key)
+	}
+	return false
+}
+
 // GetRouter returns the router instance
 func (g *Gateway) GetRouter() *Router {
 	return g.router
@@ -268,6 +304,14 @@ func (g *Gateway) GetRouter() *Router {
 // GetDiscovery returns the service discovery instance
 func (g *Gateway) GetDiscovery() *ServiceDiscovery {
 	return g.discovery
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // GetLoadBalancer returns the load balancer instance

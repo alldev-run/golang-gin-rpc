@@ -74,6 +74,66 @@ type LoadBalancerConfig struct {
 	Strategy string `yaml:"strategy" json:"strategy"` // "round_robin", "random", "weighted", "least_connections"
 }
 
+// AuthConfig holds RPC authentication configuration
+type AuthConfig struct {
+	// Enabled indicates if RPC authentication is enabled
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	
+	// Type indicates the RPC authentication type (apikey, jwt, oauth2)
+	Type string `yaml:"type" json:"type"`
+	
+	// HeaderName is the header name for API key (default: X-API-Key)
+	HeaderName string `yaml:"header_name" json:"header_name"`
+	
+	// QueryName is the query parameter name for API key (default: api_key)
+	QueryName string `yaml:"query_name" json:"query_name"`
+	
+	// SkipPaths are RPC paths that skip authentication
+	SkipPaths []string `yaml:"skip_paths" json:"skip_paths"`
+	
+	// SkipMethods are HTTP methods that skip RPC authentication
+	SkipMethods []string `yaml:"skip_methods" json:"skip_methods"`
+	
+	// APIKeys is a map of valid RPC API keys (key -> description/user)
+	APIKeys map[string]string `yaml:"api_keys" json:"api_keys"`
+}
+
+// SecurityConfig holds RPC security configuration
+type SecurityConfig struct {
+	// RPC authentication configuration
+	Auth AuthConfig `yaml:"auth" json:"auth"`
+	
+	// TLS configuration for transport layer security
+	TLS TLSConfig `yaml:"tls" json:"tls"`
+}
+
+// TLSConfig holds TLS configuration
+type TLSConfig struct {
+	// Enable TLS for the gateway
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	
+	// TLS certificate file path
+	CertFile string `yaml:"cert_file" json:"cert_file"`
+	
+	// TLS key file path
+	KeyFile string `yaml:"key_file" json:"key_file"`
+	
+	// CA certificate file path
+	CAFile string `yaml:"ca_file" json:"ca_file"`
+	
+	// Server name for TLS verification
+	ServerName string `yaml:"server_name" json:"server_name"`
+	
+	// Insecure connection (skip certificate verification)
+	Insecure bool `yaml:"insecure" json:"insecure"`
+	
+	// Client certificate file path (for mutual TLS)
+	ClientCertFile string `yaml:"client_cert_file" json:"client_cert_file"`
+	
+	// Client key file path (for mutual TLS)
+	ClientKeyFile string `yaml:"client_key_file" json:"client_key_file"`
+}
+
 // RouteConfig holds route configuration
 type RouteConfig struct {
 	Path        string            `yaml:"path" json:"path"`
@@ -107,6 +167,9 @@ type ProtocolConfig struct {
 	
 	// JSON-RPC configuration
 	JSONRPCConfig JSONRPCConfig `yaml:"jsonrpc_config" json:"jsonrpc_config"`
+	
+	// RPC security configuration
+	Security SecurityConfig `yaml:"security" json:"security"`
 }
 
 // GRPCConfig holds gRPC specific configuration
@@ -201,6 +264,21 @@ func DefaultConfig() *Config {
 				Version:     "2.0",
 				EnableBatch: false,
 				Timeout:     30 * time.Second,
+			},
+			Security: SecurityConfig{
+				Auth: AuthConfig{
+					APIKeys:      make(map[string]string), // 空配置，避免写死
+					HeaderName:   "X-API-Key",
+					QueryName:    "api_key",
+					SkipPaths:    []string{"/health", "/ready", "/info", "/debug/*"},
+					SkipMethods:  []string{"OPTIONS"},
+					Enabled:      false, // 默认禁用
+					Type:         "apikey",
+				},
+				TLS: TLSConfig{
+					Enabled:         false,
+					Insecure:        false,
+				},
 			},
 		},
 		Routes: []RouteConfig{
