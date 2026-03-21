@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"runtime/debug"
 	"time"
 
 	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/panicx"
 	"alldev-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -72,14 +72,14 @@ func defaultLogger(c *gin.Context, err interface{}) {
 
 	// Log the panic with context
 	logger.Errorf("Panic recovered",
-		zap.String("error", fmt.Sprintf("%v", err)),
+		zap.String("error", panicx.ErrorString(err)),
 		zap.String("method", method),
 		zap.String("path", path),
 		zap.String("ip", ip),
 		zap.String("user_agent", userAgent),
 		zap.String("user_id", userID),
 		zap.String("request_id", requestID),
-		zap.String("stack", string(debug.Stack())),
+		zap.String("stack", panicx.Stack()),
 	)
 }
 
@@ -132,8 +132,8 @@ func HandlePanic(operation string) {
 	if err := recover(); err != nil {
 		logger.Errorf("Panic in goroutine",
 			zap.String("operation", operation),
-			zap.String("error", fmt.Sprintf("%v", err)),
-			zap.String("stack", string(debug.Stack())),
+			zap.String("error", panicx.ErrorString(err)),
+			zap.String("stack", panicx.Stack()),
 		)
 	}
 }

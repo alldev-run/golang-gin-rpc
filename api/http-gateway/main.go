@@ -12,10 +12,7 @@ import (
 	
 	"gopkg.in/yaml.v3"
 
-	"github.com/gin-gonic/gin"
-
 	"alldev-gin-rpc/api/http-gateway/internal/biz/gatewayhttp"
-	"alldev-gin-rpc/api/http-gateway/internal/router"
 	"alldev-gin-rpc/pkg/gateway"
 	"alldev-gin-rpc/pkg/logger"
 )
@@ -39,19 +36,9 @@ func main() {
 	}
 	defer func() { _ = gwSvc.Close() }()
 
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.New()
-	r.Use(gin.Recovery())
-
-	// Gateway routes + middlewares (CORS/RateLimit/RequestID/Logging)
-	gwSvc.Register(r)
-
-	// Business routes
-	router.NewRouter().Register(r)
-
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", gwCfg.Host, gwCfg.Port),
-		Handler:      r,
+		Handler:      gwSvc.Handler(),
 		ReadTimeout:  gwCfg.ReadTimeout,
 		WriteTimeout: gwCfg.WriteTimeout,
 		IdleTimeout:  gwCfg.IdleTimeout,

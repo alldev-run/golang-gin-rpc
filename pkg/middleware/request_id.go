@@ -2,14 +2,17 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+
+	"alldev-gin-rpc/pkg/requestid"
 )
 
 func RequestID() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-
-		id := uuid.New().String()
+		id := c.GetHeader("X-Request-ID")
+		if id == "" {
+			id = requestid.MustNew()
+		}
 
 		c.Set("request_id", id)
 

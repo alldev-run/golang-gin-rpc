@@ -2,14 +2,15 @@ package gatewayhttp
 
 import (
 	"fmt"
+	"net/http"
 
-	"github.com/gin-gonic/gin"
-
+	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
 	"alldev-gin-rpc/pkg/gateway"
 )
 
 type Service struct {
-	gw *gateway.Gateway
+	gw      *gateway.Gateway
+	handler http.Handler
 }
 
 func New(gwCfg *gateway.Config) (*Service, error) {
@@ -25,11 +26,30 @@ func New(gwCfg *gateway.Config) (*Service, error) {
 		return nil, fmt.Errorf("failed to start gateway: %w", err)
 	}
 
-	return &Service{gw: gw}, nil
+	svc := &Service{gw: gw}
+	svc.handler = svc.buildHandler()
+	return svc, nil
 }
 
-func (s *Service) Register(engine *gin.Engine) {
-	s.gw.SetupRoutes(engine)
+// Handler returns the HTTP handler for the gateway service.
+// It includes:
+// - pkg/gateway middlewares + proxy routes + /health /ready /info
+// - business routes registered under api/http-gateway/internal/router
+func (s *Service) Handler() http.Handler {
+	return s.handler
+}
+
+func (s *Service) buildHandler() http.Handler {
+	gatewayHandler := s.gw.Handler()
+	bizHandler := httpapi.NewRouter(s.gw.GetConfig()).Handler()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if httpapi.IsBusinessPath(r.URL.Path) {
+			bizHandler.ServeHTTP(w, r)
+			return
+		}
+		gatewayHandler.ServeHTTP(w, r)
+	})
 }
 
 func (s *Service) Close() error {

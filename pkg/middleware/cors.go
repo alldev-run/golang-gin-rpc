@@ -1,11 +1,8 @@
 package middleware
 
 import (
-	"net/http"
-	"strconv"
-	"strings"
-
 	"github.com/gin-gonic/gin"
+	"alldev-gin-rpc/pkg/cors"
 )
 
 
@@ -25,63 +22,24 @@ func CORS(config CORSConfig) gin.HandlerFunc {
 		config.MaxAge = 86400
 	}
 
+	cc := cors.Config{
+		AllowedOrigins:   config.AllowedOrigins,
+		AllowedMethods:   config.AllowedMethods,
+		AllowedHeaders:   config.AllowedHeaders,
+		ExposedHeaders:   config.ExposedHeaders,
+		AllowCredentials: config.AllowCredentials,
+		MaxAge:           config.MaxAge,
+		OptionsPassthrough: config.OptionsPassthrough,
+	}
+
 	return func(c *gin.Context) {
-		origin := c.Request.Header.Get("Origin")
-		
-		// Set CORS headers
-		if len(config.AllowedOrigins) == 1 && config.AllowedOrigins[0] == "*" {
-			c.Header("Access-Control-Allow-Origin", "*")
-		} else if isAllowedOrigin(origin, config.AllowedOrigins) {
-			c.Header("Access-Control-Allow-Origin", origin)
-		}
-
-		c.Header("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
-		c.Header("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
-		
-		if len(config.ExposedHeaders) > 0 {
-			c.Header("Access-Control-Expose-Headers", strings.Join(config.ExposedHeaders, ","))
-		}
-
-		if config.AllowCredentials {
-			c.Header("Access-Control-Allow-Credentials", "true")
-		}
-
-		c.Header("Access-Control-Max-Age", strconv.Itoa(config.MaxAge))
-
-		// Handle preflight requests
-		if c.Request.Method == "OPTIONS" {
-			if config.OptionsPassthrough {
-				c.Next()
-				return
-			}
-			c.AbortWithStatus(http.StatusNoContent)
+		if handled := cors.Apply(c.Writer, c.Request, cc); handled {
+			c.Abort()
 			return
 		}
 
 		c.Next()
 	}
-}
-
-// isAllowedOrigin checks if the origin is allowed
-func isAllowedOrigin(origin string, allowedOrigins []string) bool {
-	if origin == "" {
-		return false
-	}
-
-	for _, allowedOrigin := range allowedOrigins {
-		if allowedOrigin == "*" || allowedOrigin == origin {
-			return true
-		}
-		// Support wildcard subdomains
-		if strings.HasPrefix(allowedOrigin, "*.") {
-			domain := strings.TrimPrefix(allowedOrigin, "*.")
-			if strings.HasSuffix(origin, domain) {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // RestrictiveCORS creates a restrictive CORS configuration for production
