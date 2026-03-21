@@ -38,6 +38,14 @@ type ServiceInstance struct {
 func NewServiceDiscovery(config DiscoveryConfig) (*ServiceDiscovery, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// 如果服务发现被禁用，返回静态实现
+	if !config.Enabled {
+		return &ServiceDiscovery{
+			ctx:    ctx,
+			cancel: cancel,
+		}, nil
+	}
+
 	if config.Type == "static" || len(config.Endpoints) == 0 {
 		// For static discovery, return a mock implementation
 		return &ServiceDiscovery{
@@ -51,6 +59,7 @@ func NewServiceDiscovery(config DiscoveryConfig) (*ServiceDiscovery, error) {
 		Type:    discovery.RegistryType(config.Type),
 		Address: config.Endpoints[0], // Use first endpoint for now
 		Timeout: config.Timeout,
+		Enabled: config.Enabled,
 	}
 	
 	disc, err := discovery.NewDiscovery(discoveryConfig)
@@ -137,16 +146,10 @@ func (sd *ServiceDiscovery) Stop() error {
 
 // getStaticEndpoints returns static endpoints for testing/demo
 func (sd *ServiceDiscovery) getStaticEndpoints(serviceName string) ([]string, error) {
-	switch serviceName {
-	case "user-service":
-		return []string{"http://localhost:8001"}, nil
-	case "order-service":
-		return []string{"http://localhost:8002"}, nil
-	case "health-service":
-		return []string{"http://localhost:8003"}, nil
-	default:
-		return nil, fmt.Errorf("unknown static service: %s", serviceName)
-	}
+	// 对于静态发现，我们不再硬编码服务列表
+	// 而是让 Gateway 在路由初始化时直接使用配置中的 targets
+	// 这个函数现在只用于向后兼容
+	return nil, fmt.Errorf("static discovery should use route targets directly: %s", serviceName)
 }
 
 

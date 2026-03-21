@@ -266,14 +266,44 @@ func (g *Gateway) initRoutes() error {
 		}
 		
 		// Get service endpoints
-		if g.discovery != nil {
+		if g.discovery != nil && g.config.Discovery.Enabled {
+			// 只有在服务发现启用时才尝试获取动态端点
 			endpoints, err := g.discovery.GetServiceEndpoints(routeConfig.Service)
 			if err != nil {
-				logger.Errorf("Failed to get endpoints for service", 
-					logger.String("service", routeConfig.Service), logger.Error(err))
-				// Continue with empty targets, will be refreshed later
+				logger.Debug("Service discovery failed during initialization", 
+					logger.String("service", routeConfig.Service), 
+					logger.String("error", err.Error()))
+				// 使用配置中的静态 targets
+				if len(routeConfig.Targets) > 0 {
+					route.targets = append([]string(nil), routeConfig.Targets...)
+					logger.Debug("Using static targets for service", 
+						logger.String("service", routeConfig.Service),
+						logger.Any("targets", routeConfig.Targets))
+				}
 			} else if len(endpoints) > 0 {
 				route.targets = endpoints
+				logger.Info("Using discovery endpoints for service", 
+					logger.String("service", routeConfig.Service),
+					logger.Any("endpoints", endpoints))
+			} else {
+				// 服务发现返回空结果，使用静态 targets
+				if len(routeConfig.Targets) > 0 {
+					route.targets = append([]string(nil), routeConfig.Targets...)
+					logger.Debug("Discovery returned empty, using static targets for service", 
+						logger.String("service", routeConfig.Service),
+						logger.Any("targets", routeConfig.Targets))
+				}
+			}
+		} else {
+			// 服务发现被禁用或不可用，直接使用静态 targets
+			if len(routeConfig.Targets) > 0 {
+				route.targets = append([]string(nil), routeConfig.Targets...)
+				logger.Debug("Service discovery disabled, using static targets for service", 
+					logger.String("service", routeConfig.Service),
+					logger.Any("targets", routeConfig.Targets))
+			} else {
+				logger.Warn("No targets available for service", 
+					logger.String("service", routeConfig.Service))
 			}
 		}
 		
@@ -335,6 +365,11 @@ func (g *Gateway) refreshServices() {
 		return
 	}
 	
+	// 检查服务发现是否被禁用
+	if !g.config.Discovery.Enabled {
+		return
+	}
+	
 	// Refresh routes with updated service endpoints
 	g.router.mu.Lock()
 	defer g.router.mu.Unlock()
@@ -342,18 +377,39 @@ func (g *Gateway) refreshServices() {
 	for _, route := range g.router.routes {
 		endpoints, err := g.discovery.GetServiceEndpoints(route.config.Service)
 		if err != nil {
-			logger.Errorf("Failed to refresh endpoints for service", 
-				logger.String("service", route.config.Service), logger.Error(err))
+			// 减少日志噪音：只在第一次或错误类型变化时记录
+			logger.Debug("Service discovery refresh failed", 
+				logger.String("service", route.config.Service), 
+				logger.String("error", err.Error()))
+			
+			// 使用配置中的静态 targets
+			if len(route.config.Targets) > 0 {
+				route.targets = append([]string(nil), route.config.Targets...)
+				logger.Debug("Using static targets for service", 
+					logger.String("service", route.config.Service),
+					logger.Any("targets", route.config.Targets))
+			}
 			continue
 		}
 		
-		// Update route targets
-		route.targets = endpoints
+		// 如果服务发现返回空结果，使用静态 targets
+		if len(endpoints) == 0 && len(route.config.Targets) > 0 {
+			route.targets = append([]string(nil), route.config.Targets...)
+			logger.Debug("Discovery returned empty, using static targets for service", 
+				logger.String("service", route.config.Service),
+				logger.Any("targets", route.config.Targets))
+		} else {
+			// Update route targets
+			route.targets = endpoints
+			logger.Debug("Updated service endpoints from discovery", 
+				logger.String("service", route.config.Service),
+				logger.Any("endpoints", endpoints))
+		}
 		route.healthyTargets = nil
 		
 		// Update load balancer targets
 		if g.balancer != nil {
-			g.balancer.UpdateTargets(endpoints)
+			g.balancer.UpdateTargets(route.targets)
 		}
 	}
 

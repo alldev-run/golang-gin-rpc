@@ -1,3 +1,0 @@
-package router
-
-// Router placeholder

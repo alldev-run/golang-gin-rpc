@@ -23,10 +23,13 @@
 - **最少连接 (Least Connections)** - 选择连接数最少的服务
 
 ### 🔍 服务发现
-- **静态配置** - 手动配置服务列表
 - **Consul** - 基于 Consul 的服务发现
-- **etcd** - 基于 etcd 的服务发现
+- **etcd** - 基于 etcd 的服务发现  
+- **Zookeeper** - 基于 Zookeeper 的服务发现
+- **Static** - 静态配置（开发测试）
 - **动态更新** - 服务列表自动刷新
+- **健康检查** - 自动探活服务实例
+- **故障转移** - 自动剔除不健康实例
 
 ### 🛡️ 安全与可靠性
 - **CORS 支持** - 完整的跨域资源共享配置
@@ -73,10 +76,11 @@ gateway:
 
   # 服务发现配置
   discovery:
-    type: "static"  # static, consul, etcd
-    endpoints: []
+    type: "consul"  # static, consul, etcd, zookeeper
+    endpoints: ["localhost:8500"]  # Consul 地址
     namespace: "default"
     timeout: "5s"
+    options: {}
 
   # 负载均衡配置
   load_balancer:

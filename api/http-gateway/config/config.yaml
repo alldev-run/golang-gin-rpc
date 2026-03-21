@@ -5,7 +5,7 @@
 # 服务器基本配置
 # =============================================================================
 host: "0.0.0.0"
-port: 8080
+port: 8080  # 修改端口避免冲突
 service_name: "http-gateway"
 read_timeout: "30s"
 write_timeout: "30s"
@@ -41,11 +41,12 @@ rate_limit:
 # 服务发现配置
 # =============================================================================
 discovery:
-  type: static
+  type: consul  # 支持: static, consul, etcd, zookeeper
   endpoints: 
-    - "http://localhost:8080"
+    - "localhost:8500"  # Consul 地址
   namespace: default
   timeout: "5s"
+  enabled: false  # 默认关闭，需要时启用
   options: {}
 
 # =============================================================================
@@ -71,13 +72,17 @@ tracing:
 protocols:
   http: true
   http2: true
-  grpc: false   # 默认关闭，需要时启用
-  jsonrpc: false # 默认关闭，需要时启用
+  grpc: false   # 启用 gRPC 协议支持
+  jsonrpc: false # 启用 JSON-RPC 协议支持
   
   grpc_config:
     enable_tls: false
     server_name: "http-gateway.example.com"
     timeout: "30s"
+    # gRPC 客户端配置
+    discovery_cache_ttl: "10s"
+    failover_threshold: 3
+    failover_cooldown: "30s"
   
   jsonrpc_config:
     version: "2.0"
@@ -85,23 +90,73 @@ protocols:
     timeout: "30s"
     headers:
       "Content-Type": "application/json"
+    # JSON-RPC 客户端配置
+    discovery_cache_ttl: "10s"
+    failover_threshold: 3
+    failover_cooldown: "30s"
 
 # =============================================================================
 # 路由配置
 # =============================================================================
 routes:
-  # 本地 API 路由
-  - path: /api/*
+  # 用户服务路由 - 使用服务发现
+  - path: /api/user/*
     method: "*"
     protocol: "http"
-    service: local-service
-    targets:
-      - "http://localhost:8080"
-    strip_prefix: false
+    service: user-service  # 服务发现中的服务名
+    targets: ["http://localhost:8081", "http://localhost:8082"]  # 静态备用
+    strip_prefix: true
+    timeout: "30s"
+    retries: 3
+    headers:
+      X-Service: user-service
+    query: {}
+
+  # 订单服务路由 - 使用服务发现
+  - path: /api/order/*
+    method: "*"
+    protocol: "http"
+    service: order-service  # 服务发现中的服务名
+    targets: ["http://localhost:8083", "http://localhost:8084"]  # 静态备用
+    strip_prefix: true
+    timeout: "30s"
+    retries: 3
+    headers:
+      X-Service: order-service
+    query: {}
+
+  # 支付服务路由 - 使用服务发现
+  - path: /api/payment/*
+    method: "*"
+    protocol: "http"
+    service: payment-service  # 服务发现中的服务名
+    targets: ["http://localhost:8085", "http://localhost:8086"]  # 静态备用
+    strip_prefix: true
+    timeout: "30s"
+    retries: 3
+    headers:
+      X-Service: payment-service
+    query: {}
+
+  # gRPC 用户服务路由 - 使用服务发现
+  - path: /grpc/user/*
+    method: "POST"
+    protocol: "grpc"
+    service: user-grpc-service  # 服务发现中的服务名
+    targets: ["grpc://localhost:50051", "grpc://localhost:50052"]  # 静态备用
     timeout: "30s"
     retries: 3
 
-  # 调试端点
+  # JSON-RPC 支付服务路由 - 使用服务发现
+  - path: /rpc/payment
+    method: "POST"
+    protocol: "jsonrpc"
+    service: payment-rpc-service  # 服务发现中的服务名
+    targets: ["http://localhost:8087/rpc", "http://localhost:8088/rpc"]  # 静态备用
+    timeout: "30s"
+    retries: 3
+
+  # 调试端点 - 本地路由
   - path: /debug/*
     method: "*"
     protocol: "http"
@@ -112,7 +167,7 @@ routes:
     timeout: "5s"
     retries: 1
 
-  # Hello 服务
+  # Hello 服务 - 本地路由
   - path: /
     method: "*"
     protocol: "http"

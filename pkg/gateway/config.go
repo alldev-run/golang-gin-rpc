@@ -66,6 +66,7 @@ type DiscoveryConfig struct {
 	Namespace string            `yaml:"namespace" json:"namespace"`
 	Timeout   time.Duration     `yaml:"timeout" json:"timeout"`
 	Options   map[string]string `yaml:"options" json:"options"`
+	Enabled   bool              `yaml:"enabled" json:"enabled"` // 是否启用服务发现
 }
 
 // LoadBalancerConfig holds load balancer configuration
@@ -173,6 +174,8 @@ func DefaultConfig() *Config {
 			Endpoints: []string{},
 			Namespace: "default",
 			Timeout:   5 * time.Second,
+			Options:   make(map[string]string),
+			Enabled:   false, // 默认关闭服务发现
 		},
 		LoadBalancer: LoadBalancerConfig{
 			Strategy: "round_robin",
