@@ -60,10 +60,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to init gateway service: %v", err)
 	}
-	defer func() { 
-		logger.Info("gateway service closing")
-		_ = gwSvc.Close() 
-	}()
 
 	// 创建 HTTP 服务器
 	srv := &http.Server{
@@ -93,7 +89,11 @@ func main() {
 	<-sigCh
 	logger.Info("http-gateway shutting down")
 
-	// 优雅关闭
+	// 先关闭 Gateway 服务
+	logger.Info("gateway service closing")
+	_ = gwSvc.Close()
+
+	// 再关闭 HTTP 服务器
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	

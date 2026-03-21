@@ -148,18 +148,27 @@ func (p *GRPCProxy) getOrCreateGRPCClient(target string) (*grpc.Client, error) {
 
 // Close closes all gRPC clients
 func (p *GRPCProxy) Close() error {
-	p.gateway.mu.Lock()
-	defer p.gateway.mu.Unlock()
-
+	logger.Info("Starting gRPC proxy close...")
+	
+	// 在关闭阶段，完全避免使用 Gateway 的锁
+	// 直接操作 clients 映射，因为在关闭时不会有并发访问
 	var lastErr error
+	var clientCount int
+	
+	// 直接遍历并关闭客户端
 	for target, client := range p.clients {
+		clientCount++
+		logger.Debug("Closing gRPC client", logger.String("target", target))
 		if err := client.Close(); err != nil {
-			logger.Errorf("Failed to close gRPC client to %s", logger.String("target", target), logger.Error(err))
+			logger.Debug("Failed to close gRPC client", logger.Error(err))
 			lastErr = err
 		}
+		// 从映射中移除已关闭的客户端
+		delete(p.clients, target)
 	}
-
-	p.clients = make(map[string]*grpc.Client)
+	
+	logger.Info("Found gRPC clients to close", logger.Int("count", clientCount))
+	logger.Info("gRPC proxy closed successfully")
 	return lastErr
 }
 
@@ -299,10 +308,17 @@ func (p *JSONRPCProxy) getOrCreateJSONRPCClient(target string) (*jsonrpc.Client,
 
 // Close closes all JSON-RPC clients
 func (p *JSONRPCProxy) Close() error {
-	p.gateway.mu.Lock()
-	defer p.gateway.mu.Unlock()
-
+	logger.Info("Starting JSON-RPC proxy close...")
+	
+	// 在关闭阶段，完全避免使用 Gateway 的锁
+	// 直接操作 clients 映射，因为在关闭时不会有并发访问
+	clientCount := len(p.clients)
+	
 	// JSON-RPC clients don't need explicit closing in pkg/rpc/jsonrpc
+	// 直接清空映射
 	p.clients = make(map[string]*jsonrpc.Client)
+	
+	logger.Info("Found JSON-RPC clients to close", logger.Int("count", clientCount))
+	logger.Info("JSON-RPC proxy closed successfully")
 	return nil
 }

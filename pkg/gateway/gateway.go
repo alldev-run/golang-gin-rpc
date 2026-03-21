@@ -23,6 +23,7 @@ type Gateway struct {
 	tracer     *tracing.TracerProvider
 	grpcProxy  *GRPCProxy
 	jsonProxy  *JSONRPCProxy
+	proxy      *Proxy           // HTTP proxy
 	mu         sync.RWMutex
 	started    bool
 	ctx        context.Context
@@ -168,6 +169,18 @@ func (g *Gateway) Start() error {
 		return ErrGatewayAlreadyStarted
 	}
 
+	// Start service discovery
+	if g.discovery != nil {
+		if err := g.discovery.Start(); err != nil {
+			logger.Errorf("Failed to start service discovery", logger.Error(err))
+		}
+	}
+
+	// Start health manager
+	if g.health != nil {
+		g.health.Start()
+	}
+
 	// Start background tasks
 	go g.serviceDiscoveryLoop()
 	go g.healthCheckLoop()
@@ -189,18 +202,50 @@ func (g *Gateway) Stop() error {
 		return ErrGatewayNotStarted
 	}
 
+	logger.Info("Stopping gateway server...")
+
+	// Cancel context to stop all background goroutines
 	g.cancel()
+	logger.Info("Gateway context cancelled")
+	
+	// Stop service discovery
+	if g.discovery != nil {
+		if err := g.discovery.Stop(); err != nil {
+			logger.Errorf("Failed to stop service discovery", logger.Error(err))
+		} else {
+			logger.Info("Service discovery stopped")
+		}
+	}
+	
+	// Stop health manager
+	if g.health != nil {
+		g.health.Stop()
+		logger.Info("Health manager stopped")
+	}
 	
 	// Close protocol proxies
 	if g.grpcProxy != nil {
 		if err := g.grpcProxy.Close(); err != nil {
 			logger.Errorf("Failed to close gRPC proxy", logger.Error(err))
+		} else {
+			logger.Info("gRPC proxy closed")
 		}
 	}
 	
 	if g.jsonProxy != nil {
 		if err := g.jsonProxy.Close(); err != nil {
 			logger.Errorf("Failed to close JSON-RPC proxy", logger.Error(err))
+		} else {
+			logger.Info("JSON-RPC proxy closed")
+		}
+	}
+	
+	// Close HTTP proxy
+	if g.proxy != nil {
+		if err := g.proxy.Close(); err != nil {
+			logger.Errorf("Failed to close HTTP proxy", logger.Error(err))
+		} else {
+			logger.Info("HTTP proxy closed")
 		}
 	}
 	

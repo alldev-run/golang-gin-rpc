@@ -32,9 +32,18 @@ func NewProxy(gateway *Gateway) *Proxy {
 	}
 }
 
+// Close closes the HTTP proxy client
+func (p *Proxy) Close() error {
+	if p.client != nil {
+		p.client.CloseIdleConnections()
+		logger.Info("HTTP proxy client closed")
+	}
+	return nil
+}
+
 // SetupRoutes sets up the HTTP routes
 func (g *Gateway) SetupRoutes(engine *gin.Engine) {
-	proxy := NewProxy(g)
+	g.proxy = NewProxy(g)
 
 	// Add tracing middleware first (to trace all requests)
 	engine.Use(g.TracingMiddleware())
@@ -99,7 +108,7 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 				}
 			}
 		default: // HTTP
-			handler = proxy.handleRoute(route)
+			handler = g.proxy.handleRoute(route)
 		}
 
 		// Register route based on method
