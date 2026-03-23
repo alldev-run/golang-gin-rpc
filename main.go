@@ -12,25 +12,9 @@ import (
 	"alldev-gin-rpc/internal/app"
 	"alldev-gin-rpc/internal/bootstrap"
 	"alldev-gin-rpc/internal/router"
-	"alldev-gin-rpc/pkg/tracing"
 )
 
 func main() {
-	// Initialize tracing first
-	if err := tracing.InitFromFile("./configs/tracing.yaml"); err != nil {
-		log.Printf("Failed to initialize tracing: %v", err)
-		// Continue without tracing
-	}
-	
-	// Ensure tracing is shutdown gracefully
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := tracing.ShutdownGlobalTracer(ctx); err != nil {
-			log.Printf("Failed to shutdown tracer: %v", err)
-		}
-	}()
-
 	// Initialize bootstrap
 	boot, err := bootstrap.NewBootstrap("./configs/config.yaml")
 	if err != nil {
@@ -38,24 +22,11 @@ func main() {
 	}
 	defer boot.Close()
 
-	// Initialize databases
-	if err := boot.InitializeDatabases(); err != nil {
-		log.Fatalf("Failed to initialize databases: %v", err)
-	}
+	frameworkOptions := bootstrap.DefaultFrameworkOptions()
+	frameworkOptions.Services = []string{bootstrap.ServiceRPC}
 
-	// Initialize cache
-	if err := boot.InitializeCache(); err != nil {
-		log.Fatalf("Failed to initialize cache: %v", err)
-	}
-
-	// Initialize RPC services
-	if err := boot.InitializeRPC(); err != nil {
-		log.Fatalf("Failed to initialize RPC services: %v", err)
-	}
-
-	// Initialize service discovery
-	if err := boot.InitializeDiscovery(); err != nil {
-		log.Fatalf("Failed to initialize service discovery: %v", err)
+	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
+		log.Fatalf("Failed to start framework services: %v", err)
 	}
 
 	// Get configuration
@@ -96,6 +67,10 @@ func main() {
 	
 	if err := application.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Error during shutdown: %v", err)
+	}
+
+	if err := boot.StopFramework(shutdownCtx, frameworkOptions.Services...); err != nil {
+		log.Printf("Error stopping framework services: %v", err)
 	}
 
 	log.Println("Application shutdown complete")

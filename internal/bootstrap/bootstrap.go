@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"alldev-gin-rpc/pkg/auth"
@@ -19,6 +20,7 @@ import (
 	"alldev-gin-rpc/pkg/metrics"
 	"alldev-gin-rpc/pkg/rpc"
 	"alldev-gin-rpc/pkg/tracing"
+	"alldev-gin-rpc/pkg/websocket"
 	"alldev-gin-rpc/pkg/auth/jwtx"
 	cacheredis "alldev-gin-rpc/pkg/cache/redis"
 	pg "alldev-gin-rpc/pkg/db/postgres"
@@ -48,12 +50,21 @@ type Bootstrap struct {
 	db               *db.Factory
 	cache            cache.Cache
 	rpcManager       *rpc.Manager
+	websocketServer  *websocket.Server
 	discoveryManager *discovery.ServiceDiscoveryManager
 	healthManager    *health.HealthManager
 	metricsCollector *metrics.MetricsCollector
 	authManager      *auth.AuthManager
 	tracer           *tracing.Tracer
 	gateway          *gateway.Gateway
+
+	serviceMu       sync.RWMutex
+	serviceFactories map[string]ServiceFactory
+	managedServices  map[string]ManagedService
+	serviceOrder     []string
+
+	depMu        sync.RWMutex
+	dependencies map[string]interface{}
 }
 
 // NewBootstrap creates a new bootstrap instance
@@ -106,9 +117,16 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 
 	logger.Info("Configuration loaded successfully")
 
-	return &Bootstrap{
-		config: cfg,
-	}, nil
+	boot := &Bootstrap{
+		config:           cfg,
+		serviceFactories: make(map[string]ServiceFactory),
+		managedServices:  make(map[string]ManagedService),
+		dependencies:     make(map[string]interface{}),
+	}
+	if err := boot.RegisterDefaultServiceFactories(); err != nil {
+		return nil, err
+	}
+	return boot, nil
 }
 
 // InitializeAll initializes all components
@@ -195,6 +213,7 @@ func (b *Bootstrap) InitializeDatabases() error {
 	}
 
 	b.db = factory
+	b.setDependency("db.factory", factory)
 	logger.Info("Database initialization completed")
 	return nil
 }
@@ -220,6 +239,7 @@ func (b *Bootstrap) InitializeCache() error {
 	}
 
 	b.cache = cacheInstance
+	b.setDependency("cache", cacheInstance)
 	logger.Info("Redis cache initialized")
 
 	return nil
@@ -261,6 +281,7 @@ func (b *Bootstrap) InitializeRPC() error {
 	}
 
 	b.rpcManager = rpc.NewManager(managerConfig)
+	b.setDependency("rpc.manager", b.rpcManager)
 
 	if b.config.RPC.Degradation.Enabled {
 		dmConfig := rpc.DefaultDegradationConfig()
@@ -495,6 +516,7 @@ func (b *Bootstrap) InitializeGateway() error {
 	gatewayConfig.Discovery.Timeout = b.config.Discovery.Timeout
 
 	b.gateway = gateway.NewGateway(gatewayConfig)
+	b.setDependency("gateway", b.gateway)
 
 	// Initialize gateway
 	if err := b.gateway.Initialize(); err != nil {
@@ -620,6 +642,34 @@ func (b *Bootstrap) GetRPCManager() *rpc.Manager {
 	return b.rpcManager
 }
 
+// GetWebSocketServer returns the websocket server.
+func (b *Bootstrap) GetWebSocketServer() *websocket.Server {
+	return b.websocketServer
+}
+
+// GetDependency returns a dependency by key.
+func (b *Bootstrap) GetDependency(key string) (interface{}, bool) {
+	b.depMu.RLock()
+	defer b.depMu.RUnlock()
+	v, ok := b.dependencies[key]
+	return v, ok
+}
+
+// MustGetDependency returns a dependency by key or panics when not found.
+func (b *Bootstrap) MustGetDependency(key string) interface{} {
+	v, ok := b.GetDependency(key)
+	if !ok {
+		panic(fmt.Sprintf("dependency not found: %s", key))
+	}
+	return v
+}
+
+func (b *Bootstrap) setDependency(key string, value interface{}) {
+	b.depMu.Lock()
+	defer b.depMu.Unlock()
+	b.dependencies[key] = value
+}
+
 // GetDiscoveryManager returns the discovery manager
 func (b *Bootstrap) GetDiscoveryManager() *discovery.ServiceDiscoveryManager {
 	return b.discoveryManager
@@ -669,6 +719,14 @@ func (b *Bootstrap) Close() error {
 		if err := b.rpcManager.Stop(); err != nil {
 			errors = append(errors, fmt.Errorf("rpc manager close error: %w", err))
 		}
+	}
+
+	if b.websocketServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := b.websocketServer.Stop(ctx); err != nil {
+			errors = append(errors, fmt.Errorf("websocket server close error: %w", err))
+		}
+		cancel()
 	}
 
 	if b.discoveryManager != nil {

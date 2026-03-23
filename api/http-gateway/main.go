@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +13,7 @@ import (
 
 	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
 	"alldev-gin-rpc/api/http-gateway/internal/mw"
+	"alldev-gin-rpc/internal/bootstrap"
 	"alldev-gin-rpc/pkg/gateway"
 	"alldev-gin-rpc/pkg/logger"
 )
@@ -48,57 +48,65 @@ func main() {
 		logger.String("protocols", getEnabledProtocols(gwCfg)),
 	)
 
+	frameworkConfigPath := "./configs/config.yaml"
+	if len(os.Args) > 2 {
+		frameworkConfigPath = os.Args[2]
+	}
+
+	boot, err := bootstrap.NewBootstrap(frameworkConfigPath)
+	if err != nil {
+		log.Fatalf("failed to initialize bootstrap: %v", err)
+	}
+	defer boot.Close()
+
+	const gatewayServiceName = "api-gateway.http-gateway"
+
 	// 创建业务处理器
 	bizHandler := httpapi.NewRouter(gwCfg).Handler()
-
-	// 创建网关服务
-	gwSvc, err := gateway.NewHTTPServiceWithOptions(gwCfg, gateway.HTTPServiceOptions{
-		BizHandler:     bizHandler,
-		IsBusinessPath: httpapi.IsBusinessPath,
-		Middlewares:    mw.Middlewares(),
-	})
-	if err != nil {
-		log.Fatalf("failed to init gateway service: %v", err)
+	if err := boot.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{
+		Name:   gatewayServiceName,
+		Config: gwCfg,
+		HTTPOptions: gateway.HTTPServiceOptions{
+			BizHandler:     bizHandler,
+			IsBusinessPath: httpapi.IsBusinessPath,
+			Middlewares:    mw.Middlewares(),
+		},
+	}); err != nil {
+		log.Fatalf("failed to register api-gateway service factory: %v", err)
 	}
 
-	// 创建 HTTP 服务器
-	srv := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", gwCfg.Host, gwCfg.Port),
-		Handler:      gwSvc.Handler(),
-		ReadTimeout:  gwCfg.ReadTimeout,
-		WriteTimeout: gwCfg.WriteTimeout,
-		IdleTimeout:  gwCfg.IdleTimeout,
+	frameworkOptions := bootstrap.FrameworkOptions{
+		InitDatabases: true,
+		InitCache:     true,
+		InitDiscovery: true,
+		InitTracing:   true,
+		InitAuth:      true,
+		Services:      []string{gatewayServiceName},
 	}
+
+	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
+		log.Fatalf("failed to start framework services: %v", err)
+	}
+
+	logger.Info("http-gateway service started",
+		logger.String("addr", fmt.Sprintf("%s:%d", gwCfg.Host, gwCfg.Port)),
+		logger.String("protocols", getEnabledProtocols(gwCfg)),
+	)
 
 	// 启动服务器
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		logger.Info("http-gateway server starting", 
-			logger.String("addr", srv.Addr),
-			logger.String("protocols", getEnabledProtocols(gwCfg)),
-		)
-		
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Errorf("http server failed", logger.Error(err))
-		}
-	}()
-
 	// 等待信号
 	<-sigCh
 	logger.Info("http-gateway shutting down")
 
-	// 先关闭 Gateway 服务
-	logger.Info("gateway service closing")
-	_ = gwSvc.Close()
-
-	// 再关闭 HTTP 服务器
+	// 关闭框架托管服务
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Errorf("server shutdown failed", logger.Error(err))
+
+	if err := boot.StopFramework(shutdownCtx, frameworkOptions.Services...); err != nil {
+		logger.Errorf("framework shutdown failed", logger.Error(err))
 	}
 	
 	logger.Info("http-gateway stopped")

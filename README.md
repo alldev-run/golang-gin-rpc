@@ -60,20 +60,30 @@
  ## 启动流程
  
  当前主程序入口是 `main.go`，整体启动顺序大致如下：
- 
- - **初始化 tracing**
-   - 读取 `configs/tracing.yaml`
- - **加载主配置**
-   - 通过 `bootstrap.NewBootstrap("./configs/config.yaml")`
- - **初始化核心依赖**
-   - 数据库
-   - Redis 缓存
-   - RPC 服务
-   - 服务发现
- - **启动 HTTP 应用**
-   - 注册路由
-   - 监听退出信号
- - **执行优雅关闭**
+
+- **加载主配置**
+  - 通过 `bootstrap.NewBootstrap("./configs/config.yaml")`
+- **通过框架入口启动依赖与服务**
+  - `bootstrap.StartFramework(ctx, options)`
+  - 依赖初始化按需启用：数据库、缓存、服务发现、鉴权、链路追踪
+  - 托管服务按需选择：`api-gateway` / `rpc` / `websocket`
+- **启动 HTTP 应用**
+  - 注册路由
+  - 监听退出信号
+- **执行优雅关闭**
+  - `bootstrap.StopFramework(...)` 停止托管服务
+
+### 服务组合（FrameworkOptions）
+
+`bootstrap.FrameworkOptions` 用于描述框架启动清单。
+
+- 依赖开关：`InitDatabases` / `InitCache` / `InitDiscovery` / `InitTracing` / `InitAuth`
+- 托管服务：`Services: []string{bootstrap.ServiceRPC, bootstrap.ServiceAPIGateway, bootstrap.ServiceWebSocket}`
+- WebSocket 可选注册参数：`WebSocket: &bootstrap.WebSocketServiceOptions{...}`
+
+自定义 API Gateway（含业务路由）可通过：
+
+- `bootstrap.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{...})`
  
  ## 配置文件
  
