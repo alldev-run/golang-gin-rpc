@@ -141,6 +141,24 @@ Use `WhereBuilder` for typed predicates:
 - `IsNull/IsNotNull`
 - `Between`
 
+#### Grouping (AND/OR with parentheses)
+
+Use grouping helpers to build conditions like:
+
+- `AND (.. OR ..)`
+- `OR (.. AND ..)`
+
+```go
+wb := orm.NewWhereBuilder(orm.NewMySQLDialect())
+wb.Where("a = ?", 1).AndGroup(func(g *orm.WhereBuilder) {
+    g.Where("b = ?", 2).Or("c = ?", 3)
+})
+
+where, args := wb.Build()
+// WHERE a = ? AND (b = ? OR c = ?)
+// [1 2 3]
+```
+
 ### INSERT
 
 Use `InsertBuilder`:
@@ -148,9 +166,21 @@ Use `InsertBuilder`:
 - Single row: `Set` / `Sets`
 - Bulk insert: `Values(columns, rows...)`
 
+MySQL extensions:
+
+- Upsert: `OnDuplicateKeyUpdate(...)`
+- `INSERT IGNORE`: `Ignore()`
+- `REPLACE INTO`: `Replace()`
+
 ### UPDATE / DELETE
 
 Use `UpdateBuilder` / `DeleteBuilder`.
+
+Notes:
+
+- Both builders support JOIN clauses.
+- UPDATE supports ORDER BY / LIMIT (dialect-dependent).
+- When using PostgreSQL dialect, placeholder numbering is positional (`$1`, `$2`, ...) and is handled automatically across SET/JOIN/WHERE parts.
 
 ## Struct scanning
 
@@ -174,6 +204,18 @@ Use `ORM.Transaction(ctx, func(txORM *ORM) error { ... })` to run within a trans
 - Placeholders: `?`
 - LIMIT/OFFSET: `LIMIT n OFFSET m`
 - Locks: `FOR UPDATE`, `LOCK IN SHARE MODE`
+
+### PostgreSQL
+
+- Identifier quoting: double quotes (`"col"`)
+- Placeholders: `$1`, `$2`, ...
+- Notes:
+  - When composing queries with subqueries/CTEs/UNION, the builder will shift placeholder indices to keep SQL valid.
+
+### SQLite
+
+- Identifier quoting: double quotes (`"col"`)
+- Placeholders: `?`
 
 Known gaps:
 
