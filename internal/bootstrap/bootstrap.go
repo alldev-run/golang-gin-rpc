@@ -176,7 +176,7 @@ func (b *Bootstrap) InitializeDatabases() error {
 			continue
 		}
 
-		clientConfig, err := buildDBConfig(dbConfig)
+		clientConfig, err := buildDBConfig(dbConfig, b.config.Database.Pool)
 		if err != nil {
 			return fmt.Errorf("failed to build database config %s: %w", name, err)
 		}
@@ -512,7 +512,7 @@ func (b *Bootstrap) InitializeGateway() error {
 	return nil
 }
 
-func buildDBConfig(dbConfig config.DBConfig) (db.Config, error) {
+func buildDBConfig(dbConfig config.DBConfig, poolCfg config.DBPoolConfig) (db.Config, error) {
 	switch dbConfig.Driver {
 	case "mysql":
 		cfg := mysqlpkg.DefaultConfig()
@@ -521,6 +521,18 @@ func buildDBConfig(dbConfig config.DBConfig) (db.Config, error) {
 		cfg.Database = dbConfig.Database
 		cfg.Username = dbConfig.Username
 		cfg.Password = dbConfig.Password
+		if poolCfg.MaxOpenConns > 0 {
+			cfg.MaxOpenConns = poolCfg.MaxOpenConns
+		}
+		if poolCfg.MaxIdleConns > 0 {
+			cfg.MaxIdleConns = poolCfg.MaxIdleConns
+		}
+		if poolCfg.ConnMaxLifetime > 0 {
+			cfg.ConnMaxLifetime = poolCfg.ConnMaxLifetime
+		}
+		if poolCfg.ConnMaxIdleTime > 0 {
+			cfg.ConnMaxIdleTime = poolCfg.ConnMaxIdleTime
+		}
 		return db.Config{Type: db.TypeMySQL, MySQL: cfg}, nil
 	case "postgres", "postgresql":
 		cfg := pg.DefaultConfig()
@@ -530,6 +542,15 @@ func buildDBConfig(dbConfig config.DBConfig) (db.Config, error) {
 		cfg.Username = dbConfig.Username
 		cfg.Password = dbConfig.Password
 		cfg.SSLMode = dbConfig.SSLMode
+		if poolCfg.MaxOpenConns > 0 {
+			cfg.MaxOpenConns = poolCfg.MaxOpenConns
+		}
+		if poolCfg.MaxIdleConns > 0 {
+			cfg.MaxIdleConns = poolCfg.MaxIdleConns
+		}
+		if poolCfg.ConnMaxLifetime > 0 {
+			cfg.ConnMaxLifetime = poolCfg.ConnMaxLifetime
+		}
 		return db.Config{Type: db.TypePostgres, PG: cfg}, nil
 	default:
 		return db.Config{}, fmt.Errorf("unsupported database driver: %s", dbConfig.Driver)
