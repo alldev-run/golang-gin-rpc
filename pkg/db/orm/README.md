@@ -106,6 +106,16 @@ Supported:
 - **MySQL upsert** via `INSERT ... ON DUPLICATE KEY UPDATE ...`
   - Use `InsertBuilder.OnDuplicateKeyUpdate("col1", "col2", ...)`
 
+- **INSERT IGNORE**
+  - Use `InsertBuilder.Ignore()`
+
+- **REPLACE INTO**
+  - Use `InsertBuilder.Replace()`
+
+- **FOR UPDATE 扩展**（MySQL 8 常用）
+  - `SelectBuilder.ForUpdateNowait()` => `FOR UPDATE NOWAIT`
+  - `SelectBuilder.ForUpdateSkipLocked()` => `FOR UPDATE SKIP LOCKED`
+
 ### ClickHouse
 
 A minimal ClickHouse dialect is provided (`DialectClickHouse`).
@@ -123,3 +133,9 @@ Important differences:
   - Driver (e.g. clickhouse-go)
 
 If you need strict ClickHouse support for mutations (UPDATE/DELETE), we should add dedicated helpers that emit ClickHouse-specific mutation syntax.
+
+## Notes on MySQL compatibility
+
+- `FULL OUTER JOIN` is not supported by MySQL.
+  - When using MySQL-like dialects (Default/MySQL), calling `FullOuterJoin(...)` will be degraded to `LEFT JOIN` so the generated SQL remains executable.
+  - If you need true full outer join semantics in MySQL, use `UNION` with two queries.

@@ -87,6 +87,42 @@ func ExampleInsertBuilder_mysql() {
 	// true
 }
 
+func ExampleInsertBuilder_mysqlIgnore() {
+	db := &noopDB{}
+	ib := NewInsertBuilderWithDialect(db, "users", NewMySQLDialect()).
+		Ignore().
+		Set("id", 1).
+		Set("name", "alice")
+
+	q, args, err := ib.Build()
+	fmt.Println(q)
+	fmt.Println(args)
+	fmt.Println(err == nil)
+
+	// Output:
+	// INSERT IGNORE INTO `users` (`id`, `name`) VALUES (?, ?)
+	// [1 alice]
+	// true
+}
+
+func ExampleInsertBuilder_mysqlReplace() {
+	db := &noopDB{}
+	ib := NewInsertBuilderWithDialect(db, "users", NewMySQLDialect()).
+		Replace().
+		Set("id", 1).
+		Set("name", "alice")
+
+	q, args, err := ib.Build()
+	fmt.Println(q)
+	fmt.Println(args)
+	fmt.Println(err == nil)
+
+	// Output:
+	// REPLACE INTO `users` (`id`, `name`) VALUES (?, ?)
+	// [1 alice]
+	// true
+}
+
 func ExampleInsertBuilder_mysqlUpsert() {
 	db := &noopDB{}
 	ib := NewInsertBuilderWithDialect(db, "users", NewMySQLDialect()).

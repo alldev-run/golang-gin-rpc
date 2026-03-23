@@ -220,6 +220,22 @@ func (sb *SelectBuilder) ForUpdate() *SelectBuilder {
 	return sb
 }
 
+func (sb *SelectBuilder) ForUpdateNowait() *SelectBuilder {
+	sb.lockMode = sb.dialect.LockForUpdate()
+	if sb.lockMode != "" {
+		sb.lockMode += " NOWAIT"
+	}
+	return sb
+}
+
+func (sb *SelectBuilder) ForUpdateSkipLocked() *SelectBuilder {
+	sb.lockMode = sb.dialect.LockForUpdate()
+	if sb.lockMode != "" {
+		sb.lockMode += " SKIP LOCKED"
+	}
+	return sb
+}
+
 // LockInShareMode adds LOCK IN SHARE MODE to the query.
 func (sb *SelectBuilder) LockInShareMode() *SelectBuilder {
 	sb.lockMode = sb.dialect.LockInShareMode()
@@ -260,6 +276,9 @@ func (sb *SelectBuilder) RightJoin(table, condition string, args ...interface{})
 
 // FullOuterJoin adds a FULL OUTER JOIN clause.
 func (sb *SelectBuilder) FullOuterJoin(table, condition string, args ...interface{}) *SelectBuilder {
+	if sb.dialect != nil && !sb.dialect.SupportsFeature(FeatureFullOuterJoin) {
+		return sb.JoinWithType("LEFT", table, condition, args...)
+	}
 	return sb.JoinWithType("FULL OUTER", table, condition, args...)
 }
 

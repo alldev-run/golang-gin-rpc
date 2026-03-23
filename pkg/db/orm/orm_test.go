@@ -250,7 +250,7 @@ func TestSelectBuilderJoins(t *testing.T) {
 	sb4 := NewSelectBuilder(mockDB, "users")
 	sb4.FullOuterJoin("profiles", "users.id = profiles.user_id")
 	query, args = sb4.Build()
-	expectedQuery = "SELECT * FROM `users` FULL OUTER JOIN `profiles` ON users.id = profiles.user_id"
+	expectedQuery = "SELECT * FROM `users` LEFT JOIN `profiles` ON users.id = profiles.user_id"
 	if query != expectedQuery || len(args) != 0 {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, []interface{}{}, query, args)
 	}
@@ -265,7 +265,7 @@ func TestSelectBuilderGroupByHaving(t *testing.T) {
 	sb.Having("COUNT(*) > ?", 5)
 
 	query, args := sb.Build()
-	expectedQuery := "SELECT `status`, `COUNT(*)` FROM `orders` GROUP BY `status` HAVING COUNT(*) > ?"
+	expectedQuery := "SELECT `status`, COUNT(*) FROM `orders` GROUP BY `status` HAVING COUNT(*) > ?"
 	expectedArgs := []interface{}{5}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -274,7 +274,7 @@ func TestSelectBuilderGroupByHaving(t *testing.T) {
 	// Test HAVING with AND
 	sb.HavingAnd("status != ?", "cancelled")
 	query, args = sb.Build()
-	expectedQuery = "SELECT `status`, `COUNT(*)` FROM `orders` GROUP BY `status` HAVING COUNT(*) > ? AND status != ?"
+	expectedQuery = "SELECT `status`, COUNT(*) FROM `orders` GROUP BY `status` HAVING COUNT(*) > ? AND status != ?"
 	expectedArgs = []interface{}{5, "cancelled"}
 	if query != expectedQuery || !reflect.DeepEqual(args, expectedArgs) {
 		t.Errorf("Expected query='%s', args=%v, got query='%s', args=%v", expectedQuery, expectedArgs, query, args)
@@ -296,6 +296,71 @@ func TestInsertBuilderMySQLUpsert(t *testing.T) {
 	expectedQuery := "INSERT INTO `users` (`id`, `name`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `name` = VALUES(`name`)"
 	expectedArgs := []interface{}{1, "alice"}
 	assertQueryAndArgs(t, query, args, expectedQuery, expectedArgs)
+}
+
+func TestInsertBuilderMySQLIgnoreAndReplace(t *testing.T) {
+	mockDB := &MockDB{}
+
+	q1, a1, err := NewInsertBuilderWithDialect(mockDB, "users", NewMySQLDialect()).
+		Ignore().
+		Set("id", 1).
+		Set("name", "alice").
+		Build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertQueryAndArgs(t, q1, a1,
+		"INSERT IGNORE INTO `users` (`id`, `name`) VALUES (?, ?)",
+		[]interface{}{1, "alice"},
+	)
+
+	q2, a2, err := NewInsertBuilderWithDialect(mockDB, "users", NewMySQLDialect()).
+		Replace().
+		Set("id", 1).
+		Set("name", "alice").
+		Build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertQueryAndArgs(t, q2, a2,
+		"REPLACE INTO `users` (`id`, `name`) VALUES (?, ?)",
+		[]interface{}{1, "alice"},
+	)
+}
+
+func TestSelectBuilderMySQLForUpdateExtensions(t *testing.T) {
+	mockDB := &MockDB{}
+
+	q1, _ := NewSelectBuilderWithDialect(mockDB, "accounts", NewMySQLDialect()).
+		Columns("id").
+		Eq("id", 1).
+		ForUpdateNowait().
+		Build()
+	if q1 != "SELECT `id` FROM `accounts` WHERE `id` = ? FOR UPDATE NOWAIT" {
+		t.Errorf("unexpected query: %s", q1)
+	}
+
+	q2, _ := NewSelectBuilderWithDialect(mockDB, "accounts", NewMySQLDialect()).
+		Columns("id").
+		Eq("id", 1).
+		ForUpdateSkipLocked().
+		Build()
+	if q2 != "SELECT `id` FROM `accounts` WHERE `id` = ? FOR UPDATE SKIP LOCKED" {
+		t.Errorf("unexpected query: %s", q2)
+	}
+}
+
+func TestMySQLDialectQuoteIdentifierSemantics(t *testing.T) {
+	d := NewMySQLDialect()
+	if got := d.QuoteIdentifier("u.id"); got != "`u`.`id`" {
+		t.Errorf("expected dotted identifier to be quoted segment-wise, got %s", got)
+	}
+	if got := d.QuoteIdentifier("users u"); got != "`users` u" {
+		t.Errorf("expected table alias quoting, got %s", got)
+	}
+	if got := d.QuoteIdentifier("COUNT(*)"); got != "COUNT(*)" {
+		t.Errorf("expected expression to remain raw, got %s", got)
+	}
 }
 
 func TestDeleteBuilder(t *testing.T) {

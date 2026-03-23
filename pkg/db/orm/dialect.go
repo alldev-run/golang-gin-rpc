@@ -53,6 +53,28 @@ func (d *MySQLDialect) LockInShareMode() string {
 }
 
 func (d *MySQLDialect) QuoteIdentifier(identifier string) string {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return "``"
+	}
+	if strings.ContainsAny(identifier, "()*,+-/\\") {
+		return identifier
+	}
+	if strings.Contains(identifier, " ") {
+		parts := strings.Fields(identifier)
+		if len(parts) >= 2 {
+			quoted := d.QuoteIdentifier(parts[0])
+			return quoted + " " + strings.Join(parts[1:], " ")
+		}
+		return identifier
+	}
+	if strings.Contains(identifier, ".") {
+		segs := strings.Split(identifier, ".")
+		for i := range segs {
+			segs[i] = "`" + segs[i] + "`"
+		}
+		return strings.Join(segs, ".")
+	}
 	return "`" + identifier + "`"
 }
 
@@ -210,6 +232,28 @@ func (d *ClickHouseDialect) LockInShareMode() string {
 }
 
 func (d *ClickHouseDialect) QuoteIdentifier(identifier string) string {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return "``"
+	}
+	if strings.ContainsAny(identifier, "()*,+-/\\") {
+		return identifier
+	}
+	if strings.Contains(identifier, " ") {
+		parts := strings.Fields(identifier)
+		if len(parts) >= 2 {
+			quoted := d.QuoteIdentifier(parts[0])
+			return quoted + " " + strings.Join(parts[1:], " ")
+		}
+		return identifier
+	}
+	if strings.Contains(identifier, ".") {
+		segs := strings.Split(identifier, ".")
+		for i := range segs {
+			segs[i] = "`" + segs[i] + "`"
+		}
+		return strings.Join(segs, ".")
+	}
 	return "`" + identifier + "`"
 }
 

@@ -17,6 +17,7 @@ type InsertBuilder struct {
 	values     [][]interface{}
 	onConflict string
 	onDuplicateKeyUpdate []string
+	insertPrefix string
 	dialect    Dialect
 }
 
@@ -27,6 +28,7 @@ func NewInsertBuilder(db DB, table string) *InsertBuilder {
 		db:      db,
 		table:   table,
 		data:    make(map[string]interface{}),
+		insertPrefix: "INSERT INTO",
 		dialect: dialect,
 	}
 }
@@ -37,8 +39,19 @@ func NewInsertBuilderWithDialect(db DB, table string, dialect Dialect) *InsertBu
 		db:      db,
 		table:   table,
 		data:    make(map[string]interface{}),
+		insertPrefix: "INSERT INTO",
 		dialect: dialect,
 	}
+}
+
+func (ib *InsertBuilder) Ignore() *InsertBuilder {
+	ib.insertPrefix = "INSERT IGNORE INTO"
+	return ib
+}
+
+func (ib *InsertBuilder) Replace() *InsertBuilder {
+	ib.insertPrefix = "REPLACE INTO"
+	return ib
 }
 
 // Set sets a column value.
@@ -113,6 +126,11 @@ func (ib *InsertBuilder) Build() (string, []interface{}, error) {
 	} else if len(ib.data) > 0 {
 		// Single insert mode
 		query, args, err = BuildInsertQuery(ib.table, ib.data, ib.dialect)
+		if err == nil && ib.insertPrefix != "" && ib.insertPrefix != "INSERT INTO" {
+			if strings.HasPrefix(query, "INSERT INTO ") {
+				query = strings.Replace(query, "INSERT INTO ", ib.insertPrefix+" ", 1)
+			}
+		}
 	} else {
 		return "", nil, ErrEmptyData
 	}
@@ -163,8 +181,11 @@ func (ib *InsertBuilder) buildSingleInsert() (string, []interface{}) {
 		args[i] = ib.data[key]
 	}
 	
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", 
-		ib.dialect.QuoteIdentifier(ib.table), columns, placeholders)
+	query := fmt.Sprintf("%s %s (%s) VALUES (%s)",
+		ib.insertPrefix,
+		ib.dialect.QuoteIdentifier(ib.table),
+		columns,
+		placeholders)
 	
 	return query, args
 }
@@ -191,9 +212,10 @@ func (ib *InsertBuilder) buildBulkInsert() (string, []interface{}, error) {
 		valueStrings[i] = "(" + strings.Join(placeholders, ", ") + ")"
 	}
 	
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", 
-		ib.dialect.QuoteIdentifier(ib.table), 
-		columns, 
+	query := fmt.Sprintf("%s %s (%s) VALUES %s",
+		ib.insertPrefix,
+		ib.dialect.QuoteIdentifier(ib.table),
+		columns,
 		strings.Join(valueStrings, ", "))
 	
 	return query, args, nil
@@ -279,24 +301,6 @@ func (ib *InsertBuilder) InsertReturningTx(ctx context.Context, tx *sql.Tx, retu
 	return tx.QueryContext(ctx, query, args...)
 }
 
-// Ignore sets the INSERT to ignore duplicates (MySQL syntax).
-func (ib *InsertBuilder) Ignore() *InsertBuilder {
-	// This is MySQL-specific syntax
-	if _, ok := ib.dialect.(*MySQLDialect); ok {
-		return ib // MySQL uses INSERT IGNORE, but we'll handle this in the query
-	}
-	return ib
-}
-
-// Replace sets the query to be a REPLACE INTO (MySQL syntax).
-func (ib *InsertBuilder) Replace() *InsertBuilder {
-	// This is MySQL-specific syntax
-	if _, ok := ib.dialect.(*MySQLDialect); ok {
-		return ib // Will be handled in Build()
-	}
-	return ib
-}
-
 // Clone creates a copy of the InsertBuilder.
 func (ib *InsertBuilder) Clone() *InsertBuilder {
 	clone := &InsertBuilder{
@@ -306,6 +310,8 @@ func (ib *InsertBuilder) Clone() *InsertBuilder {
 		columns:    make([]string, len(ib.columns)),
 		values:     make([][]interface{}, len(ib.values)),
 		onConflict: ib.onConflict,
+		onDuplicateKeyUpdate: append([]string(nil), ib.onDuplicateKeyUpdate...),
+		insertPrefix: ib.insertPrefix,
 		dialect:    ib.dialect,
 	}
 	
@@ -332,6 +338,8 @@ func (ib *InsertBuilder) Reset() *InsertBuilder {
 	ib.columns = ib.columns[:0]
 	ib.values = ib.values[:0]
 	ib.onConflict = ""
+	ib.onDuplicateKeyUpdate = nil
+	ib.insertPrefix = "INSERT INTO"
 	return ib
 }
 
