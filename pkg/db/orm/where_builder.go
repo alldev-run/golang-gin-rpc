@@ -29,6 +29,30 @@ func (wb *WhereBuilder) Where(condition string, args ...interface{}) *WhereBuild
 	return wb
 }
 
+func (wb *WhereBuilder) Group(fn func(*WhereBuilder)) *WhereBuilder {
+	subBuilder := NewWhereBuilder(wb.dialect)
+	fn(subBuilder)
+
+	if len(subBuilder.conditions) > 0 {
+		subCondition := strings.Join(subBuilder.conditions, " ")
+		if len(wb.conditions) > 0 {
+			wb.conditions = append(wb.conditions, "AND ("+subCondition+")")
+		} else {
+			wb.conditions = append(wb.conditions, "("+subCondition+")")
+		}
+		wb.args = append(wb.args, subBuilder.args...)
+	}
+	return wb
+}
+
+func (wb *WhereBuilder) AndGroup(fn func(*WhereBuilder)) *WhereBuilder {
+	return wb.AndWhere(fn)
+}
+
+func (wb *WhereBuilder) OrGroup(fn func(*WhereBuilder)) *WhereBuilder {
+	return wb.OrWhere(fn)
+}
+
 // And adds an AND condition.
 func (wb *WhereBuilder) And(condition string, args ...interface{}) *WhereBuilder {
 	if len(wb.conditions) > 0 {
@@ -249,23 +273,75 @@ func (wb *WhereBuilder) Raw(condition string, args ...interface{}) *WhereBuilder
 	return wb.Where(condition, args...)
 }
 
+func (wb *WhereBuilder) ExistsSubquery(sub *SelectBuilder) *WhereBuilder {
+	if sub == nil {
+		return wb
+	}
+	q, args := sub.Build()
+	q = shiftPlaceholdersIfNeeded(q, wb.dialect, len(wb.args))
+	wb.args = append(wb.args, args...)
+	wb.conditions = append(wb.conditions, fmt.Sprintf("EXISTS (%s)", q))
+	return wb
+}
+
+func (wb *WhereBuilder) NotExistsSubquery(sub *SelectBuilder) *WhereBuilder {
+	if sub == nil {
+		return wb
+	}
+	q, args := sub.Build()
+	q = shiftPlaceholdersIfNeeded(q, wb.dialect, len(wb.args))
+	wb.args = append(wb.args, args...)
+	wb.conditions = append(wb.conditions, fmt.Sprintf("NOT EXISTS (%s)", q))
+	return wb
+}
+
+func (wb *WhereBuilder) InSubquery(column string, sub *SelectBuilder) *WhereBuilder {
+	if sub == nil {
+		return wb
+	}
+	q, args := sub.Build()
+	q = shiftPlaceholdersIfNeeded(q, wb.dialect, len(wb.args))
+	wb.args = append(wb.args, args...)
+	wb.conditions = append(wb.conditions, fmt.Sprintf("%s IN (%s)", wb.dialect.QuoteIdentifier(column), q))
+	return wb
+}
+
+func (wb *WhereBuilder) NotInSubquery(column string, sub *SelectBuilder) *WhereBuilder {
+	if sub == nil {
+		return wb
+	}
+	q, args := sub.Build()
+	q = shiftPlaceholdersIfNeeded(q, wb.dialect, len(wb.args))
+	wb.args = append(wb.args, args...)
+	wb.conditions = append(wb.conditions, fmt.Sprintf("%s NOT IN (%s)", wb.dialect.QuoteIdentifier(column), q))
+	return wb
+}
+
 // Build constructs the WHERE clause string and returns conditions with args.
-func (wb *WhereBuilder) Build() (string, []interface{}) {
+
+func (wb *WhereBuilder) BuildWithOffset(startIndex int) (string, []interface{}) {
 	if len(wb.conditions) == 0 {
 		return "", nil
 	}
 	
 	// Replace placeholders with dialect-specific ones
 	conditions := make([]string, len(wb.conditions))
+	argIndex := startIndex
 	for i, condition := range wb.conditions {
 		conditions[i] = condition
 		// Replace ? placeholders with dialect-specific ones
 		for j := 0; j < strings.Count(condition, "?"); j++ {
-			conditions[i] = strings.Replace(conditions[i], "?", wb.dialect.Placeholder(j), 1)
+			conditions[i] = strings.Replace(conditions[i], "?", wb.dialect.Placeholder(argIndex), 1)
+			argIndex++
 		}
 	}
 	
 	return "WHERE " + strings.Join(conditions, " "), wb.args
+}
+
+// Build constructs the WHERE clause string and returns conditions with args.
+func (wb *WhereBuilder) Build() (string, []interface{}) {
+	return wb.BuildWithOffset(0)
 }
 
 // Clone creates a copy of the WhereBuilder.

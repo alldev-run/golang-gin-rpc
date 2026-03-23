@@ -258,7 +258,7 @@ func (ub *UpdateBuilder) Build() (string, []interface{}) {
 	}
 
 	// Add WHERE clause
-	whereClause, whereArgs := ub.where.Build()
+	whereClause, whereArgs := ub.where.BuildWithOffset(len(allArgs))
 	if whereClause != "" {
 		query += " " + whereClause
 		allArgs = append(allArgs, whereArgs...)

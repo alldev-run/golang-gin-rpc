@@ -201,7 +201,7 @@ func (db *DeleteBuilder) Build() (string, []interface{}) {
 	}
 
 	// Add WHERE clause
-	whereClause, whereArgs := db.where.Build()
+	whereClause, whereArgs := db.where.BuildWithOffset(len(allArgs))
 	if whereClause != "" {
 		query += " " + whereClause
 		allArgs = append(allArgs, whereArgs...)

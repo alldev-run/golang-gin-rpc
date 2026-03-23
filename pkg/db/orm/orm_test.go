@@ -150,6 +150,32 @@ func TestWhereBuilder(t *testing.T) {
 	}
 }
 
+func TestWhereBuilder_GroupingAndOr(t *testing.T) {
+	wb := NewWhereBuilder(NewDefaultDialect())
+	wb.Where("a = ?", 1).AndGroup(func(g *WhereBuilder) {
+		g.Where("b = ?", 2).Or("c = ?", 3)
+	})
+
+	where, args := wb.Build()
+	expectedWhere := "WHERE a = ? AND (b = ? OR c = ?)"
+	expectedArgs := []interface{}{1, 2, 3}
+	if where != expectedWhere || !reflect.DeepEqual(args, expectedArgs) {
+		t.Errorf("Expected where='%s', args=%v, got where='%s', args=%v", expectedWhere, expectedArgs, where, args)
+	}
+
+	wb2 := NewWhereBuilder(NewDefaultDialect())
+	wb2.Where("a = ?", 1).OrGroup(func(g *WhereBuilder) {
+		g.Where("b = ?", 2).And("c = ?", 3)
+	})
+
+	where2, args2 := wb2.Build()
+	expectedWhere2 := "WHERE a = ? OR (b = ? AND c = ?)"
+	expectedArgs2 := []interface{}{1, 2, 3}
+	if where2 != expectedWhere2 || !reflect.DeepEqual(args2, expectedArgs2) {
+		t.Errorf("Expected where='%s', args=%v, got where='%s', args=%v", expectedWhere2, expectedArgs2, where2, args2)
+	}
+}
+
 func TestSelectBuilder(t *testing.T) {
 	mockDB := &MockDB{}
 	sb := NewSelectBuilder(mockDB, "users")

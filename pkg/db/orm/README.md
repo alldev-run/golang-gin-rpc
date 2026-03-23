@@ -52,6 +52,85 @@ Features:
 - Columns / joins / where / group by / having / order / limit / offset
 - Locking (`FOR UPDATE`, `LOCK IN SHARE MODE`) depending on dialect
 
+#### WITH (CTE)
+
+```go
+cte := orm.NewSelectBuilder(db, "orders").
+    Columns("user_id", "COUNT(*)").
+    Where("status = ?", "paid").
+    GroupBy("user_id")
+
+q, args := orm.NewSelectBuilder(db, "active_users").
+    With("active_users", cte).
+    Columns("user_id").
+    Where("COUNT(*) > ?", 10).
+    Build()
+```
+
+#### Subquery in FROM
+
+```go
+sub := orm.NewSelectBuilder(db, "users").Columns("id").Where("status = ?", "active")
+q, args := orm.NewSelectBuilder(db, "ignored").FromSubquery(sub, "u").Columns("u.id").Build()
+```
+
+#### EXISTS / IN (subquery)
+
+```go
+sub := orm.NewSelectBuilder(db, "orders").Columns("1").Where("user_id = ?", 10)
+sb := orm.NewSelectBuilder(db, "users").Columns("id")
+sb.WhereBuilder().ExistsSubquery(sub)
+q, args := sb.Build()
+```
+
+#### Join subquery
+
+```go
+sub := orm.NewSelectBuilder(db, "orders").Columns("user_id").Where("status = ?", "paid")
+q, args := orm.NewSelectBuilder(db, "users u").
+    Columns("u.id").
+    JoinSubquery(sub, "o", "o.user_id = u.id").
+    Build()
+```
+
+#### JoinOnBuilder (avoid raw ON but still allow raw)
+
+```go
+q, args := orm.NewSelectBuilder(db, "users u").
+    Columns("u.id").
+    JoinOn("profiles p", func(on *orm.JoinOnBuilder) {
+        on.Eq("u.id", "p.user_id").And("p.status = ?", "active")
+        // or: on.Raw("p.created_at > ?", time.Now().Add(-24*time.Hour))
+    }).
+    Build()
+```
+
+#### UNION / UNION ALL
+
+```go
+a := orm.NewSelectBuilder(db, "users").Columns("id").Where("status = ?", "active")
+b := orm.NewSelectBuilder(db, "admins").Columns("id").Where("enabled = ?", true)
+q, args := a.UnionAll(b).Build()
+```
+
+#### ORDER BY / LIMIT over UNION results
+
+```go
+outer := a.UnionAll(b).AsDerived("t").
+    Columns("t.id").
+    OrderByDesc("t.id").
+    Limit(10)
+q, args := outer.Build()
+```
+
+#### WITH RECURSIVE
+
+```go
+seed := orm.NewSelectBuilder(db, "nodes").Columns("id", "parent_id").Where("id = ?", 1)
+rec := orm.NewSelectBuilder(db, "nodes n").Columns("n.id", "n.parent_id").Join("tree t", "n.parent_id = t.id")
+q, args := orm.NewSelectBuilder(db, "tree").WithRecursive("tree", seed, rec).Columns("id").FromRaw("tree").Build()
+```
+
 ### WHERE
 
 Use `WhereBuilder` for typed predicates:
