@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"alldev-gin-rpc/pkg/db/orm"
-
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -279,44 +277,4 @@ func (c *Client) Transaction(ctx context.Context, fn func(*sql.Tx) error) error 
 // Prepare creates a prepared statement.
 func (c *Client) Prepare(ctx context.Context, query string) (*sql.Stmt, error) {
 	return c.db.PrepareContext(ctx, query)
-}
-
-// NewSelectBuilder creates a new SELECT query builder.
-func (c *Client) NewSelectBuilder(table string) *orm.SelectBuilder {
-	return orm.NewSelectBuilder(c, table)
-}
-
-// Count returns a new SelectBuilder configured for COUNT queries.
-func (c *Client) Count(table string) *orm.SelectBuilder {
-	return orm.NewSelectBuilder(c, table).Columns("COUNT(*)")
-}
-
-// CountColumn returns a new SelectBuilder configured for COUNT(column) queries.
-func (c *Client) CountColumn(table, column string) *orm.SelectBuilder {
-	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("COUNT(%s)", column))
-}
-
-// Sum returns a new SelectBuilder configured for SUM queries.
-func (c *Client) Sum(table, column string) *orm.SelectBuilder {
-	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("SUM(%s)", column))
-}
-
-// Avg returns a new SelectBuilder configured for AVG queries.
-func (c *Client) Avg(table, column string) *orm.SelectBuilder {
-	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("AVG(%s)", column))
-}
-
-// Max returns a new SelectBuilder configured for MAX queries.
-func (c *Client) Max(table, column string) *orm.SelectBuilder {
-	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("MAX(%s)", column))
-}
-
-// Min returns a new SelectBuilder configured for MIN queries.
-func (c *Client) Min(table, column string) *orm.SelectBuilder {
-	return orm.NewSelectBuilder(c, table).Columns(fmt.Sprintf("MIN(%s)", column))
-}
-
-// NewDeleteBuilder creates a new DELETE query builder.
-func (c *Client) NewDeleteBuilder(table string) *orm.DeleteBuilder {
-	return orm.NewDeleteBuilder(c, table)
 }

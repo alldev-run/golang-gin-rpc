@@ -190,6 +190,59 @@ func (d *SQLiteDialect) GetLastInsertID() string {
 	return "SELECT last_insert_rowid()"
 }
 
+// ClickHouseDialect provides ClickHouse-compatible dialect.
+// Note: ClickHouse SQL differs from OLTP databases; this dialect targets the
+// query builder output (quoting/placeholders/limit) that is commonly accepted
+// by ClickHouse drivers.
+type ClickHouseDialect struct{}
+
+// NewClickHouseDialect creates a new ClickHouse dialect.
+func NewClickHouseDialect() *ClickHouseDialect {
+	return &ClickHouseDialect{}
+}
+
+func (d *ClickHouseDialect) LockForUpdate() string {
+	return ""
+}
+
+func (d *ClickHouseDialect) LockInShareMode() string {
+	return ""
+}
+
+func (d *ClickHouseDialect) QuoteIdentifier(identifier string) string {
+	return "`" + identifier + "`"
+}
+
+func (d *ClickHouseDialect) Placeholder(index int) string {
+	return "?"
+}
+
+func (d *ClickHouseDialect) SupportsFeature(feature Feature) bool {
+	switch feature {
+	case FeatureWindowFunctions, FeatureCTE, FeatureJSON:
+		return true
+	default:
+		return false
+	}
+}
+
+func (d *ClickHouseDialect) LimitOffset(limit, offset int) string {
+	if limit <= 0 && offset <= 0 {
+		return ""
+	}
+	if offset <= 0 {
+		return fmt.Sprintf("LIMIT %d", limit)
+	}
+	if limit <= 0 {
+		return fmt.Sprintf("OFFSET %d", offset)
+	}
+	return fmt.Sprintf("LIMIT %d OFFSET %d", limit, offset)
+}
+
+func (d *ClickHouseDialect) GetLastInsertID() string {
+	return ""
+}
+
 // DefaultDialect provides MySQL-compatible dialect as default.
 type DefaultDialect struct {
 	*MySQLDialect
@@ -207,6 +260,7 @@ const (
 	DialectMySQL      DialectType = "mysql"
 	DialectPostgreSQL DialectType = "postgresql"
 	DialectSQLite     DialectType = "sqlite"
+	DialectClickHouse DialectType = "clickhouse"
 )
 
 // NewDialect creates a new dialect based on the dialect type.
@@ -218,6 +272,8 @@ func NewDialect(dialectType DialectType) Dialect {
 		return NewPostgreSQLDialect()
 	case DialectSQLite:
 		return NewSQLiteDialect()
+	case DialectClickHouse:
+		return NewClickHouseDialect()
 	default:
 		return NewDefaultDialect()
 	}

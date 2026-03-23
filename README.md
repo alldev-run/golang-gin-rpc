@@ -402,9 +402,9 @@ v1 := router.Group("/api/v1")
 ### 数据库操作
 
 ```go
-// 使用查询构建器
+// 使用查询构建器（统一到 pkg/db/orm）
 client := mysqlClient // 从 bootstrap 获取
-rows, err := client.NewSelectBuilder("users").
+rows, err := orm.NewSelectBuilder(client, "users").
     Where("status = ?", "active").
     Limit(10).
     Query(ctx)

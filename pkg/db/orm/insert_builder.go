@@ -16,6 +16,7 @@ type InsertBuilder struct {
 	columns    []string
 	values     [][]interface{}
 	onConflict string
+	onDuplicateKeyUpdate []string
 	dialect    Dialect
 }
 
@@ -95,6 +96,11 @@ func (ib *InsertBuilder) OnConflictUpdate(updateColumns ...string) *InsertBuilde
 	return ib
 }
 
+func (ib *InsertBuilder) OnDuplicateKeyUpdate(columns ...string) *InsertBuilder {
+	ib.onDuplicateKeyUpdate = columns
+	return ib
+}
+
 // Build constructs the INSERT query string and returns it with args.
 func (ib *InsertBuilder) Build() (string, []interface{}, error) {
 	var query string
@@ -118,6 +124,19 @@ func (ib *InsertBuilder) Build() (string, []interface{}, error) {
 	// Add ON CONFLICT clause if specified
 	if ib.onConflict != "" && ib.dialect.SupportsFeature(FeatureUpsert) {
 		query += " ON CONFLICT " + ib.onConflict
+	}
+
+	if len(ib.onDuplicateKeyUpdate) > 0 {
+		switch ib.dialect.(type) {
+		case *MySQLDialect, *DefaultDialect:
+			updateCols := ib.onDuplicateKeyUpdate
+			updates := make([]string, 0, len(updateCols))
+			for _, col := range updateCols {
+				qCol := ib.dialect.QuoteIdentifier(col)
+				updates = append(updates, fmt.Sprintf("%s = VALUES(%s)", qCol, qCol))
+			}
+			query += " ON DUPLICATE KEY UPDATE " + strings.Join(updates, ", ")
+		}
 	}
 	
 	return query, args, nil

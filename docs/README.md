@@ -61,7 +61,6 @@ The MySQL client also provides helper methods for common write operations:
 - `Update` - run an UPDATE and return affected rows
 - `SetFieldByID` - update a single field by primary key
 - `Save` - insert or update based on whether the ID is zero. Supports optimistic locking with version field.
-- `NewDeleteBuilder` - fluent builder for DELETE queries
 
 ```go
 id, err := client.InsertGetID(ctx, "INSERT INTO users (name,email) VALUES (?, ?)", "alice", "alice@example.com")
@@ -73,7 +72,7 @@ _, err = client.Save(ctx, "users", "id", id, map[string]interface{}{"status": "a
 _, err = client.Save(ctx, "users", "id", id, map[string]interface{}{"status": "active", "version": 1})
 
 // DELETE queries
-result, err := client.NewDeleteBuilder("users").Where("status = ?", "inactive").Exec(ctx)
+result, err := orm.NewDeleteBuilder(client, "users").Where("status = ?", "inactive").Exec(ctx)
 ```
 
 ## Connection Pooling

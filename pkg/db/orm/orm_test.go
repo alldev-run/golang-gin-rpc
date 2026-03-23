@@ -281,6 +281,23 @@ func TestSelectBuilderGroupByHaving(t *testing.T) {
 	}
 }
 
+func TestInsertBuilderMySQLUpsert(t *testing.T) {
+	mockDB := &MockDB{}
+	ib := NewInsertBuilderWithDialect(mockDB, "users", NewMySQLDialect()).
+		Set("id", 1).
+		Set("name", "alice").
+		OnDuplicateKeyUpdate("name")
+
+	query, args, err := ib.Build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedQuery := "INSERT INTO `users` (`id`, `name`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `name` = VALUES(`name`)"
+	expectedArgs := []interface{}{1, "alice"}
+	assertQueryAndArgs(t, query, args, expectedQuery, expectedArgs)
+}
+
 func TestDeleteBuilder(t *testing.T) {
 	mockDB := &MockDB{}
 	db := NewDeleteBuilder(mockDB, "users")

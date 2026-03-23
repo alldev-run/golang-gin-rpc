@@ -3,9 +3,10 @@ package mysql
 import (
 	"context"
 	"database/sql"
-	"alldev-gin-rpc/pkg/db/orm"
 	"testing"
 	"time"
+
+	"alldev-gin-rpc/pkg/db/orm"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -144,7 +145,7 @@ func TestWhereBuilder(t *testing.T) {
 func TestSelectBuilder(t *testing.T) {
 	client := &Client{} // Mock client for testing
 
-	sb := client.NewSelectBuilder("users")
+	sb := orm.NewSelectBuilder(client, "users")
 
 	// Test basic SELECT
 	query, args := sb.Build()
@@ -198,7 +199,7 @@ func TestSelectBuilder(t *testing.T) {
 func TestSelectBuilderWithJoins(t *testing.T) {
 	client := &Client{} // Mock client for testing
 
-	sb := client.NewSelectBuilder("users").
+	sb := orm.NewSelectBuilder(client, "users").
 		Columns("u.id", "u.name", "p.title").
 		Join("posts p", "u.id = p.user_id").
 		LeftJoin("comments c", "p.id = c.post_id").
@@ -225,7 +226,7 @@ func TestSelectBuilderWithJoins(t *testing.T) {
 func TestJoinWithType(t *testing.T) {
 	client := &Client{} // Mock client for testing
 
-	sb := client.NewSelectBuilder("users").
+	sb := orm.NewSelectBuilder(client, "users").
 		Columns("u.id", "u.name", "p.title").
 		JoinWithType("CROSS", "posts p", "true").
 		Where("u.status = ?", "active")
@@ -247,42 +248,42 @@ func TestAggregationFunctions(t *testing.T) {
 	client := &Client{} // Mock client for testing
 
 	// Test COUNT
-	countQuery, countArgs := client.Count("users").Where("status = ?", "active").Build()
+	countQuery, countArgs := orm.NewSelectBuilder(client, "users").Columns("COUNT(*)").Where("status = ?", "active").Build()
 	expectedCountQuery := "SELECT `COUNT(*)` FROM `users` WHERE status = ?"
 	if countQuery != expectedCountQuery || len(countArgs) != 1 || countArgs[0] != "active" {
 		t.Errorf("COUNT query failed: got query='%s', args=%v", countQuery, countArgs)
 	}
 
 	// Test COUNT with column
-	countColQuery, countColArgs := client.CountColumn("orders", "id").Where("status = ?", "completed").Build()
+	countColQuery, countColArgs := orm.NewSelectBuilder(client, "orders").Columns("COUNT(id)").Where("status = ?", "completed").Build()
 	expectedCountColQuery := "SELECT `COUNT(id)` FROM `orders` WHERE status = ?"
 	if countColQuery != expectedCountColQuery || len(countColArgs) != 1 || countColArgs[0] != "completed" {
 		t.Errorf("COUNT column query failed: got query='%s', args=%v", countColQuery, countColArgs)
 	}
 
 	// Test SUM
-	sumQuery, sumArgs := client.Sum("orders", "total_amount").Where("created_at >= ?", "2023-01-01").Build()
+	sumQuery, sumArgs := orm.NewSelectBuilder(client, "orders").Columns("SUM(total_amount)").Where("created_at >= ?", "2023-01-01").Build()
 	expectedSumQuery := "SELECT `SUM(total_amount)` FROM `orders` WHERE created_at >= ?"
 	if sumQuery != expectedSumQuery || len(sumArgs) != 1 || sumArgs[0] != "2023-01-01" {
 		t.Errorf("SUM query failed: got query='%s', args=%v", sumQuery, sumArgs)
 	}
 
 	// Test AVG
-	avgQuery, avgArgs := client.Avg("products", "price").Where("category = ?", "electronics").Build()
+	avgQuery, avgArgs := orm.NewSelectBuilder(client, "products").Columns("AVG(price)").Where("category = ?", "electronics").Build()
 	expectedAvgQuery := "SELECT `AVG(price)` FROM `products` WHERE category = ?"
 	if avgQuery != expectedAvgQuery || len(avgArgs) != 1 || avgArgs[0] != "electronics" {
 		t.Errorf("AVG query failed: got query='%s', args=%v", avgQuery, avgArgs)
 	}
 
 	// Test MAX
-	maxQuery, maxArgs := client.Max("temperatures", "value").Where("sensor_id = ?", 1).Build()
+	maxQuery, maxArgs := orm.NewSelectBuilder(client, "temperatures").Columns("MAX(value)").Where("sensor_id = ?", 1).Build()
 	expectedMaxQuery := "SELECT `MAX(value)` FROM `temperatures` WHERE sensor_id = ?"
 	if maxQuery != expectedMaxQuery || len(maxArgs) != 1 || maxArgs[0] != 1 {
 		t.Errorf("MAX query failed: got query='%s', args=%v", maxQuery, maxArgs)
 	}
 
 	// Test MIN
-	minQuery, minArgs := client.Min("products", "stock_quantity").Where("supplier_id = ?", 123).Build()
+	minQuery, minArgs := orm.NewSelectBuilder(client, "products").Columns("MIN(stock_quantity)").Where("supplier_id = ?", 123).Build()
 	expectedMinQuery := "SELECT `MIN(stock_quantity)` FROM `products` WHERE supplier_id = ?"
 	if minQuery != expectedMinQuery || len(minArgs) != 1 || minArgs[0] != 123 {
 		t.Errorf("MIN query failed: got query='%s', args=%v", minQuery, minArgs)
@@ -292,7 +293,7 @@ func TestAggregationFunctions(t *testing.T) {
 func TestSelectBuilderTransactionMethods(t *testing.T) {
 	client := &Client{} // Mock client for testing
 
-	sb := client.NewSelectBuilder("users").
+	sb := orm.NewSelectBuilder(client, "users").
 		Columns("id", "name", "email").
 		Where("status = ?", "active").
 		OrderBy("created_at DESC").
@@ -318,7 +319,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 	client := &Client{} // Mock client for testing
 
 	// Test FOR UPDATE lock
-	sb1 := client.NewSelectBuilder("accounts").
+	sb1 := orm.NewSelectBuilder(client, "accounts").
 		Columns("id", "balance").
 		Where("user_id = ?", 123).
 		ForUpdate()
@@ -330,7 +331,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 	}
 
 	// Test LOCK IN SHARE MODE
-	sb2 := client.NewSelectBuilder("products").
+	sb2 := orm.NewSelectBuilder(client, "products").
 		Columns("id", "name", "stock").
 		Where("category = ?", "electronics").
 		LockInShareMode()
@@ -342,7 +343,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 	}
 
 	// Test custom lock
-	sb3 := client.NewSelectBuilder("orders").
+	sb3 := orm.NewSelectBuilder(client, "orders").
 		Columns("id", "total").
 		Where("status = ?", "pending").
 		Lock("FOR UPDATE NOWAIT")
@@ -354,7 +355,7 @@ func TestSelectBuilderLocks(t *testing.T) {
 	}
 
 	// Test lock with JOIN
-	sb4 := client.NewSelectBuilder("users u").
+	sb4 := orm.NewSelectBuilder(client, "users u").
 		Columns("u.id", "u.name", "a.balance").
 		LeftJoin("accounts a", "u.id = a.user_id").
 		Where("u.status = ?", "active").

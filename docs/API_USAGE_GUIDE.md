@@ -144,8 +144,8 @@ affected, err = client.Save(ctx, "users", "id", newID, map[string]interface{}{
     "version": 1, // current version value
 })
 
-// DELETE queries using DeleteBuilder
-result, err := client.NewDeleteBuilder("users").
+// DELETE queries using DeleteBuilder (统一使用 pkg/db/orm)
+result, err := orm.NewDeleteBuilder(client, "users").
     Where("status = ?", "inactive").
     And("created_at < ?", time.Now().Add(-30*24*time.Hour)).
     Exec(ctx)
