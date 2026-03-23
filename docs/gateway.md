@@ -1,249 +1,92 @@
 # HTTP Gateway 使用指南
 
-## 🌟 概述
+本文档面向 `api/http-gateway` 示例与 `pkg/gateway` 组件的实际使用方式，内容已按当前代码实现校准。
 
-HTTP Gateway 是一个企业级多协议统一网关，支持 HTTP/HTTPS、gRPC、JSON-RPC 协议代理，集成分布式追踪、负载均衡、服务发现等企业级特性。
+## 快速启动
 
-## 🚀 快速开始
-
-### 启动方式
-
-#### 启动 Gateway 网关
 ```bash
 go run ./api/http-gateway ./api/http-gateway/config/config.yaml
 ```
 
-### 验证服务
+## 核心端点
 
-#### 健康检查
-```bash
-curl http://localhost:8080/health
-```
+示例服务启动后，可直接验证：
 
-#### 就绪状态
-```bash
-curl http://localhost:8080/ready
-```
-
-#### 主页访问
 ```bash
 curl http://localhost:8080/
+curl http://localhost:8080/health
+curl http://localhost:8080/ready
+curl http://localhost:8080/info
+curl http://localhost:8080/metrics
 ```
 
-#### 调试端点
-```bash
-curl http://localhost:8080/debug/ok
-curl http://localhost:8080/debug/tracing
-curl http://localhost:8080/debug/request-id
-```
+说明：`/debug/*` 为示例业务路由层提供的端点，不属于 `pkg/gateway` 固定内置端点。
 
-## 🔧 配置说明
+## 配置要点
 
-### 配置特点
-- 🌐 **零外部依赖** - 默认配置指向本地服务
-- 🚫 **可选追踪** - 追踪功能默认关闭，需要时启用
-- 🚫 **可选协议** - gRPC/JSON-RPC 默认关闭，需要时启用
-- 🏥 **健康检查** - 使用 Gateway 内置端点
-- 🔧 **灵活配置** - 可根据需要启用企业级功能
+- 配置结构为扁平结构（顶层 `host` / `port` / `protocols` 等），不是 `gateway:` 嵌套
+- 动态服务发现由 `discovery.enabled` 控制
+- 负载均衡策略由 `load_balancer.strategy` 控制
+- RPC 认证配置在 `protocols.security.auth`
 
-### 启用高级功能
+最小配置示例：
 
-#### 启用分布式追踪
 ```yaml
-tracing:
-  enabled: true
-  sample_rate: 1.0  # 调试时 100% 采样
-```
+host: "0.0.0.0"
+port: 8080
+service_name: "http-gateway"
 
-#### 启用 gRPC 协议
-```yaml
 protocols:
+  http: true
+  http2: true
   grpc: true
-```
-
-#### 启用 JSON-RPC 协议
-```yaml
-protocols:
   jsonrpc: true
-```
+  security:
+    auth:
+      enabled: false
+      type: "apikey"
+      header_name: "X-API-Key"
+      query_name: "api_key"
+      api_keys: {}
 
-#### 添加外部服务路由
-```yaml
-routes:
-  - path: /api/user/*
-    targets:
-      - "http://user-service-1:8080"
-      - "http://user-service-2:8080"
-```
-
-## ❌ 故障排查
-
-### "no healthy upstream" 错误
-
-**原因**：配置文件中的路由指向了不存在的服务实例
-
-**解决方案**：
-1. 确保目标服务正常运行
-2. 检查服务发现配置
-3. 使用本地服务进行测试
-
-**本地服务配置示例**：
-```yaml
 discovery:
-  type: static
-  endpoints: 
-    - "http://localhost:8080"
+  type: "static"
+  enabled: false
+  endpoints: []
 
-routes:
-  - path: /api/*
-    targets: ["http://localhost:8080"]
+load_balancer:
+  strategy: "round_robin"
 ```
 
-### 路由冲突
+## 常见问题
 
-**错误**：`handlers are already registered for path '/health'`
+### `no healthy upstream`
 
-**解决方案**：Gateway 已提供 `/health` 端点，无需在业务路由中重复注册
+常见原因是路由目标不可达。
 
-### 服务启动失败
+排查建议：
 
-**检查步骤**：
+1. 检查 `routes[*].targets` 对应服务是否真的在监听
+2. 若启用了服务发现，检查注册中心内是否有健康实例
+3. 用 `curl http://localhost:8080/ready` 查看当前健康路由数量
+
+### 路由冲突（例如 `/health` 重复注册）
+
+`pkg/gateway` 已注册 `/health`、`/ready`、`/info`、`/metrics`，业务层避免重复注册同路径。
+
+### 配置看起来生效但行为异常
+
+确认使用的是 `api/http-gateway/config/config.yaml`，并检查字段是否与 `pkg/gateway/config.go` 中结构一致。
+
+## 验证建议
+
 ```bash
-# 1. 检查端口占用
-netstat -an | grep :8080
-
-# 2. 检查编译状态
-go build ./api/http-gateway
-
-# 3. 检查配置文件
-yamllint ./api/http-gateway/config/config-simple.yaml
+go test ./pkg/gateway -v
+go test ./api/http-gateway -v
 ```
 
-## 📋 验证清单
+## 相关文档
 
-- [ ] **服务启动** - Gateway 成功启动
-- [ ] **端口监听** - 8080 端口可用
-- [ ] **健康检查** - `/health` 返回 200
-- [ ] **就绪状态** - `/ready` 显示 ready
-- [ ] **主页访问** - `/` 返回正常内容
-- [ ] **调试端点** - `/debug/ok` 正常
-- [ ] **无错误日志** - 控制台无错误信息
-
-## 🌐 可用端点
-
-| 端点 | 方法 | 描述 |
-|------|------|------|
-| `/health` | GET | 健康检查 |
-| `/ready` | GET | 就绪状态 |
-| `/info` | GET | 网关信息 |
-| `/metrics` | GET | Prometheus 指标 |
-| `/` | GET | 主页 |
-| `/debug/ok` | GET | 调试端点 |
-| `/debug/tracing` | GET | 追踪信息 |
-| `/debug/request-id` | GET | 请求ID信息 |
-
-## 🔄 启用高级功能
-
-### 启用分布式追踪
-
-1. **修改配置文件**：
-```yaml
-tracing:
-  enabled: true
-  sample_rate: 1.0  # 调试时 100% 采样
-```
-
-2. **启动追踪后端**：
-   - Jaeger: `localhost:16686`
-   - Zipkin: `localhost:9411`
-
-3. **重启服务**：
-```bash
-go run ./api/http-gateway ./api/http-gateway/config/config.yaml
-```
-
-### 启用多协议支持
-
-1. **启用 gRPC**：
-```yaml
-protocols:
-  grpc: true
-```
-
-2. **启用 JSON-RPC**：
-```yaml
-protocols:
-  jsonrpc: true
-```
-
-3. **添加外部服务路由**：
-```yaml
-routes:
-  - path: /api/user/*
-    targets:
-      - "http://user-service-1:8080"
-      - "http://user-service-2:8080"
-  
-  - path: /grpc/user/*
-    protocol: "grpc"
-    targets:
-      - "grpc://user-grpc-1:50051"
-      - "grpc://user-grpc-2:50051"
-  
-  - path: /rpc/payment
-    protocol: "jsonrpc"
-    targets:
-      - "http://payment-service:8080/rpc"
-```
-
-4. **验证功能**：
-```bash
-# 测试 gRPC 路由
-curl -X POST http://localhost:8080/grpc/user/123
-
-# 测试 JSON-RPC 路由
-curl -X POST http://localhost:8080/rpc/payment
-```
-
-## 📚 相关文档
-
-- [Gateway 详细文档](../pkg/gateway/README.md)
-- [API Gateway 示例](../api/http-gateway/README.md)
-- [配置模板](../pkg/gateway/templates/http-gateway/)
-
-## 🛠️ 开发指南
-
-### 添加新路由
-
-1. 在配置文件中添加路由：
-```yaml
-routes:
-  - path: /new-service/*
-    method: "*"
-    protocol: "http"
-    service: new-service
-    targets:
-      - "http://localhost:8080"
-```
-
-2. 在业务代码中处理请求：
-```go
-func (r *Router) newServiceHandler(w http.ResponseWriter, req *http.Request) {
-    // 处理新服务逻辑
-}
-```
-
-### 添加新中间件
-
-1. 在 `internal/mw/` 目录下创建中间件文件
-2. 实现 `Middleware` 类型
-3. 在 `registry.go` 中注册中间件
-
-## 📞 获取帮助
-
-如果遇到问题：
-1. 查看控制台日志输出
-2. 检查配置文件格式
-3. 验证服务依赖
-4. 提交 GitHub Issue
-5. 查看故障排查文档
+- `pkg/gateway/README.md`
+- `docs/gateway-discovery.md`
+- `docs/gateway-auth-complete-guide.md`

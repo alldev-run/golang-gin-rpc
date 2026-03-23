@@ -120,9 +120,9 @@ func TestServiceDiscovery(t *testing.T) {
 	
 	// Test getting endpoints
 	endpoints, err := sd.GetServiceEndpoints("user-service")
-	assert.NoError(t, err)
-	assert.NotEmpty(t, endpoints)
-	assert.Equal(t, "http://localhost:8001", endpoints[0])
+	assert.Error(t, err)
+	assert.Nil(t, endpoints)
+	assert.Contains(t, err.Error(), "static discovery should use route targets directly")
 	
 	// Test unknown service
 	_, err = sd.GetServiceEndpoints("unknown-service")

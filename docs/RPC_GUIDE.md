@@ -334,7 +334,7 @@ log.Printf("RPC Manager Status: %+v", status)
 
 ```bash
 # 运行 RPC 示例
-go run examples/rpc_example.go
+go run ./examples/rpc
 
 # 运行完整应用
 ./start.sh
@@ -429,9 +429,9 @@ rpcManager.RegisterService(myService)
 
 查看 `examples/` 目录下的完整示例：
 
-- `rpc_example.go` - 完整的 RPC 框架使用示例
-- `user_service.go` - 用户管理服务示例
-- `calculator_service.go` - 计算器服务示例
+- `examples/rpc/main.go` - RPC 框架使用示例
+- `pkg/rpc/examples/user_service.go` - 用户管理服务示例
+- `pkg/rpc/examples/calculator_service.go` - 计算器服务示例
 
 ---
 

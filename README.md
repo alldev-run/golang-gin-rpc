@@ -77,15 +77,12 @@
  
  ## 配置文件
  
- 项目当前主要使用：
- 
- - `configs/config.yaml`
- - `configs/tracing.yaml`
- - `configs/discovery.yaml`
- 
- 其中，应用主流程实际读取的是：
- 
- - `configs/config.yaml`
+ 项目运行时主要会读取：
+
+- `configs/config.yaml`（主配置，由 `bootstrap.NewBootstrap` 加载）
+- `configs/tracing.yaml`（启动前由 `tracing.InitFromFile` 加载）
+
+仓库中也提供了其他示例配置文件（例如 `configs/discovery.yaml`），用于模块化参考。
  
  ## `configs/config.yaml` 主要模块
  
@@ -341,12 +338,14 @@ docker-compose down     # 停止服务
  针对不同模块可以执行：
  
  ```bash
- go test ./...
- go test ./pkg/discovery/...
- go test ./pkg/logger/...
- go test ./pkg/tracing/...
- go test ./pkg/rpc/...
- ```
+go test ./pkg/...
+go test ./pkg/discovery/...
+go test ./pkg/logger/...
+go test ./pkg/tracing/...
+go test ./pkg/rpc/...
+```
+
+说明：`go test ./...` 会包含 `examples` 目录；若本地示例依赖未满足或存在示例编译约束，建议优先执行上面的 `pkg` 级回归命令。
  
  ## 开发建议
 
@@ -414,7 +413,7 @@ rows, err := client.NewSelectBuilder("users").
 ### 缓存使用
 
 ```go
-cache := bootstrap.GetCache()
+cache := boot.GetCache()
 err = cache.Set(ctx, "key", "value", time.Hour)
 ```
 
@@ -424,18 +423,8 @@ err = cache.Set(ctx, "key", "value", time.Hour)
 import "alldev-gin-rpc/pkg/logger"
 
 logger.Info("Request processed", logger.String("path", "/api/users"))
-logger.Error("Database failed", logger.ErrorField(err))
+logger.Error("Database failed", logger.Error(err))
 ```
-
- 
- - **优先修改 `configs/config.yaml`**
-   - 统一通过 bootstrap 加载配置
- - **新增服务发现后端时**
-   - 同步更新 `pkg/discovery` 与根 README
- - **新增模块时**
-   - 尽量接入 bootstrap 统一初始化流程
- - **输出结构化日志时**
-   - 推荐使用 `pkg/logger`
  
  ## 相关文档
  

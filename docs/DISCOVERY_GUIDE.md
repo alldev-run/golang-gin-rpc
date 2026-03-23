@@ -2,9 +2,9 @@
 
 ## 🚀 服务发现概述
 
-本项目提供了完整的服务发现解决方案，支持多种注册中心（Consul、etcd），具有以下特性：
+本项目提供统一的服务发现能力，当前支持 `consul`、`etcd`、`zookeeper`、`static`，具有以下特性：
 
-- **多注册中心支持**: 支持 Consul、etcd 等主流服务注册中心
+- **多注册中心支持**: 支持 Consul、etcd、zookeeper、static
 - **负载均衡**: 内置多种负载均衡策略（轮询、随机、最少连接等）
 - **健康检查**: 自动健康检查和服务状态监控
 - **服务监听**: 实时监听服务变化
@@ -27,8 +27,9 @@ pkg/discovery/
 │   ├── etcd.go
 │   ├── balancer.go
 │   └── watcher.go
-└── examples/                  # 示例服务
-    └── discovery_example.go
+└── zookeeper/                 # Zookeeper 实现
+
+示例程序位于仓库根目录：`examples/discovery/main.go`
 ```
 
 ## 🔧 配置
@@ -38,7 +39,7 @@ pkg/discovery/
 ```yaml
 discovery:
   enabled: true
-  registry_type: "consul"  # consul, etcd
+  registry_type: "consul"  # consul, etcd, zookeeper, static
   registry_address: "localhost:8500"
   timeout: 30s
   health_check_interval: 30s
@@ -471,7 +472,7 @@ func (s *MyService) Stop() error {
 
 ```bash
 # 运行服务发现示例
-go run examples/discovery_example.go
+go run ./examples/discovery
 
 # 运行完整应用（包含服务发现）
 ./start.sh
@@ -588,10 +589,10 @@ return err
 
 ## 📚 更多示例
 
-查看 `examples/` 目录下的完整示例：
+查看 `examples/` 目录下的相关示例：
 
-- `discovery_example.go` - 完整的服务发现使用示例
-- `rpc_example.go` - RPC 与服务发现集成示例
+- `examples/discovery/main.go` - 服务发现使用示例
+- `examples/rpc/main.go` - RPC 与服务发现集成示例
 
 ---
 
