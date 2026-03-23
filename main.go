@@ -23,7 +23,10 @@ func main() {
 	defer boot.Close()
 
 	frameworkOptions := bootstrap.DefaultFrameworkOptions()
-	frameworkOptions.Services = []string{bootstrap.ServiceRPC}
+	frameworkOptions = boot.FrameworkOptionsFromConfig()
+	if len(frameworkOptions.Services) == 0 {
+		frameworkOptions.Services = []string{bootstrap.ServiceRPC}
+	}
 
 	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
 		log.Fatalf("Failed to start framework services: %v", err)

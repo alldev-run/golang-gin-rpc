@@ -86,11 +86,49 @@
 - `bootstrap.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{...})`
  
  ## 配置文件
- 
- 项目运行时主要会读取：
+
+项目运行时主要会读取：
 
 - `configs/config.yaml`（主配置，由 `bootstrap.NewBootstrap` 加载）
-- `configs/tracing.yaml`（启动前由 `tracing.InitFromFile` 加载）
+
+推荐在 `configs/config.yaml` 中配置 `framework` 启动清单，例如：
+
+```yaml
+framework:
+  init_databases: true
+  init_cache: true
+  init_discovery: true
+  init_tracing: true
+  init_auth: true
+  init_metrics: true
+  init_health: true
+  init_errors: true
+  validate_dependency_coverage: true
+  services: ["rpc"]
+```
+
+- `init_*` 决定 bootstrap 是否初始化对应依赖
+- `services` 决定托管服务启动清单（支持 `rpc` / `api-gateway` / `websocket`）
+- `validate_dependency_coverage` 会校验关键依赖是否已注入 bootstrap 容器
+
+### `http-gateway` 配置优先级
+
+`http-gateway` 启动时会同时读取两份配置：
+
+- 框架配置（全局基线）：`configs/config.yaml`
+- 服务配置（最高优先级）：`api/http-gateway/config/config.yaml`
+
+合并规则：
+
+- 先用框架配置构建网关基础配置
+- 再加载服务配置覆盖同名字段
+- 最终以服务配置为准（未配置的字段继承框架配置）
+
+启动参数示例：
+
+```bash
+./http-gateway ./api/http-gateway/config/config.yaml ./configs/config.yaml
+```
 
 仓库中也提供了其他示例配置文件（例如 `configs/discovery.yaml`），用于模块化参考。
  

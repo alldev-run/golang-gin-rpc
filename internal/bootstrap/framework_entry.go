@@ -9,6 +9,11 @@ type FrameworkOptions struct {
 	InitDiscovery bool
 	InitTracing   bool
 	InitAuth      bool
+	InitMetrics   bool
+	InitHealth    bool
+	InitErrors    bool
+
+	ValidateDependencyCoverage bool
 
 	WebSocket *WebSocketServiceOptions
 	Services  []string
@@ -22,7 +27,30 @@ func DefaultFrameworkOptions() FrameworkOptions {
 		InitDiscovery: true,
 		InitTracing:   true,
 		InitAuth:      true,
+		InitMetrics:   true,
+		InitHealth:    true,
+		InitErrors:    true,
+		ValidateDependencyCoverage: true,
 		Services:      []string{ServiceRPC, ServiceAPIGateway},
+	}
+}
+
+// FrameworkOptionsFromConfig builds framework options from loaded global config.
+func (b *Bootstrap) FrameworkOptionsFromConfig() FrameworkOptions {
+	if b == nil || b.config == nil {
+		return DefaultFrameworkOptions()
+	}
+	return FrameworkOptions{
+		InitDatabases:             b.config.Framework.InitDatabases,
+		InitCache:                 b.config.Framework.InitCache,
+		InitDiscovery:             b.config.Framework.InitDiscovery,
+		InitTracing:               b.config.Framework.InitTracing,
+		InitAuth:                  b.config.Framework.InitAuth,
+		InitMetrics:               b.config.Framework.InitMetrics,
+		InitHealth:                b.config.Framework.InitHealth,
+		InitErrors:                b.config.Framework.InitErrors,
+		ValidateDependencyCoverage: b.config.Framework.ValidateDependencyCoverage,
+		Services:                  append([]string(nil), b.config.Framework.Services...),
 	}
 }
 
@@ -53,15 +81,37 @@ func (b *Bootstrap) StartFramework(ctx context.Context, options FrameworkOptions
 			return err
 		}
 	}
+	if options.InitMetrics {
+		if err := b.InitializeMetrics(); err != nil {
+			return err
+		}
+	}
+	if options.InitHealth {
+		if err := b.InitializeHealth(); err != nil {
+			return err
+		}
+	}
+	if options.InitErrors {
+		if err := b.InitializeErrors(); err != nil {
+			return err
+		}
+	}
 	if options.WebSocket != nil {
 		if err := b.RegisterWebSocketServiceFactory(*options.WebSocket); err != nil {
 			return err
 		}
 	}
-	if len(options.Services) == 0 {
-		return nil
+	if len(options.Services) > 0 {
+		if err := b.StartServices(ctx, options.Services...); err != nil {
+			return err
+		}
 	}
-	return b.StartServices(ctx, options.Services...)
+	if options.ValidateDependencyCoverage {
+		if err := b.ValidateDependencyCoverage(options); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // StopFramework stops selected managed services.

@@ -14,8 +14,10 @@ import (
 	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
 	"alldev-gin-rpc/api/http-gateway/internal/mw"
 	"alldev-gin-rpc/internal/bootstrap"
+	"alldev-gin-rpc/pkg/config"
 	"alldev-gin-rpc/pkg/gateway"
 	"alldev-gin-rpc/pkg/logger"
+	"alldev-gin-rpc/pkg/tracing"
 )
 
 func main() {
@@ -59,13 +61,23 @@ func main() {
 	}
 	defer boot.Close()
 
+	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig())
+	frameworkGatewayCfg, err := loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
+	if err != nil {
+		log.Fatalf("failed to load gateway config from framework file: %v", err)
+	}
+	mergedGwCfg, err := loadGatewayConfigWithBase(configPath, frameworkGatewayCfg)
+	if err != nil {
+		log.Fatalf("failed to merge gateway config with framework defaults: %v", err)
+	}
+
 	const gatewayServiceName = "api-gateway.http-gateway"
 
 	// 创建业务处理器
-	bizHandler := httpapi.NewRouter(gwCfg).Handler()
+	bizHandler := httpapi.NewRouter(mergedGwCfg).Handler()
 	if err := boot.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{
 		Name:   gatewayServiceName,
-		Config: gwCfg,
+		Config: mergedGwCfg,
 		HTTPOptions: gateway.HTTPServiceOptions{
 			BizHandler:     bizHandler,
 			IsBusinessPath: httpapi.IsBusinessPath,
@@ -75,22 +87,16 @@ func main() {
 		log.Fatalf("failed to register api-gateway service factory: %v", err)
 	}
 
-	frameworkOptions := bootstrap.FrameworkOptions{
-		InitDatabases: true,
-		InitCache:     true,
-		InitDiscovery: true,
-		InitTracing:   true,
-		InitAuth:      true,
-		Services:      []string{gatewayServiceName},
-	}
+	frameworkOptions := boot.FrameworkOptionsFromConfig()
+	frameworkOptions.Services = []string{gatewayServiceName}
 
 	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
 		log.Fatalf("failed to start framework services: %v", err)
 	}
 
 	logger.Info("http-gateway service started",
-		logger.String("addr", fmt.Sprintf("%s:%d", gwCfg.Host, gwCfg.Port)),
-		logger.String("protocols", getEnabledProtocols(gwCfg)),
+		logger.String("addr", fmt.Sprintf("%s:%d", mergedGwCfg.Host, mergedGwCfg.Port)),
+		logger.String("protocols", getEnabledProtocols(mergedGwCfg)),
 	)
 
 	// 启动服务器
@@ -120,11 +126,122 @@ func loadGatewayConfig(path string) (*gateway.Config, error) {
 	}
 
 	cfg := gateway.DefaultConfig()
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	if err := unmarshalGatewayConfig(data, cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	return cfg, nil
+}
+
+func loadGatewayConfigWithBase(path string, base *gateway.Config) (*gateway.Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	cfg := cloneGatewayConfig(base)
+	if err := unmarshalGatewayConfig(data, cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func unmarshalGatewayConfig(data []byte, cfg *gateway.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("gateway config target is nil")
+	}
+
+	raw := make(map[string]interface{})
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if gatewayValue, ok := raw["gateway"]; ok {
+		nested, err := yaml.Marshal(gatewayValue)
+		if err != nil {
+			return err
+		}
+		return yaml.Unmarshal(nested, cfg)
+	}
+
+	return yaml.Unmarshal(data, cfg)
+}
+
+func buildGatewayConfigFromFramework(cfg *config.GlobalConfig) *gateway.Config {
+	base := gateway.DefaultConfig()
+	if cfg == nil {
+		return base
+	}
+
+	base.Host = cfg.Server.HTTP.Host
+	base.Port = cfg.Server.HTTP.Port
+	base.ReadTimeout = cfg.Server.HTTP.ReadTimeout
+	base.WriteTimeout = cfg.Server.HTTP.WriteTimeout
+	base.IdleTimeout = cfg.Server.HTTP.IdleTimeout
+	base.ServiceName = cfg.App.Name
+
+	base.CORS.AllowedOrigins = append([]string(nil), cfg.Security.CORS.AllowOrigins...)
+	base.CORS.AllowedMethods = append([]string(nil), cfg.Security.CORS.AllowMethods...)
+	base.CORS.AllowedHeaders = append([]string(nil), cfg.Security.CORS.AllowHeaders...)
+	base.CORS.AllowCredentials = cfg.Security.CORS.AllowCredentials
+
+	base.RateLimit.Enabled = cfg.Security.RateLimit.Enabled
+	base.RateLimit.Requests = cfg.Security.RateLimit.Limit
+	base.RateLimit.Window = cfg.Security.RateLimit.Window.String()
+
+	base.Discovery.Enabled = cfg.Discovery.Enabled
+	base.Discovery.Type = cfg.Discovery.Type
+	base.Discovery.Timeout = cfg.Discovery.Timeout
+	base.Discovery.Namespace = cfg.Discovery.Config["namespace"]
+	if base.Discovery.Namespace == "" {
+		base.Discovery.Namespace = "default"
+	}
+	if cfg.Discovery.Address != "" {
+		base.Discovery.Endpoints = []string{cfg.Discovery.Address}
+	}
+	if base.Discovery.Options == nil {
+		base.Discovery.Options = make(map[string]string)
+	}
+	for k, v := range cfg.Discovery.Config {
+		base.Discovery.Options[k] = v
+	}
+
+	base.Tracing = &tracing.Config{
+		Enabled:       cfg.Observability.Tracing.Enabled,
+		Type:          cfg.Observability.Tracing.Type,
+		Endpoint:      cfg.Observability.Tracing.Endpoint,
+		SampleRate:    cfg.Observability.Tracing.SampleRate,
+		ServiceName:   cfg.App.Name,
+		ServiceVersion: cfg.App.Version,
+		Environment:   cfg.App.Environment,
+	}
+
+	return base
+}
+
+func cloneGatewayConfig(src *gateway.Config) *gateway.Config {
+	if src == nil {
+		return gateway.DefaultConfig()
+	}
+	clone := *src
+	clone.CORS.AllowedOrigins = append([]string(nil), src.CORS.AllowedOrigins...)
+	clone.CORS.AllowedMethods = append([]string(nil), src.CORS.AllowedMethods...)
+	clone.CORS.AllowedHeaders = append([]string(nil), src.CORS.AllowedHeaders...)
+	clone.CORS.ExposedHeaders = append([]string(nil), src.CORS.ExposedHeaders...)
+	clone.Discovery.Endpoints = append([]string(nil), src.Discovery.Endpoints...)
+	if src.Discovery.Options != nil {
+		clone.Discovery.Options = make(map[string]string, len(src.Discovery.Options))
+		for k, v := range src.Discovery.Options {
+			clone.Discovery.Options[k] = v
+		}
+	}
+	clone.Routes = append([]gateway.RouteConfig(nil), src.Routes...)
+	if src.Tracing != nil {
+		tracingClone := *src.Tracing
+		clone.Tracing = &tracingClone
+	}
+	return &clone
 }
 
 // getEnabledProtocols 获取启用的协议列表

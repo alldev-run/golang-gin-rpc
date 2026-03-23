@@ -1,4 +1,18 @@
 # Application Configuration
+
+# Framework Runtime Configuration
+framework:
+  init_databases: false
+  init_cache: false
+  init_discovery: false
+  init_tracing: false
+  init_auth: false
+  init_metrics: true
+  init_health: true
+  init_errors: true
+  validate_dependency_coverage: true
+  services: ["api-gateway"]
+
 server:
   host: "localhost"
   port: "8080"

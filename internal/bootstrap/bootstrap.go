@@ -356,6 +356,7 @@ func (b *Bootstrap) InitializeDiscovery() error {
 	}
 
 	b.discoveryManager = manager
+	b.setDependency("discovery.manager", manager)
 
 	if b.rpcManager != nil {
 		if err := b.rpcManager.SetDiscoveryIntegration(manager, rpc.DiscoveryRegistrationConfig{
@@ -375,6 +376,7 @@ func (b *Bootstrap) InitializeDiscovery() error {
 
 // InitializeErrors initializes error handling
 func (b *Bootstrap) InitializeErrors() error {
+	b.setDependency("errors.initialized", true)
 	logger.Info("Error handling initialized successfully")
 	return nil
 }
@@ -413,6 +415,7 @@ func (b *Bootstrap) InitializeHealth() error {
 	}
 
 	b.healthManager = healthManager
+	b.setDependency("health.manager", healthManager)
 
 	logger.Info("Health check services initialized successfully")
 	return nil
@@ -427,11 +430,17 @@ func (b *Bootstrap) InitializeMetrics() error {
 
 	metricsCollector := metrics.NewMetricsCollector()
 	b.metricsCollector = metricsCollector
+	b.setDependency("metrics.collector", metricsCollector)
 
 	// Start metrics server in background
 	go func() {
 		addr := b.config.Observability.Metrics.Endpoint
-		if addr == "" {
+		if addr == "" || strings.HasPrefix(addr, "/") {
+			if strings.HasPrefix(addr, "/") {
+				logger.Warn("Metrics endpoint is a path, using default listen address",
+					logger.String("endpoint", addr),
+					logger.String("fallback_addr", ":9090"))
+			}
 			addr = ":9090"
 		}
 		if err := metricsCollector.StartMetricsServer(addr); err != nil {
@@ -461,6 +470,7 @@ func (b *Bootstrap) InitializeAuth() error {
 		},
 	})
 	b.authManager = authManager
+	b.setDependency("auth.manager", authManager)
 
 	logger.Info("Authentication services initialized successfully")
 	return nil
@@ -488,6 +498,7 @@ func (b *Bootstrap) InitializeTracing() error {
 	}
 
 	b.tracer = tracer
+	b.setDependency("tracer", tracer)
 
 	logger.Info("Tracing services initialized successfully")
 	return nil

@@ -23,6 +23,9 @@ type Loader struct {
 type GlobalConfig struct {
 	// Application basic config
 	App AppConfig `yaml:"app" json:"app"`
+
+	// Framework runtime config
+	Framework FrameworkConfig `yaml:"framework" json:"framework"`
 	
 	// Server configs
 	Server ServerConfig `yaml:"server" json:"server"`
@@ -56,6 +59,20 @@ type AppConfig struct {
 	Environment string            `yaml:"environment" json:"environment"`
 	Debug       bool              `yaml:"debug" json:"debug"`
 	Labels      map[string]string `yaml:"labels" json:"labels"`
+}
+
+// FrameworkConfig controls bootstrap-managed dependency and service composition.
+type FrameworkConfig struct {
+	InitDatabases             bool     `yaml:"init_databases" json:"init_databases"`
+	InitCache                 bool     `yaml:"init_cache" json:"init_cache"`
+	InitDiscovery             bool     `yaml:"init_discovery" json:"init_discovery"`
+	InitTracing               bool     `yaml:"init_tracing" json:"init_tracing"`
+	InitAuth                  bool     `yaml:"init_auth" json:"init_auth"`
+	InitMetrics               bool     `yaml:"init_metrics" json:"init_metrics"`
+	InitHealth                bool     `yaml:"init_health" json:"init_health"`
+	InitErrors                bool     `yaml:"init_errors" json:"init_errors"`
+	ValidateDependencyCoverage bool    `yaml:"validate_dependency_coverage" json:"validate_dependency_coverage"`
+	Services                  []string `yaml:"services" json:"services"`
 }
 
 // ServerConfig server configuration
@@ -432,6 +449,18 @@ func DefaultConfig() *GlobalConfig {
 			Environment: "development",
 			Debug:       true,
 			Labels:      map[string]string{},
+		},
+		Framework: FrameworkConfig{
+			InitDatabases:             true,
+			InitCache:                 true,
+			InitDiscovery:             true,
+			InitTracing:               true,
+			InitAuth:                  true,
+			InitMetrics:               true,
+			InitHealth:                true,
+			InitErrors:                true,
+			ValidateDependencyCoverage: true,
+			Services:                  []string{"rpc"},
 		},
 		Server: ServerConfig{
 			HTTP: HTTPConfig{
