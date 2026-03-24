@@ -5,6 +5,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -45,6 +46,15 @@ type Client struct {
 	db                  *sql.DB
 	config              Config
 	defaultVersionField string
+}
+
+var ErrClientNotInitialized = errors.New("mysql client is nil or uninitialized")
+
+func (c *Client) ensureDB() error {
+	if c == nil || c.db == nil {
+		return ErrClientNotInitialized
+	}
+	return nil
 }
 
 // New creates a new MySQL client from config.
@@ -91,31 +101,49 @@ func (c *Client) DB() *sql.DB {
 
 // Close closes the database connection.
 func (c *Client) Close() error {
+	if err := c.ensureDB(); err != nil {
+		return err
+	}
 	return c.db.Close()
 }
 
 // Ping checks the database connection health.
 func (c *Client) Ping(ctx context.Context) error {
+	if err := c.ensureDB(); err != nil {
+		return err
+	}
 	return c.db.PingContext(ctx)
 }
 
 // Stats returns database connection statistics.
 func (c *Client) Stats() sql.DBStats {
+	if err := c.ensureDB(); err != nil {
+		return sql.DBStats{}
+	}
 	return c.db.Stats()
 }
 
 // Query executes a query that returns multiple rows.
 func (c *Client) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	if err := c.ensureDB(); err != nil {
+		return nil, err
+	}
 	return c.db.QueryContext(ctx, query, args...)
 }
 
 // QueryRow executes a query that returns a single row.
 func (c *Client) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
+	if err := c.ensureDB(); err != nil {
+		return &sql.Row{}
+	}
 	return c.db.QueryRowContext(ctx, query, args...)
 }
 
 // Exec executes a query without returning rows (INSERT, UPDATE, DELETE).
 func (c *Client) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if err := c.ensureDB(); err != nil {
+		return nil, err
+	}
 	return c.db.ExecContext(ctx, query, args...)
 }
 
@@ -249,6 +277,9 @@ func (c *Client) buildUpdateQuery(table, idColumn string, id interface{}, data m
 
 // Begin starts a new transaction.
 func (c *Client) Begin(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	if err := c.ensureDB(); err != nil {
+		return nil, err
+	}
 	return c.db.BeginTx(ctx, opts)
 }
 
@@ -276,5 +307,8 @@ func (c *Client) Transaction(ctx context.Context, fn func(*sql.Tx) error) error 
 
 // Prepare creates a prepared statement.
 func (c *Client) Prepare(ctx context.Context, query string) (*sql.Stmt, error) {
+	if err := c.ensureDB(); err != nil {
+		return nil, err
+	}
 	return c.db.PrepareContext(ctx, query)
 }

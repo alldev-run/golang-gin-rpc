@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 	
@@ -13,7 +14,7 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/httpapi"
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/mw"
-	"github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
@@ -63,21 +64,38 @@ func main() {
 		logger.String("protocols", getEnabledProtocols(gwCfg)),
 	)
 
-	frameworkConfigPath := "./configs/config.yaml"
+	frameworkConfigPath := resolveFrameworkConfigPath(configPath)
 	if len(os.Args) > 2 {
 		frameworkConfigPath = os.Args[2]
 	}
+	if frameworkConfigPath != "" {
+		if _, err := os.Stat(frameworkConfigPath); err != nil {
+			gatewayLogger.Warn("framework config path not found, fallback to defaults",
+				logger.String("path", frameworkConfigPath),
+				logger.Error(err),
+			)
+			frameworkConfigPath = ""
+		}
+	}
 
-	boot, err := bootstrap.NewBootstrap(frameworkConfigPath)
+	var boot *bootstrap.Bootstrap
+	if frameworkConfigPath != "" {
+		boot, err = bootstrap.NewBootstrap(frameworkConfigPath)
+	} else {
+		boot, err = bootstrap.NewBootstrapWithDefaults()
+	}
 	if err != nil {
 		log.Fatalf("failed to initialize bootstrap: %v", err)
 	}
 	defer boot.Close()
 
 	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig())
-	frameworkGatewayCfg, err := loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
-	if err != nil {
-		log.Fatalf("failed to load gateway config from framework file: %v", err)
+	frameworkGatewayCfg := frameworkGatewayBase
+	if frameworkConfigPath != "" {
+		frameworkGatewayCfg, err = loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
+		if err != nil {
+			log.Fatalf("failed to load gateway config from framework file: %v", err)
+		}
 	}
 	mergedGwCfg, err := loadGatewayConfigWithBase(configPath, frameworkGatewayCfg)
 	if err != nil {
@@ -103,6 +121,30 @@ func main() {
 
 	frameworkOptions := boot.FrameworkOptionsFromConfig()
 	frameworkOptions.Services = []string{gatewayServiceName}
+
+	serviceDBConfigPath := filepath.Join(filepath.Dir(configPath), "database.yml")
+	if _, err := os.Stat(serviceDBConfigPath); err == nil {
+		if err := bootstrap.LoadDatabaseConfig(boot, serviceDBConfigPath); err != nil {
+			log.Fatalf("failed to load service database config: %v", err)
+		}
+		frameworkOptions.InitDatabases = true
+		gatewayLogger.Info("service database config loaded and overrides framework database config",
+			logger.String("path", serviceDBConfigPath),
+		)
+	} else if frameworkConfigPath == "" {
+		frameworkOptions.InitDatabases = false
+	}
+
+	if frameworkConfigPath == "" {
+		frameworkOptions.InitCache = false
+		frameworkOptions.InitDiscovery = false
+		frameworkOptions.InitTracing = false
+		frameworkOptions.InitAuth = false
+		frameworkOptions.InitMetrics = false
+		frameworkOptions.InitHealth = true
+		frameworkOptions.InitErrors = true
+		frameworkOptions.ValidateDependencyCoverage = false
+	}
 
 	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
 		log.Fatalf("failed to start framework services: %v", err)
@@ -256,6 +298,23 @@ func cloneGatewayConfig(src *gateway.Config) *gateway.Config {
 		clone.Tracing = &tracingClone
 	}
 	return &clone
+}
+
+func resolveFrameworkConfigPath(gatewayConfigPath string) string {
+	candidates := []string{
+		"./configs/config.yaml",
+		"./config/config.yaml",
+		gatewayConfigPath,
+	}
+	for _, p := range candidates {
+		if p == "" {
+			continue
+		}
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
 }
 
 // getEnabledProtocols 获取启用的协议列表

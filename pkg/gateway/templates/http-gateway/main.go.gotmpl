@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 	
@@ -67,6 +68,15 @@ func main() {
 	if len(os.Args) > 2 {
 		frameworkConfigPath = os.Args[2]
 	}
+	if frameworkConfigPath != "" {
+		if _, err := os.Stat(frameworkConfigPath); err != nil {
+			gatewayLogger.Warn("framework config path not found, fallback to defaults",
+				logger.String("path", frameworkConfigPath),
+				logger.Error(err),
+			)
+			frameworkConfigPath = ""
+		}
+	}
 
 	var boot *bootstrap.Bootstrap
 	if frameworkConfigPath != "" {
@@ -111,20 +121,22 @@ func main() {
 
 	frameworkOptions := boot.FrameworkOptionsFromConfig()
 	frameworkOptions.Services = []string{gatewayServiceName}
-	
-	// If no framework config file was found, check for database config
-	if frameworkConfigPath == "" {
-		// Check if database config exists
-		dbConfigPath := filepath.Join(filepath.Dir(configPath), "database.yml")
-		if _, err := os.Stat(dbConfigPath); err == nil {
-			// Database config found, enable database initialization and load config
-			if err := bootstrap.LoadDatabaseConfig(boot, dbConfigPath); err != nil {
-				log.Fatalf("failed to load database config: %v", err)
-			}
-			frameworkOptions.InitDatabases = true
-		} else {
-			frameworkOptions.InitDatabases = false
+
+	// Service-local database config overrides framework database settings when present.
+	serviceDBConfigPath := filepath.Join(filepath.Dir(configPath), "database.yml")
+	if _, err := os.Stat(serviceDBConfigPath); err == nil {
+		if err := bootstrap.LoadDatabaseConfig(boot, serviceDBConfigPath); err != nil {
+			log.Fatalf("failed to load service database config: %v", err)
 		}
+		frameworkOptions.InitDatabases = true
+		gatewayLogger.Info("service database config loaded and overrides framework database config",
+			logger.String("path", serviceDBConfigPath),
+		)
+	} else if frameworkConfigPath == "" {
+		frameworkOptions.InitDatabases = false
+	}
+
+	if frameworkConfigPath == "" {
 		frameworkOptions.InitCache = false
 		frameworkOptions.InitDiscovery = false
 		frameworkOptions.InitTracing = false
