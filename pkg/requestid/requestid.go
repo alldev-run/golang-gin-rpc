@@ -3,27 +3,57 @@ package requestid
 import (
 	"crypto/rand"
 	"encoding/base32"
-	"encoding/binary"
+	"io"
 	"strings"
+	"sync"
 	"time"
 )
 
 var encoding = base32.StdEncoding.WithPadding(base32.NoPadding)
 
+// 可替换随机源（方便测试 & fallback）
+var randReader io.Reader = rand.Reader
+
+// buffer 池（减少 GC 压力）
+var bytePool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 16)
+		return &b
+	},
+}
+
 // New returns a distributed-friendly request id.
-// Format: base32(no padding) encoding of 16 bytes:
-//  - 6 bytes: timestamp in milliseconds (big endian)
-//  - 10 bytes: cryptographically secure randomness
-// Output length is 26 chars.
 func New() (string, error) {
-	var b [16]byte
+	// 从池中取 buffer
+	bufPtr := bytePool.Get().(*[]byte)
+	b := *bufPtr
+	defer bytePool.Put(bufPtr)
+
+	// 清零（防止复用污染）
+	for i := range b {
+		b[i] = 0
+	}
+
+	// === 1. 写入 6 字节时间戳（毫秒）===
 	ms := uint64(time.Now().UnixMilli())
-	binary.BigEndian.PutUint64(b[0:8], ms)
-	copy(b[0:6], b[2:8])
-	if _, err := rand.Read(b[6:]); err != nil {
+
+	// 只取低 6 字节（更清晰写法）
+	b[0] = byte(ms >> 40)
+	b[1] = byte(ms >> 32)
+	b[2] = byte(ms >> 24)
+	b[3] = byte(ms >> 16)
+	b[4] = byte(ms >> 8)
+	b[5] = byte(ms)
+
+	// === 2. 写入 10 字节随机数 ===
+	if _, err := io.ReadFull(randReader, b[6:]); err != nil {
 		return "", err
 	}
-	id := encoding.EncodeToString(b[:])
+
+	// === 3. 编码 ===
+	id := encoding.EncodeToString(b)
+
+	// === 4. 小写 ===
 	return strings.ToLower(id), nil
 }
 
