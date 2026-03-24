@@ -111,6 +111,29 @@ func main() {
 
 	frameworkOptions := boot.FrameworkOptionsFromConfig()
 	frameworkOptions.Services = []string{gatewayServiceName}
+	
+	// If no framework config file was found, check for database config
+	if frameworkConfigPath == "" {
+		// Check if database config exists
+		dbConfigPath := filepath.Join(filepath.Dir(configPath), "database.yml")
+		if _, err := os.Stat(dbConfigPath); err == nil {
+			// Database config found, enable database initialization and load config
+			if err := bootstrap.LoadDatabaseConfig(boot, dbConfigPath); err != nil {
+				log.Fatalf("failed to load database config: %v", err)
+			}
+			frameworkOptions.InitDatabases = true
+		} else {
+			frameworkOptions.InitDatabases = false
+		}
+		frameworkOptions.InitCache = false
+		frameworkOptions.InitDiscovery = false
+		frameworkOptions.InitTracing = false
+		frameworkOptions.InitAuth = false
+		frameworkOptions.InitMetrics = false
+		frameworkOptions.InitHealth = true
+		frameworkOptions.InitErrors = true
+		frameworkOptions.ValidateDependencyCoverage = false
+	}
 
 	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
 		log.Fatalf("failed to start framework services: %v", err)

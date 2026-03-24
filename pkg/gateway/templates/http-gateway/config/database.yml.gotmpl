@@ -1,0 +1,29 @@
+# Database Configuration
+
+mysql_primary:
+  type: "mysql"
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "__API_NAME__"
+    username: "root"
+    password: "password"
+    charset: "utf8mb4"
+    max_open_conns: 25
+    max_idle_conns: 10
+    conn_max_lifetime: "1h"
+    conn_max_idle_time: "30m"
+
+mysql_replica:
+  type: "mysql"
+  mysql:
+    host: "localhost"
+    port: 3307
+    database: "__API_NAME__"
+    username: "root"
+    password: "password"
+    charset: "utf8mb4"
+    max_open_conns: 25
+    max_idle_conns: 10
+    conn_max_lifetime: "1h"
+    conn_max_idle_time: "30m"

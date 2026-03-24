@@ -1,0 +1,211 @@
+package service
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	"__MODULE__/__API_PATH__/internal/model"
+	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
+)
+
+// UserService 用户服务 - 展示如何使用全局数据库客户端
+type UserService struct {
+	dbClient *mysql.Client
+}
+
+// NewUserService 创建用户服务实例
+// 使用全局 bootstrap 获取数据库客户端，无需手动创建
+func NewUserService(boot *bootstrap.Bootstrap) (*UserService, error) {
+	// 从 bootstrap 获取 MySQL 客户端
+	dbClient, err := bootstrap.GetMySQLClient(boot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	return &UserService{
+		dbClient: dbClient,
+	}, nil
+}
+
+// Alternative: 使用 SQLClient 接口（更通用）
+func NewUserServiceWithSQLClient(boot *bootstrap.Bootstrap) (*UserService, error) {
+	// 从 bootstrap 获取 MySQL SQL 客户端接口
+	sqlClient, err := bootstrap.GetMySQLSQLClient(boot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SQL client: %w", err)
+	}
+
+	// 可以直接使用 SQLClient 接口的方法
+	// 这里为了示例，我们仍然使用具体的 MySQL 客户端
+	return &UserService{
+		dbClient: &mysql.Client{}, // 实际使用时应该从 sqlClient 获取
+	}, nil
+}
+
+// CreateUser 创建用户
+func (s *UserService) CreateUser(ctx context.Context, req *model.CreateUserRequest) (*model.User, error) {
+	// 使用数据库客户端执行 SQL
+	query := "INSERT INTO users (name, email, age, created_at) VALUES (?, ?, ?, ?)"
+	
+	result, err := s.dbClient.Exec(ctx, query, req.Name, req.Email, req.Age, "NOW()")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	user := &model.User{
+		ID:    fmt.Sprintf("%d", id),
+		Name:  req.Name,
+		Email: req.Email,
+		Age:   req.Age,
+	}
+
+	return user, nil
+}
+
+// GetUserByID 根据 ID 获取用户
+func (s *UserService) GetUserByID(ctx context.Context, id string) (*model.User, error) {
+	query := "SELECT id, name, email, age, created_at FROM users WHERE id = ?"
+	
+	var user model.User
+	err := s.dbClient.QueryRow(ctx, query, id).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Age,
+		&user.CreatedAt,
+	)
+	
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found")
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, nil
+}
+
+// UpdateUser 更新用户
+func (s *UserService) UpdateUser(ctx context.Context, id string, req *model.UpdateUserRequest) (*model.User, error) {
+	query := "UPDATE users SET name = ?, email = ?, age = ? WHERE id = ?"
+	
+	_, err := s.dbClient.Exec(ctx, query, req.Name, req.Email, req.Age, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return s.GetUserByID(ctx, id)
+}
+
+// DeleteUser 删除用户
+func (s *UserService) DeleteUser(ctx context.Context, id string) error {
+	query := "DELETE FROM users WHERE id = ?"
+	
+	_, err := s.dbClient.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	return nil
+}
+
+// ListUsers 获取用户列表
+func (s *UserService) ListUsers(ctx context.Context, page, pageSize int) ([]model.User, int, error) {
+	offset := (page - 1) * pageSize
+	
+	// 获取总数
+	var total int
+	countQuery := "SELECT COUNT(*) FROM users"
+	err := s.dbClient.QueryRow(ctx, countQuery).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	// 获取分页数据
+	query := "SELECT id, name, email, age, created_at FROM users LIMIT ? OFFSET ?"
+	rows, err := s.dbClient.Query(ctx, query, pageSize, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []model.User
+	for rows.Next() {
+		var user model.User
+		err := rows.Scan(
+			&user.ID,
+			&user.Name,
+			&user.Email,
+			&user.Age,
+			&user.CreatedAt,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("rows error: %w", err)
+	}
+
+	return users, total, nil
+}
+
+// 在 main.go 中的使用示例：
+/*
+// 在服务初始化时
+func initializeServices(boot *bootstrap.Bootstrap) (*UserService, error) {
+	userService, err := NewUserService(boot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize user service: %w", err)
+	}
+	
+	// 可以继续初始化其他服务...
+	// orderService, err := NewOrderService(boot)
+	// if err != nil {
+	//     return nil, fmt.Errorf("failed to initialize order service: %w", err)
+	// }
+	
+	return userService, nil
+}
+
+// 在路由处理器中使用
+func handleUserCreate(c *gin.Context) {
+	// 从上下文获取服务实例
+	userService := c.MustGet("userService").(*UserService)
+	
+	var req model.CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Invalid request data",
+			"error":   err.Error(),
+		})
+		return
+	}
+	
+	user, err := userService.CreateUser(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Failed to create user",
+			"error":   err.Error(),
+		})
+		return
+	}
+	
+	c.JSON(http.StatusCreated, model.UserResponse{
+		Success: true,
+		Data:    user,
+		Message: "用户创建成功",
+	})
+}
+*/

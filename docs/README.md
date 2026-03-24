@@ -53,6 +53,360 @@ import (
 )
 ```
 
+### Global MySQL / Global Client Usage (Bootstrap)
+
+When using framework bootstrap, the recommended way is:
+
+1. create bootstrap
+2. load database yaml into bootstrap
+3. initialize databases
+4. get global MySQL client from bootstrap helpers
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+)
+
+func main() {
+    boot, err := bootstrap.NewBootstrap("configs/config.yaml")
+    if err != nil {
+        log.Fatalf("new bootstrap failed: %v", err)
+    }
+    defer boot.Close()
+
+    // Optional: load external database yaml (mysql_primary/mysql_replica etc.)
+    if err := bootstrap.LoadDatabaseConfig(boot, "configs/database.yaml"); err != nil {
+        log.Fatalf("load database config failed: %v", err)
+    }
+
+    // Must initialize DB before GetMySQLClient/GetMySQLSQLClient
+    if err := boot.InitializeDatabases(); err != nil {
+        log.Fatalf("initialize databases failed: %v", err)
+    }
+
+    // Typed MySQL client
+    mysqlClient, err := bootstrap.GetMySQLClient(boot)
+    if err != nil {
+        log.Fatalf("get mysql client failed: %v", err)
+    }
+
+    ctx := context.Background()
+    if err := mysqlClient.Ping(ctx); err != nil {
+        log.Fatalf("mysql ping failed: %v", err)
+    }
+}
+```
+
+If you need a database-agnostic SQL interface (for easier mocking/abstraction), use `GetMySQLSQLClient`:
+
+```go
+sqlClient, err := bootstrap.GetMySQLSQLClient(boot)
+if err != nil {
+    return err
+}
+
+rows, err := sqlClient.Query(ctx, "SELECT id, name FROM users WHERE id = ?", 1)
+if err != nil {
+    return err
+}
+defer rows.Close()
+```
+
+You can also get the global factory and retrieve client by type:
+
+```go
+factory := bootstrap.GetDatabaseFactory(boot)
+if factory == nil {
+    return fmt.Errorf("database factory not initialized")
+}
+
+client, err := factory.GetClient(db.TypeMySQL)
+if err != nil {
+    return err
+}
+
+_ = client // db.Client
+```
+
+Common errors and meanings:
+
+- `bootstrap instance is nil`: bootstrap pointer is nil when calling helper methods.
+- `database factory not initialized`: forgot to call `InitializeDatabases()` first.
+- `MySQL client not found`: MySQL is not enabled/loaded in your DB config.
+
+### Recommended DI Pattern (Service / Repository)
+
+To avoid coupling business code with bootstrap helpers, initialize global client in startup layer and inject `db.SQLClient` into repository/service.
+
+```go
+package repository
+
+import (
+    "context"
+
+    "github.com/alldev-run/golang-gin-rpc/pkg/db"
+)
+
+type UserRepository struct {
+    db db.SQLClient
+}
+
+func NewUserRepository(dbClient db.SQLClient) *UserRepository {
+    return &UserRepository{db: dbClient}
+}
+
+func (r *UserRepository) GetNameByID(ctx context.Context, id int64) (string, error) {
+    row := r.db.QueryRow(ctx, "SELECT name FROM users WHERE id = ?", id)
+    var name string
+    if err := row.Scan(&name); err != nil {
+        return "", err
+    }
+    return name, nil
+}
+```
+
+```go
+package service
+
+import (
+    "context"
+)
+
+type UserRepo interface {
+    GetNameByID(ctx context.Context, id int64) (string, error)
+}
+
+type UserService struct {
+    repo UserRepo
+}
+
+func NewUserService(repo UserRepo) *UserService {
+    return &UserService{repo: repo}
+}
+
+func (s *UserService) GetUserName(ctx context.Context, id int64) (string, error) {
+    return s.repo.GetNameByID(ctx, id)
+}
+```
+
+```go
+package main
+
+import (
+    "log"
+
+    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+)
+
+func wire() {
+    boot, err := bootstrap.NewBootstrap("configs/config.yaml")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if err := bootstrap.LoadDatabaseConfig(boot, "configs/database.yaml"); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := boot.InitializeDatabases(); err != nil {
+        log.Fatal(err)
+    }
+
+    sqlClient, err := bootstrap.GetMySQLSQLClient(boot)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    userRepo := repository.NewUserRepository(sqlClient)
+    _ = service.NewUserService(userRepo)
+}
+```
+
+Benefits of this pattern:
+
+- Business layer depends on interface (`UserRepo`), not bootstrap/global state.
+- Repository can be unit-tested by mocking `db.SQLClient`.
+- Bootstrap concerns are isolated in startup wiring only.
+
+### ORM Usage Example (with Global MySQL Client)
+
+After getting global MySQL SQL client from bootstrap, you can build ORM instance once and inject it to repositories.
+
+```go
+package main
+
+import (
+    "log"
+
+    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+)
+
+func initORM() *orm.ORM {
+    boot, err := bootstrap.NewBootstrap("configs/config.yaml")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if err := bootstrap.LoadDatabaseConfig(boot, "configs/database.yaml"); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := boot.InitializeDatabases(); err != nil {
+        log.Fatal(err)
+    }
+
+    mysqlClient, err := bootstrap.GetMySQLClient(boot)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    return orm.NewORMWithDB(mysqlClient.DB(), orm.NewMySQLDialect())
+}
+```
+
+CRUD with query builder:
+
+```go
+// INSERT
+_, err := ormInstance.Insert("users").
+    Set("name", "alice").
+    Set("status", 1).
+    Exec(ctx)
+
+// SELECT one
+var id int64
+var name string
+err = ormInstance.Select("users").
+    Columns("id", "name").
+    Eq("status", 1).
+    QueryRow(ctx).
+    Scan(&id, &name)
+
+// UPDATE
+_, err = ormInstance.Update("users").
+    Set("status", 2).
+    Eq("id", id).
+    Exec(ctx)
+
+// DELETE
+_, err = ormInstance.Delete("users").
+    Eq("id", id).
+    Exec(ctx)
+```
+
+Transaction example:
+
+```go
+err := ormInstance.Transaction(ctx, func(tx *orm.ORM) error {
+    if _, err := tx.Insert("orders").Set("user_id", 1001).Set("amount", 99).Exec(ctx); err != nil {
+        return err
+    }
+    if _, err := tx.Update("accounts").Set("balance", 1000).Eq("user_id", 1001).Exec(ctx); err != nil {
+        return err
+    }
+    return nil
+})
+```
+
+Repository injection style:
+
+```go
+type OrderRepository struct {
+    orm *orm.ORM
+}
+
+func NewOrderRepository(ormInstance *orm.ORM) *OrderRepository {
+    return &OrderRepository{orm: ormInstance}
+}
+```
+
+Recommended practice:
+
+- Build ORM once in startup/wire layer and inject it.
+- Keep SQL/table details inside repository layer.
+- Use `Transaction` for multi-step write operations.
+- Combine ORM builder with raw SQL only when necessary (complex aggregation/reporting).
+
+### End-to-End: Global DB Client + ORM Together
+
+Use `GetMySQLClient` for ORM initialization, and keep `GetMySQLSQLClient` if you still need occasional raw SQL.
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/pkg/db"
+    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+)
+
+type UserRepository struct {
+    orm       *orm.ORM
+    sqlClient db.SQLClient
+}
+
+func NewUserRepository(ormInstance *orm.ORM, sqlClient db.SQLClient) *UserRepository {
+    return &UserRepository{orm: ormInstance, sqlClient: sqlClient}
+}
+
+func (r *UserRepository) Create(ctx context.Context, name string) error {
+    _, err := r.orm.Insert("users").Set("name", name).Set("status", 1).Exec(ctx)
+    return err
+}
+
+func (r *UserRepository) CountActive(ctx context.Context) (int, error) {
+    // Example: raw SQL for aggregation/report style query
+    row := r.sqlClient.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE status = ?", 1)
+    var n int
+    if err := row.Scan(&n); err != nil {
+        return 0, err
+    }
+    return n, nil
+}
+
+func wire() *UserRepository {
+    boot, err := bootstrap.NewBootstrap("configs/config.yaml")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if err := bootstrap.LoadDatabaseConfig(boot, "configs/database.yaml"); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := boot.InitializeDatabases(); err != nil {
+        log.Fatal(err)
+    }
+
+    mysqlClient, err := bootstrap.GetMySQLClient(boot)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    sqlClient, err := bootstrap.GetMySQLSQLClient(boot)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    ormInstance := orm.NewORMWithDB(mysqlClient.DB(), orm.NewMySQLDialect())
+    return NewUserRepository(ormInstance, sqlClient)
+}
+```
+
+When to use which:
+
+- ORM query builder: standard CRUD and maintainable repository logic.
+- SQLClient raw SQL: complex aggregation/report queries and highly tuned SQL.
+
 ### MySQL Helper Methods
 
 The MySQL client also provides helper methods for common write operations:

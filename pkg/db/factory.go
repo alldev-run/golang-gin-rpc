@@ -103,7 +103,10 @@ func (f *Factory) createMySQL(cfg mysql.Config) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mysql client: %w", err)
 	}
-	return &mysqlAdapter{client: client}, nil
+	adapter := &mysqlAdapter{client: client}
+	// Store the client in the factory for later retrieval
+	f.clients[TypeMySQL] = adapter
+	return adapter, nil
 }
 
 // createRedis creates a Redis client.
@@ -301,4 +304,52 @@ func (a *mongodbAdapter) Ping(ctx context.Context) error {
 
 func (a *mongodbAdapter) Close() error {
 	return a.client.Close(nil)
+}
+
+// GetMySQL returns the MySQL client from the factory.
+func (f *Factory) GetMySQL() (*mysql.Client, error) {
+	if client, exists := f.clients[TypeMySQL]; exists {
+		if adapter, ok := client.(*mysqlAdapter); ok {
+			return adapter.client, nil
+		}
+	}
+	return nil, fmt.Errorf("MySQL client not found")
+}
+
+// GetMySQLSQLClient returns the MySQL client as SQLClient interface.
+func (f *Factory) GetMySQLSQLClient() (SQLClient, error) {
+	if client, exists := f.clients[TypeMySQL]; exists {
+		if sqlClient, ok := client.(SQLClient); ok {
+			return sqlClient, nil
+		}
+	}
+	return nil, fmt.Errorf("MySQL SQL client not found")
+}
+
+// GetRedis returns the Redis client from the factory.
+func (f *Factory) GetRedis() (*redis.Client, error) {
+	if client, exists := f.clients[TypeRedis]; exists {
+		if adapter, ok := client.(*redisAdapter); ok {
+			return adapter.client, nil
+		}
+	}
+	return nil, fmt.Errorf("Redis client not found")
+}
+
+// GetPostgres returns the PostgreSQL client from the factory.
+func (f *Factory) GetPostgres() (*postgres.Client, error) {
+	if client, exists := f.clients[TypePostgres]; exists {
+		if adapter, ok := client.(*postgresAdapter); ok {
+			return adapter.client, nil
+		}
+	}
+	return nil, fmt.Errorf("PostgreSQL client not found")
+}
+
+// GetClient returns a client by type.
+func (f *Factory) GetClient(dbType Type) (Client, error) {
+	if client, exists := f.clients[dbType]; exists {
+		return client, nil
+	}
+	return nil, fmt.Errorf("client for type %s not found", dbType)
 }

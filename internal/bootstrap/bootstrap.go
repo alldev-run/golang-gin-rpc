@@ -11,8 +11,11 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/auth"
 	"github.com/alldev-run/golang-gin-rpc/pkg/cache"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
 	"github.com/alldev-run/golang-gin-rpc/pkg/discovery"
 	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 	"github.com/alldev-run/golang-gin-rpc/pkg/health"
@@ -196,17 +199,25 @@ func (b *Bootstrap) InitializeDatabases() error {
 
 		clientConfig, err := buildDBConfig(dbConfig, b.config.Database.Pool)
 		if err != nil {
+			logger.Errorf("Database configuration build failed",
+				logger.String("name", name),
+				logger.Error(err),
+			)
 			return fmt.Errorf("failed to build database config %s: %w", name, err)
 		}
 
 		client, err := factory.Create(clientConfig)
 		if err != nil {
+			logger.Errorf("Database client creation failed",
+				logger.String("name", name),
+				logger.Error(err),
+			)
 			return fmt.Errorf("failed to create database client %s: %w", name, err)
 		}
 
 		ctx := context.Background()
 		if err := client.Ping(ctx); err != nil {
-			logger.Warn("Database connection failed", logger.String("name", name), logger.Error(err))
+			logger.Errorf("Database connection failed", logger.String("name", name), logger.Error(err))
 		} else {
 			logger.Info("Database connected successfully", logger.String("name", name))
 		}
@@ -777,4 +788,61 @@ func (b *Bootstrap) Close() error {
 
 	logger.Info("Bootstrap shutdown completed")
 	return nil
+}
+
+// UpdateDatabaseConfig updates the database configuration in the bootstrap instance
+func (b *Bootstrap) UpdateDatabaseConfig(dbConfigs map[string]config.DBConfig) error {
+	if b.config == nil {
+		return fmt.Errorf("bootstrap config is nil")
+	}
+	
+	// Update primary database config
+	if primaryConfig, exists := dbConfigs["mysql_primary"]; exists {
+		b.config.Database.Primary = primaryConfig
+	}
+	
+	// Update replica database config if exists
+	if replicaConfig, exists := dbConfigs["mysql_replica"]; exists {
+		b.config.Database.Replica = replicaConfig
+	}
+	
+	logger.Info("Database configuration updated")
+	return nil
+}
+
+// GetDatabaseFactory returns the database factory instance
+func (b *Bootstrap) GetDatabaseFactory() *db.Factory {
+	return b.db
+}
+
+// GetMySQLClient returns the MySQL client from the database factory
+func (b *Bootstrap) GetMySQLClient() (*mysql.Client, error) {
+	if b.db == nil {
+		return nil, fmt.Errorf("database factory not initialized")
+	}
+	return b.db.GetMySQL()
+}
+
+// GetMySQLSQLClient returns the MySQL client as SQLClient interface
+func (b *Bootstrap) GetMySQLSQLClient() (db.SQLClient, error) {
+	if b.db == nil {
+		return nil, fmt.Errorf("database factory not initialized")
+	}
+	return b.db.GetMySQLSQLClient()
+}
+
+// GetRedisClient returns the Redis client from the database factory
+func (b *Bootstrap) GetRedisClient() (*redis.Client, error) {
+	if b.db == nil {
+		return nil, fmt.Errorf("database factory not initialized")
+	}
+	return b.db.GetRedis()
+}
+
+// GetPostgresClient returns the PostgreSQL client from the database factory
+func (b *Bootstrap) GetPostgresClient() (*postgres.Client, error) {
+	if b.db == nil {
+		return nil, fmt.Errorf("database factory not initialized")
+	}
+	return b.db.GetPostgres()
 }
