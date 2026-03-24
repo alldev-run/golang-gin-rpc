@@ -16,6 +16,10 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 	return internalbootstrap.NewBootstrap(configPath)
 }
 
+func NewBootstrapWithDefaults() (*Bootstrap, error) {
+	return internalbootstrap.NewBootstrap("")
+}
+
 func New(configPath string) (*Bootstrap, error) {
 	return internalbootstrap.NewBootstrap(configPath)
 }

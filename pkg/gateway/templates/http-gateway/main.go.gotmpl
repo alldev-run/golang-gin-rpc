@@ -63,21 +63,29 @@ func main() {
 		logger.String("protocols", getEnabledProtocols(gwCfg)),
 	)
 
-	frameworkConfigPath := "./configs/config.yaml"
+	frameworkConfigPath := resolveFrameworkConfigPath(configPath)
 	if len(os.Args) > 2 {
 		frameworkConfigPath = os.Args[2]
 	}
 
-	boot, err := bootstrap.NewBootstrap(frameworkConfigPath)
+	var boot *bootstrap.Bootstrap
+	if frameworkConfigPath != "" {
+		boot, err = bootstrap.NewBootstrap(frameworkConfigPath)
+	} else {
+		boot, err = bootstrap.NewBootstrapWithDefaults()
+	}
 	if err != nil {
 		log.Fatalf("failed to initialize bootstrap: %v", err)
 	}
 	defer boot.Close()
 
 	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig())
-	frameworkGatewayCfg, err := loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
-	if err != nil {
-		log.Fatalf("failed to load gateway config from framework file: %v", err)
+	frameworkGatewayCfg := frameworkGatewayBase
+	if frameworkConfigPath != "" {
+		frameworkGatewayCfg, err = loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
+		if err != nil {
+			log.Fatalf("failed to load gateway config from framework file: %v", err)
+		}
 	}
 	mergedGwCfg, err := loadGatewayConfigWithBase(configPath, frameworkGatewayCfg)
 	if err != nil {
@@ -256,6 +264,23 @@ func cloneGatewayConfig(src *gateway.Config) *gateway.Config {
 		clone.Tracing = &tracingClone
 	}
 	return &clone
+}
+
+func resolveFrameworkConfigPath(gatewayConfigPath string) string {
+	candidates := []string{
+		"./configs/config.yaml",
+		"./config/config.yaml",
+		gatewayConfigPath,
+	}
+	for _, p := range candidates {
+		if p == "" {
+			continue
+		}
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
 }
 
 // getEnabledProtocols 获取启用的协议列表
