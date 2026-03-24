@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,8 +13,11 @@ import (
 
 	"__MODULE__/__API_PATH__/internal/httpapi"
 	"__MODULE__/__API_PATH__/internal/mw"
+	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
 func main() {
@@ -62,36 +63,54 @@ func main() {
 		logger.String("protocols", getEnabledProtocols(gwCfg)),
 	)
 
-	// 创建业务处理器 - 框架已内置请求日志中间件
-	bizHandler := httpapi.NewRouter(gwCfg).Handler()
+	frameworkConfigPath := "./configs/config.yaml"
+	if len(os.Args) > 2 {
+		frameworkConfigPath = os.Args[2]
+	}
 
-	httpService, err := gateway.NewHTTPServiceWithOptions(gwCfg, gateway.HTTPServiceOptions{
-		BizHandler:     bizHandler,
-		IsBusinessPath: httpapi.IsBusinessPath,
-		Middlewares:    mw.Middlewares(),
-	})
+	boot, err := bootstrap.NewBootstrap(frameworkConfigPath)
 	if err != nil {
-		log.Fatalf("failed to create http service: %v", err)
+		log.Fatalf("failed to initialize bootstrap: %v", err)
 	}
-	defer httpService.Close()
+	defer boot.Close()
 
-	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", gwCfg.Host, gwCfg.Port),
-		Handler:      httpService.Handler(),
-		ReadTimeout:  gwCfg.ReadTimeout,
-		WriteTimeout: gwCfg.WriteTimeout,
-		IdleTimeout:  gwCfg.IdleTimeout,
+	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig())
+	frameworkGatewayCfg, err := loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
+	if err != nil {
+		log.Fatalf("failed to load gateway config from framework file: %v", err)
+	}
+	mergedGwCfg, err := loadGatewayConfigWithBase(configPath, frameworkGatewayCfg)
+	if err != nil {
+		log.Fatalf("failed to merge gateway config with framework defaults: %v", err)
 	}
 
-	go func() {
-		if serveErr := server.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-			log.Fatalf("failed to start server: %v", serveErr)
-		}
-	}()
+	const gatewayServiceName = "api-gateway.__API_NAME__"
+
+	// 创建业务处理器 - 框架已内置请求日志中间件
+	bizHandler := httpapi.NewRouter(mergedGwCfg).Handler()
+
+	if err := boot.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{
+		Name:   gatewayServiceName,
+		Config: mergedGwCfg,
+		HTTPOptions: gateway.HTTPServiceOptions{
+			BizHandler:     bizHandler,
+			IsBusinessPath: httpapi.IsBusinessPath,
+			Middlewares:    mw.Middlewares(),
+		},
+	}); err != nil {
+		log.Fatalf("failed to register api-gateway service factory: %v", err)
+	}
+
+	frameworkOptions := boot.FrameworkOptionsFromConfig()
+	frameworkOptions.Services = []string{gatewayServiceName}
+
+	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
+		log.Fatalf("failed to start framework services: %v", err)
+	}
 
 	gatewayLogger.Info("__API_NAME__ service started",
-		logger.String("addr", fmt.Sprintf("%s:%d", gwCfg.Host, gwCfg.Port)),
-		logger.String("protocols", getEnabledProtocols(gwCfg)),
+		logger.String("addr", fmt.Sprintf("%s:%d", mergedGwCfg.Host, mergedGwCfg.Port)),
+		logger.String("protocols", getEnabledProtocols(mergedGwCfg)),
 	)
 
 	// 启动服务器
@@ -106,8 +125,8 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		gatewayLogger.Error("server shutdown failed", logger.Error(err))
+	if err := boot.StopFramework(shutdownCtx, frameworkOptions.Services...); err != nil {
+		gatewayLogger.Error("framework shutdown failed", logger.Error(err))
 	}
 	
 	gatewayLogger.Info("__API_NAME__ stopped")
@@ -121,6 +140,20 @@ func loadGatewayConfig(path string) (*gateway.Config, error) {
 	}
 
 	cfg := gateway.DefaultConfig()
+	if err := unmarshalGatewayConfig(data, cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func loadGatewayConfigWithBase(path string, base *gateway.Config) (*gateway.Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	cfg := cloneGatewayConfig(base)
 	if err := unmarshalGatewayConfig(data, cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
@@ -147,6 +180,82 @@ func unmarshalGatewayConfig(data []byte, cfg *gateway.Config) error {
 	}
 
 	return yaml.Unmarshal(data, cfg)
+}
+
+func buildGatewayConfigFromFramework(cfg *config.GlobalConfig) *gateway.Config {
+	base := gateway.DefaultConfig()
+	if cfg == nil {
+		return base
+	}
+
+	base.Host = cfg.Server.HTTP.Host
+	base.Port = cfg.Server.HTTP.Port
+	base.ReadTimeout = cfg.Server.HTTP.ReadTimeout
+	base.WriteTimeout = cfg.Server.HTTP.WriteTimeout
+	base.IdleTimeout = cfg.Server.HTTP.IdleTimeout
+	base.ServiceName = cfg.App.Name
+
+	base.CORS.AllowedOrigins = append([]string(nil), cfg.Security.CORS.AllowOrigins...)
+	base.CORS.AllowedMethods = append([]string(nil), cfg.Security.CORS.AllowMethods...)
+	base.CORS.AllowedHeaders = append([]string(nil), cfg.Security.CORS.AllowHeaders...)
+	base.CORS.AllowCredentials = cfg.Security.CORS.AllowCredentials
+
+	base.RateLimit.Enabled = cfg.Security.RateLimit.Enabled
+	base.RateLimit.Requests = cfg.Security.RateLimit.Limit
+	base.RateLimit.Window = cfg.Security.RateLimit.Window.String()
+
+	base.Discovery.Enabled = cfg.Discovery.Enabled
+	base.Discovery.Type = cfg.Discovery.Type
+	base.Discovery.Timeout = cfg.Discovery.Timeout
+	base.Discovery.Namespace = cfg.Discovery.Config["namespace"]
+	if base.Discovery.Namespace == "" {
+		base.Discovery.Namespace = "default"
+	}
+	if cfg.Discovery.Address != "" {
+		base.Discovery.Endpoints = []string{cfg.Discovery.Address}
+	}
+	if base.Discovery.Options == nil {
+		base.Discovery.Options = make(map[string]string)
+	}
+	for k, v := range cfg.Discovery.Config {
+		base.Discovery.Options[k] = v
+	}
+
+	base.Tracing = &tracing.Config{
+		Enabled:        cfg.Observability.Tracing.Enabled,
+		Type:           cfg.Observability.Tracing.Type,
+		Endpoint:       cfg.Observability.Tracing.Endpoint,
+		SampleRate:     cfg.Observability.Tracing.SampleRate,
+		ServiceName:    cfg.App.Name,
+		ServiceVersion: cfg.App.Version,
+		Environment:    cfg.App.Environment,
+	}
+
+	return base
+}
+
+func cloneGatewayConfig(src *gateway.Config) *gateway.Config {
+	if src == nil {
+		return gateway.DefaultConfig()
+	}
+	clone := *src
+	clone.CORS.AllowedOrigins = append([]string(nil), src.CORS.AllowedOrigins...)
+	clone.CORS.AllowedMethods = append([]string(nil), src.CORS.AllowedMethods...)
+	clone.CORS.AllowedHeaders = append([]string(nil), src.CORS.AllowedHeaders...)
+	clone.CORS.ExposedHeaders = append([]string(nil), src.CORS.ExposedHeaders...)
+	clone.Discovery.Endpoints = append([]string(nil), src.Discovery.Endpoints...)
+	if src.Discovery.Options != nil {
+		clone.Discovery.Options = make(map[string]string, len(src.Discovery.Options))
+		for k, v := range src.Discovery.Options {
+			clone.Discovery.Options[k] = v
+		}
+	}
+	clone.Routes = append([]gateway.RouteConfig(nil), src.Routes...)
+	if src.Tracing != nil {
+		tracingClone := *src.Tracing
+		clone.Tracing = &tracingClone
+	}
+	return &clone
 }
 
 // getEnabledProtocols 获取启用的协议列表
