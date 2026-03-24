@@ -1,0 +1,116 @@
+# HTTP Gateway 配置示例 - 展示 HTTP 日志配置
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "60s"
+
+# 日志配置
+logging:
+  level: "info"
+  format: "json"
+  
+  # HTTP 请求日志配置
+  http_logging:
+    # 启用 HTTP 请求日志
+    enabled: true
+    
+    # 记录请求体（调试时启用，生产环境建议关闭）
+    log_request_body: true
+    
+    # 记录响应体（调试时启用，生产环境建议关闭）
+    log_response_body: false
+    
+    # 最大请求/响应体大小（字节）
+    max_body_size: 524288  # 512KB
+    
+    # 记录请求头
+    log_headers: true
+    
+    # 敏感请求头列表（这些头会被跳过或脱敏）
+    sensitive_headers:
+      - "Authorization"
+      - "Cookie"
+      - "X-API-Key"
+      - "X-Auth-Token"
+      - "X-CSRF-Token"
+    
+    # 跳过日志记录的路径
+    skip_paths:
+      - "/health"
+      - "/ready"
+      - "/metrics"
+      - "/favicon.ico"
+    
+    # 慢请求阈值
+    slow_request_threshold: "2s"
+    
+    # 启用请求 ID 生成
+    enable_request_id: true
+    
+    # 自定义请求 ID 头名称（可选，默认 X-Request-ID）
+    # request_id_header: "X-Trace-ID"
+    
+    # 日志级别阈值配置
+    log_level_thresholds:
+      # 状态码 >= 500 记录为 ERROR
+      error_threshold: 500
+      # 状态码 >= 400 记录为 WARN  
+      warn_threshold: 400
+      # 状态码 >= 200 记录为 INFO
+      info_threshold: 200
+
+# CORS 配置
+cors:
+  allowed_origins:
+    - "http://localhost:3000"
+    - "https://example.com"
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "OPTIONS"
+  allowed_headers:
+    - "Content-Type"
+    - "Authorization"
+    - "X-Request-ID"
+  max_age: 86400
+
+# 限流配置
+rate_limit:
+  enabled: true
+  requests_per_minute: 100
+  burst: 20
+
+# 服务发现配置
+discovery:
+  enabled: false
+  registry_url: ""
+  service_name: "http-gateway"
+
+# 协议配置
+protocols:
+  http:
+    enabled: true
+  grpc:
+    enabled: false
+
+# 安全配置
+security:
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+  jwt:
+    enabled: false
+    secret: ""
+    expiry: "24h"
+
+# 服务日志配置（可选）
+service_logging:
+  enabled: false
+  base_dir: "./logs"
+  enable_date_folders: true
+  separate_by_level: true

@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	// 初始化日志
+	// 初始化全局日志
 	loggerCfg := logger.DefaultConfig()
 	if gwCfg.Logging.Level != "" {
 		loggerCfg.Level = logger.LogLevel(gwCfg.Logging.Level)
@@ -43,7 +43,20 @@ func main() {
 	}
 	logger.Init(loggerCfg)
 
-	logger.Info("http-gateway starting", 
+	// 初始化 API Gateway 服务日志器
+	gatewayLoggerConfig := logger.DefaultServiceLoggerConfig("api-gateway")
+	gatewayLoggerConfig.EnableDateFolder = true
+	gatewayLoggerConfig.SeparateByLevel = true
+	gatewayLoggerConfig.InheritGlobalConfig = false
+	gatewayLoggerConfig.OverrideConfig = loggerCfg
+	gatewayLoggerConfig.OverrideConfig.Level = logger.LogLevelDebug // API Gateway 需要详细日志
+	gatewayLoggerConfig.OverrideConfig.MaxSize = 200 // 更大的文件大小
+	gatewayLoggerConfig.OverrideConfig.MaxBackups = 15
+	gatewayLoggerConfig.OverrideConfig.MaxAge = 45
+	
+	gatewayLogger := logger.GetServiceLoggerInstance("api-gateway", gatewayLoggerConfig)
+
+	gatewayLogger.Info("http-gateway starting", 
 		logger.String("version", "1.0.0"),
 		logger.String("config", configPath),
 		logger.String("service", gwCfg.ServiceName),
@@ -73,8 +86,9 @@ func main() {
 
 	const gatewayServiceName = "api-gateway.http-gateway"
 
-	// 创建业务处理器
+	// 创建业务处理器 - 框架已内置请求日志中间件
 	bizHandler := httpapi.NewRouter(mergedGwCfg).Handler()
+	
 	if err := boot.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{
 		Name:   gatewayServiceName,
 		Config: mergedGwCfg,
@@ -94,7 +108,7 @@ func main() {
 		log.Fatalf("failed to start framework services: %v", err)
 	}
 
-	logger.Info("http-gateway service started",
+	gatewayLogger.Info("http-gateway service started",
 		logger.String("addr", fmt.Sprintf("%s:%d", mergedGwCfg.Host, mergedGwCfg.Port)),
 		logger.String("protocols", getEnabledProtocols(mergedGwCfg)),
 	)
@@ -105,17 +119,17 @@ func main() {
 
 	// 等待信号
 	<-sigCh
-	logger.Info("http-gateway shutting down")
+	gatewayLogger.Info("http-gateway shutting down")
 
 	// 关闭框架托管服务
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := boot.StopFramework(shutdownCtx, frameworkOptions.Services...); err != nil {
-		logger.Errorf("framework shutdown failed", logger.Error(err))
+		gatewayLogger.Error("framework shutdown failed", logger.Error(err))
 	}
 	
-	logger.Info("http-gateway stopped")
+	gatewayLogger.Info("http-gateway stopped")
 }
 
 // loadGatewayConfig 加载网关配置

@@ -1,13 +1,14 @@
 # HTTP Gateway 目录结构
 
-## 📁 目录结构
+## 目录结构
 
 ```
 api/http-gateway/
 ├── main.go                    # 主入口文件
 ├── features_test.go           # 功能测试文件
 ├── config/
-│   └── config.yaml           # 配置文件
+│   ├── config.yaml            # 主配置文件
+│   └── http-logging-example.yaml # HTTP 日志配置示例
 └── internal/
     ├── httpapi/
     │   └── router.go          # HTTP 路由器
@@ -25,14 +26,14 @@ api/http-gateway/
         └── hello_service.go   # 业务服务
 ```
 
-## 📝 文件说明
+## 文件说明
 
-### 🚀 **主要文件**
+### 主要文件
 - **main.go** - 应用程序入口（加载配置、初始化网关、优雅关闭）
 - **features_test.go** - 功能验证测试
 - **config/config.yaml** - 示例配置文件
 
-### 🔧 **内部模块**
+### 内部模块
 - **internal/httpapi/router.go** - RouterBuilder 适配层
 - **internal/mw/** - 中间件集合
   - **tracing.go** - 链路追踪中间件
@@ -43,15 +44,34 @@ api/http-gateway/
 - **internal/service/hello_service.go** - 示例业务服务
 - **internal/model/hello.go** - Hello 数据模型
 
-## 🌟 **特性**
+## 功能
 
-### ✅ **当前示例能力**
-- 🔍 链路追踪接入示例
-- 🌐 基于 `pkg/gateway` 的多协议路由示例
-- 🛡️ 可扩展中间件注册机制
-- 🧪 基础功能测试
+### 当前能力
+- 链路追踪接入示例
+- 基于 `pkg/gateway` 的多协议路由示例
+- 自动化 HTTP 请求日志记录
+- 请求 ID 自动生成与传递
+- 支持通过配置控制请求/响应日志行为
 
-### 🚀 **使用方式**
+### HTTP 日志配置
+可在 `config/config.yaml` 的 `logging.http_logging` 下配置：
+
+- `enabled`：是否启用 HTTP 请求日志
+- `log_request_body` / `log_response_body`：是否记录请求体和响应体
+- `max_body_size`：记录体积上限（字节）
+- `log_headers`：是否记录请求头
+- `sensitive_headers`：敏感请求头过滤列表
+- `skip_paths`：跳过日志记录的路径
+- `slow_request_threshold`：慢请求阈值
+- `enable_request_id` / `request_id_header`：请求 ID 配置
+- `log_level_thresholds`：按状态码映射日志级别
+
+### 配置文件
+- `config/config.yaml` - 主配置文件
+- `config/http-logging-example.yaml` - HTTP 日志配置示例
+- `LOGGING.md` - 日志相关说明
+
+### 使用方式
 ```bash
 # 启动服务
 go run ./api/http-gateway
@@ -63,14 +83,14 @@ go test ./api/http-gateway
 go build ./api/http-gateway
 ```
 
-## 📈 **测试结果**
+## 测试
 可运行以下测试进行验证：
 
 ```bash
 go test ./api/http-gateway -v
 ```
 
-## 🔗 相关文档
+## 相关文档
 
 - `docs/gateway.md`
 - `pkg/gateway/README.md`

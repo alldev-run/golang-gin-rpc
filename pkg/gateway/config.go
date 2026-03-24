@@ -302,4 +302,124 @@ type LoggingConfig struct {
 	
 	// Log format (json, console)
 	Format string `yaml:"format" json:"format"`
+	
+	// HTTP request logging configuration
+	HTTPLogging *HTTPLoggingConfig `yaml:"http_logging" json:"http_logging"`
+	
+	// Service logging configuration
+	ServiceLogging *ServiceLoggingConfig `yaml:"service_logging" json:"service_logging"`
+}
+
+// ServiceLoggingConfig holds service-specific logging configuration
+type ServiceLoggingConfig struct {
+	// Enable service-specific logging
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	
+	// Base directory for service logs
+	BaseDir string `yaml:"base_dir" json:"base_dir"`
+	
+	// Enable date-based folders
+	EnableDateFolders bool `yaml:"enable_date_folders" json:"enable_date_folders"`
+	
+	// Separate files by log level
+	SeparateByLevel bool `yaml:"separate_by_level" json:"separate_by_level"`
+	
+	// Inherit global logger configuration
+	InheritGlobalConfig bool `yaml:"inherit_global_config" json:"inherit_global_config"`
+	
+	// Override configuration
+	OverrideConfig OverrideLoggerConfig `yaml:"override_config" json:"override_config"`
+	
+	// Component-specific configurations
+	Components map[string]ComponentLoggingConfig `yaml:"components" json:"components"`
+	
+	// Cleanup configuration
+	Cleanup CleanupConfig `yaml:"cleanup" json:"cleanup"`
+}
+
+// OverrideLoggerConfig holds logger configuration overrides
+type OverrideLoggerConfig struct {
+	Level               string `yaml:"level" json:"level"`
+	Format              string `yaml:"format" json:"format"`
+	MaxSize             int    `yaml:"max_size" json:"max_size"`
+	MaxBackups          int    `yaml:"max_backups" json:"max_backups"`
+	MaxAge              int    `yaml:"max_age" json:"max_age"`
+	Compress            bool   `yaml:"compress" json:"compress"`
+	EnableCaller        bool   `yaml:"enable_caller" json:"enable_caller"`
+	EnableStacktrace    bool   `yaml:"enable_stacktrace" json:"enable_stacktrace"`
+	TimeFormat          string `yaml:"time_format" json:"time_format"`
+	Sampling            SamplingConfig `yaml:"sampling" json:"sampling"`
+}
+
+// ComponentLoggingConfig holds component-specific logging configuration
+type ComponentLoggingConfig struct {
+	BaseDir        string              `yaml:"base_dir" json:"base_dir"`
+	SeparateByLevel bool                `yaml:"separate_by_level" json:"separate_by_level"`
+	OverrideConfig OverrideLoggerConfig `yaml:"override_config" json:"override_config"`
+}
+
+// CleanupConfig holds log cleanup configuration
+type CleanupConfig struct {
+	Enabled           bool     `yaml:"enabled" json:"enabled"`
+	Schedule          string   `yaml:"schedule" json:"schedule"`
+	MaxAgeDays        int      `yaml:"max_age_days" json:"max_age_days"`
+	ExcludeComponents []string `yaml:"exclude_components" json:"exclude_components"`
+	CompressOld       bool     `yaml:"compress_old" json:"compress_old"`
+}
+
+// SamplingConfig holds log sampling configuration
+type SamplingConfig struct {
+	Enabled    bool   `yaml:"enabled" json:"enabled"`
+	Rate       float64 `yaml:"rate" json:"rate"`
+	Tick       string `yaml:"tick" json:"tick"`
+	Initial    int    `yaml:"initial" json:"initial"`
+	Thereafter int    `yaml:"thereafter" json:"thereafter"`
+}
+
+// HTTPLoggingConfig holds HTTP request logging configuration
+type HTTPLoggingConfig struct {
+	// Enable HTTP request logging
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	
+	// Log request body
+	LogRequestBody bool `yaml:"log_request_body" json:"log_request_body"`
+	
+	// Log response body
+	LogResponseBody bool `yaml:"log_response_body" json:"log_response_body"`
+	
+	// Maximum body size to log (in bytes)
+	MaxBodySize int64 `yaml:"max_body_size" json:"max_body_size"`
+	
+	// Log request headers
+	LogHeaders bool `yaml:"log_headers" json:"log_headers"`
+	
+	// Sensitive headers to mask
+	SensitiveHeaders []string `yaml:"sensitive_headers" json:"sensitive_headers"`
+	
+	// Skip logging for these paths
+	SkipPaths []string `yaml:"skip_paths" json:"skip_paths"`
+	
+	// Slow request threshold (duration string, e.g., "1s", "500ms")
+	SlowRequestThreshold string `yaml:"slow_request_threshold" json:"slow_request_threshold"`
+	
+	// Enable request ID generation
+	EnableRequestID bool `yaml:"enable_request_id" json:"enable_request_id"`
+	
+	// Custom request ID header name (default: X-Request-ID)
+	RequestIDHeader string `yaml:"request_id_header" json:"request_id_header"`
+	
+	// Log level thresholds
+	LogLevelThresholds LogLevelThresholds `yaml:"log_level_thresholds" json:"log_level_thresholds"`
+}
+
+// LogLevelThresholds defines status code to log level mapping
+type LogLevelThresholds struct {
+	// Status codes >= this level will be logged as ERROR
+	ErrorThreshold int `yaml:"error_threshold" json:"error_threshold"`
+	
+	// Status codes >= this level will be logged as WARN
+	WarnThreshold int `yaml:"warn_threshold" json:"warn_threshold"`
+	
+	// Status codes >= this level will be logged as INFO
+	InfoThreshold int `yaml:"info_threshold" json:"info_threshold"`
 }

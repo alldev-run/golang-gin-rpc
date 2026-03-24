@@ -17,6 +17,10 @@
  - **日志系统**
    - 基于 Zap 的结构化日志
    - JSON 输出不会写入 ANSI 颜色码
+   - 自动化 HTTP 请求日志记录
+   - 配置化的日志行为控制
+   - 请求 ID 自动生成和追踪
+   - 网关日志配置入口：`api/http-gateway/config/config.yaml` 下 `logging.http_logging`
  - **链路追踪**
    - 支持 Zipkin、Jaeger、OTLP
  - **WebSocket 多节点**

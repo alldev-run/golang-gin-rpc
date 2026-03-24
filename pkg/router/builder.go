@@ -27,10 +27,10 @@ func NewRouterBuilder(cfg *gateway.Config) *RouterBuilder {
 	// 添加全局中间件
 	engine.Use(
 		middleware.Recovery(),
-		middleware.RequestID(),
+		middleware.RequestIDFromConfig(cfg),
 		middleware.CORSFromGatewayConfig(cfg),
 		middleware.RateLimitFromGatewayConfig(cfg),
-		middleware.Logging(),
+		middleware.LoggingFromConfig(cfg),
 	)
 	
 	// 如果启用了追踪，添加追踪中间件

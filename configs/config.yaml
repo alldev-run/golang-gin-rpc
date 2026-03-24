@@ -86,6 +86,88 @@ logger:
     tick: "1s"
     initial: 10
     thereafter: 100
+  
+  # Service-specific logging configuration
+  service_logging:
+    enabled: true
+    base_dir: "./logs"
+    enable_date_folders: true
+    separate_by_level: false  # Set to true in development for debugging
+    inherit_global_config: true
+    
+    # Per-service configuration overrides
+    services:
+      api-gateway:
+        base_dir: "./logs/api-gateway"
+        enable_date_folders: true
+        separate_by_level: true  # Separate levels for API debugging
+        inherit_global_config: true
+        override_config:
+          level: "debug"
+          format: "json"
+          max_size: 200  # Larger files for API logs
+          max_backups: 15
+          max_age: 45
+          compress: true
+      
+      rpc:
+        base_dir: "./logs/rpc"
+        enable_date_folders: true
+        separate_by_level: false
+        inherit_global_config: true
+        override_config:
+          level: "info"
+          format: "json"
+          max_size: 150
+          max_backups: 10
+          max_age: 30
+          compress: true
+      
+      websocket:
+        base_dir: "./logs/websocket"
+        enable_date_folders: true
+        separate_by_level: false
+        inherit_global_config: true
+        override_config:
+          level: "debug"  # Debug level for WebSocket connections
+          format: "json"
+          max_size: 100
+          max_backups: 7
+          max_age: 14
+          compress: true
+      
+      auth-service:
+        base_dir: "./logs/auth"
+        enable_date_folders: true
+        separate_by_level: true  # Security logs need level separation
+        inherit_global_config: true
+        override_config:
+          level: "info"
+          format: "json"
+          max_size: 100
+          max_backups: 30  # Keep auth logs longer
+          max_age: 90
+          compress: true
+      
+      metrics:
+        base_dir: "./logs/metrics"
+        enable_date_folders: false  # Single directory for metrics
+        separate_by_level: false
+        inherit_global_config: true
+        override_config:
+          level: "info"
+          format: "json"
+          max_size: 50
+          max_backups: 5
+          max_age: 7
+          compress: true
+    
+    # Log cleanup configuration
+    cleanup:
+      enabled: true
+      schedule: "0 2 * * *"  # Daily at 2 AM
+      max_age_days: 30
+      exclude_services: ["auth-service"]  # Keep auth logs longer
 
 # Tracing Configuration
 tracing:

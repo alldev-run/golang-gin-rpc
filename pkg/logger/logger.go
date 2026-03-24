@@ -133,6 +133,39 @@ func L() *zap.Logger {
 	return defaultL
 }
 
+// GetServiceLogger gets or creates a service-specific logger using global config
+func GetServiceLogger(serviceName string) *zap.Logger {
+	config := DefaultServiceLoggerConfig(serviceName)
+	
+	// If global logger is initialized, try to inherit its config
+	if defaultL != nil {
+		// We need to access the global config, but it's not stored currently
+		// For now, use default config with inheritance enabled
+		config.InheritGlobalConfig = true
+	}
+	
+	return GetServiceLoggerFromConfig(serviceName, config)
+}
+
+// GetServiceLoggerFromConfig gets or creates a service-specific logger with custom config
+func GetServiceLoggerFromConfig(serviceName string, config ServiceLoggerConfig) *zap.Logger {
+	return GetServiceLoggerInstance(serviceName, config)
+}
+
+// NewServiceLogger creates a new service logger wrapper
+func NewServiceLogger(serviceName string) *ServiceLogger {
+	config := DefaultServiceLoggerConfig(serviceName)
+	return NewServiceLoggerFromConfig(serviceName, config)
+}
+
+// NewServiceLoggerFromConfig creates a new service logger wrapper with custom config
+func NewServiceLoggerFromConfig(serviceName string, config ServiceLoggerConfig) *ServiceLogger {
+	return &ServiceLogger{
+		serviceName: serviceName,
+		logger:      GetServiceLoggerInstance(serviceName, config),
+	}
+}
+
 // 快捷方法（类似 logrus 风格）
 
 func Debug(msg string, fields ...zap.Field) { L().Debug(msg, fields...) }
