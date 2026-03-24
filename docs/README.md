@@ -233,6 +233,50 @@ Benefits of this pattern:
 - Repository can be unit-tested by mocking `db.SQLClient`.
 - Bootstrap concerns are isolated in startup wiring only.
 
+### Gateway Route Wiring Pattern (Recommended)
+
+For HTTP gateway projects, keep the same DI principle:
+
+- Assemble dependencies in `main` (startup layer).
+- Pass service dependencies into router/route registrars.
+- Do not inject `*bootstrap.Bootstrap` into route handlers directly.
+- Do not use request context (`gin.Context`) to store global dependencies.
+
+```go
+// main.go
+const gatewayServiceName = "api-gateway.http-gateway"
+
+routeServices := routes.NewServices()
+bizHandler := httpapi.NewRouter(mergedGwCfg, routeServices).Handler()
+```
+
+```go
+// internal/routes/registry.go
+type Services struct {
+    HelloService *service.HelloService
+}
+
+func NewServices() *Services {
+    return &Services{
+        HelloService: service.NewHelloService(),
+    }
+}
+
+func RegisterAll(registry *router.RouteRegistry, services *Services) {
+    RegisterUserRoutes(registry, services)
+}
+```
+
+```go
+// Example: blog routes receive service dependency (preferred)
+func RegisterBlogRoutes(registry *router.RouteRegistry, topicService *service.TopicService) {
+    blogGroup := registry.Group("blog", "/api/blog")
+    blogGroup.GET("/list", topicService.TopicList, "获取主题列表")
+}
+```
+
+This keeps routing layer simple and testable, while allowing service construction to use global MySQL/ORM clients in startup code.
+
 ### ORM Usage Example (with Global MySQL Client)
 
 After getting global MySQL SQL client from bootstrap, you can build ORM instance once and inject it to repositories.
@@ -672,6 +716,48 @@ for name, cfg := range cfgs {
 ```
 
 ## Database Migration
+
+Generate migration SQL files with scaffold CLI (standalone, not coupled to api-gateway):
+
+```bash
+# create migrations/20260324183000_create_users_table.up.sql
+# create migrations/20260324183000_create_users_table.down.sql
+go run ./cmd/scaffold gen-migration --name create_users_table
+
+# custom output directory
+go run ./cmd/scaffold gen-migration --name add_user_status --dir db/migrations
+
+# custom version prefix
+go run ./cmd/scaffold gen-migration --name add_user_index --version 20260324190000
+```
+
+The generated files are plain SQL templates. Fill in `UP` and `DOWN` SQL, then register/run them via `pkg/db/migration`.
+
+Run SQL migration files directly with scaffold CLI:
+
+```bash
+# apply all pending migrations from directory
+go run ./cmd/scaffold run-migration \
+  --driver mysql \
+  --dsn "root:password@tcp(127.0.0.1:3306)/myblog?parseTime=true" \
+  --dir migrations \
+  --action up
+
+# rollback one step
+go run ./cmd/scaffold run-migration \
+  --driver mysql \
+  --dsn "root:password@tcp(127.0.0.1:3306)/myblog?parseTime=true" \
+  --dir migrations \
+  --action down \
+  --steps 1
+
+# view migration status
+go run ./cmd/scaffold run-migration \
+  --driver mysql \
+  --dsn "root:password@tcp(127.0.0.1:3306)/myblog?parseTime=true" \
+  --dir migrations \
+  --action status
+```
 
 ```go
 import "github.com/alldev-run/golang-gin-rpc/pkg/db/migration"

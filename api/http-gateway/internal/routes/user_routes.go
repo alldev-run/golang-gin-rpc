@@ -13,7 +13,8 @@ import (
 )
 
 // RegisterUserRoutes 注册用户路由
-func RegisterUserRoutes(registry *router.RouteRegistry) {
+func RegisterUserRoutes(registry *router.RouteRegistry, services *Services) {
+	_ = services
 	// 创建用户路由组，带认证中间件
 	userGroup := registry.Group("user", "/api/user")
 

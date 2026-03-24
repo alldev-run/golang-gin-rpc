@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"database/sql"
 	"flag"
 	"fmt"
 	"io"
@@ -9,13 +11,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/migration"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fatalf("usage: scaffold <command> [args]\ncommands: create-api, export-template")
+		fatalf("usage: scaffold <command> [args]\ncommands: create-api, export-template, gen-migration, run-migration")
 	}
 
 	switch os.Args[1] {
@@ -23,9 +31,292 @@ func main() {
 		createAPI(os.Args[2:])
 	case "export-template":
 		exportTemplate(os.Args[2:])
+	case "gen-migration":
+		genMigration(os.Args[2:])
+	case "run-migration":
+		runMigration(os.Args[2:])
 	default:
 		fatalf("unknown command: %s", os.Args[1])
 	}
+}
+
+type sqlMigrationSpec struct {
+	Version int
+	Name    string
+	UpSQL   string
+	DownSQL string
+}
+
+func runMigration(args []string) {
+	fsFlag := flag.NewFlagSet("run-migration", flag.ExitOnError)
+	dirFlag := fsFlag.String("dir", "migrations", "migration files directory")
+	driverFlag := fsFlag.String("driver", "mysql", "database driver (e.g. mysql)")
+	dsnFlag := fsFlag.String("dsn", "", "database DSN")
+	actionFlag := fsFlag.String("action", "up", "action: up|down|status")
+	stepsFlag := fsFlag.Int("steps", 1, "rollback steps for action=down")
+	tableFlag := fsFlag.String("table", "schema_migrations", "migration tracking table name")
+	timeoutFlag := fsFlag.Duration("timeout", 30*time.Second, "operation timeout")
+	_ = fsFlag.Parse(args)
+
+	if strings.TrimSpace(*dsnFlag) == "" {
+		fatalf("missing --dsn")
+	}
+
+	action := strings.ToLower(strings.TrimSpace(*actionFlag))
+	if action != "up" && action != "down" && action != "status" {
+		fatalf("invalid --action: %s (allowed: up|down|status)", action)
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		fatalf("getwd: %v", err)
+	}
+
+	dir := strings.TrimSpace(*dirFlag)
+	if dir == "" {
+		dir = "migrations"
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(root, dir)
+	}
+
+	specs, err := loadSQLMigrations(dir)
+	if err != nil {
+		fatalf("load migrations: %v", err)
+	}
+
+	db, err := sql.Open(strings.TrimSpace(*driverFlag), strings.TrimSpace(*dsnFlag))
+	if err != nil {
+		fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), *timeoutFlag)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		fatalf("ping db: %v", err)
+	}
+
+	m := migration.New(db)
+	tableName := strings.TrimSpace(*tableFlag)
+	if tableName != "" {
+		m.TableName = tableName
+	}
+	for _, spec := range specs {
+		m.Add(spec.Version, spec.Name, spec.UpSQL, spec.DownSQL)
+	}
+
+	switch action {
+	case "up":
+		if err := m.Up(ctx); err != nil {
+			fatalf("run up migrations: %v", err)
+		}
+		fmt.Println("migrations applied successfully")
+	case "down":
+		steps := *stepsFlag
+		if steps <= 0 {
+			steps = 1
+		}
+		for i := 0; i < steps; i++ {
+			if err := m.Down(ctx); err != nil {
+				fatalf("run down migration (step %d): %v", i+1, err)
+			}
+		}
+		fmt.Printf("rollback completed, steps=%d\n", steps)
+	case "status":
+		statuses, err := m.Status(ctx)
+		if err != nil {
+			fatalf("query migration status: %v", err)
+		}
+		if len(statuses) == 0 {
+			fmt.Println("no migrations registered")
+			return
+		}
+		for _, s := range statuses {
+			fmt.Printf("%d\t%s\tapplied=%v\n", s.Version, s.Name, s.Applied)
+		}
+	}
+}
+
+func loadSQLMigrations(dir string) ([]sqlMigrationSpec, error) {
+	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
+		return nil, fmt.Errorf("migration dir not found: %s", dir)
+	}
+
+	re := regexp.MustCompile(`^(\d+)_([a-z0-9_]+)\.(up|down)\.sql$`)
+	type holder struct {
+		Version int
+		Name    string
+		UpPath  string
+		DownPath string
+	}
+	items := make(map[string]*holder)
+
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		base := d.Name()
+		match := re.FindStringSubmatch(base)
+		if len(match) == 0 {
+			return nil
+		}
+
+		version, convErr := strconv.Atoi(match[1])
+		if convErr != nil {
+			return fmt.Errorf("invalid migration version in %s: %w", base, convErr)
+		}
+		name := match[2]
+		direction := match[3]
+		key := match[1] + "_" + name
+
+		h := items[key]
+		if h == nil {
+			h = &holder{Version: version, Name: name}
+			items[key] = h
+		}
+
+		if direction == "up" {
+			h.UpPath = path
+		} else {
+			h.DownPath = path
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no migration files found in %s", dir)
+	}
+
+	specs := make([]sqlMigrationSpec, 0, len(items))
+	for _, h := range items {
+		if h.UpPath == "" || h.DownPath == "" {
+			return nil, fmt.Errorf("migration %d_%s missing up/down pair", h.Version, h.Name)
+		}
+		upBytes, err := os.ReadFile(h.UpPath)
+		if err != nil {
+			return nil, fmt.Errorf("read up sql %s: %w", h.UpPath, err)
+		}
+		downBytes, err := os.ReadFile(h.DownPath)
+		if err != nil {
+			return nil, fmt.Errorf("read down sql %s: %w", h.DownPath, err)
+		}
+		specs = append(specs, sqlMigrationSpec{
+			Version: h.Version,
+			Name:    h.Name,
+			UpSQL:   string(upBytes),
+			DownSQL: string(downBytes),
+		})
+	}
+
+	sort.Slice(specs, func(i, j int) bool {
+		return specs[i].Version < specs[j].Version
+	})
+
+	return specs, nil
+}
+
+func genMigration(args []string) {
+	fsFlag := flag.NewFlagSet("gen-migration", flag.ExitOnError)
+	nameFlag := fsFlag.String("name", "", "migration name, e.g. create_users_table")
+	dirFlag := fsFlag.String("dir", "migrations", "output directory for migration files")
+	versionFlag := fsFlag.String("version", "", "migration version prefix (default: UTC timestamp YYYYMMDDHHMMSS)")
+	_ = fsFlag.Parse(args)
+
+	name := strings.TrimSpace(*nameFlag)
+	if name == "" && fsFlag.NArg() > 0 {
+		name = strings.TrimSpace(strings.Join(fsFlag.Args(), "_"))
+	}
+	if name == "" {
+		fatalf("missing migration name, use: scaffold gen-migration --name create_users_table")
+	}
+
+	name = sanitizeMigrationName(name)
+	if name == "" {
+		fatalf("invalid migration name")
+	}
+
+	version := strings.TrimSpace(*versionFlag)
+	if version == "" {
+		version = time.Now().UTC().Format("20060102150405")
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		fatalf("getwd: %v", err)
+	}
+
+	outDir := strings.TrimSpace(*dirFlag)
+	if outDir == "" {
+		outDir = "migrations"
+	}
+	if !filepath.IsAbs(outDir) {
+		outDir = filepath.Join(root, outDir)
+	}
+
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		fatalf("create migration directory: %v", err)
+	}
+
+	base := version + "_" + name
+	upPath := filepath.Join(outDir, base+".up.sql")
+	downPath := filepath.Join(outDir, base+".down.sql")
+
+	if _, err := os.Stat(upPath); err == nil {
+		fatalf("migration already exists: %s", upPath)
+	}
+	if _, err := os.Stat(downPath); err == nil {
+		fatalf("migration already exists: %s", downPath)
+	}
+
+	upContent := fmt.Sprintf("-- Migration: %s\n-- Version: %s\n\n-- Write your UP SQL here\n", name, version)
+	downContent := fmt.Sprintf("-- Rollback: %s\n-- Version: %s\n\n-- Write your DOWN SQL here\n", name, version)
+
+	if err := os.WriteFile(upPath, []byte(upContent), 0o644); err != nil {
+		fatalf("write up migration: %v", err)
+	}
+	if err := os.WriteFile(downPath, []byte(downContent), 0o644); err != nil {
+		_ = os.Remove(upPath)
+		fatalf("write down migration: %v", err)
+	}
+
+	fmt.Printf("created migration:\n- %s\n- %s\n", upPath, downPath)
+}
+
+func sanitizeMigrationName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	name = strings.ReplaceAll(name, "-", "_")
+	name = strings.ReplaceAll(name, " ", "_")
+
+	var b strings.Builder
+	lastUnderscore := false
+	for _, ch := range name {
+		isLetter := ch >= 'a' && ch <= 'z'
+		isDigit := ch >= '0' && ch <= '9'
+		if isLetter || isDigit {
+			b.WriteRune(ch)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteRune('_')
+			lastUnderscore = true
+		}
+	}
+
+	cleaned := strings.Trim(b.String(), "_")
+	for strings.Contains(cleaned, "__") {
+		cleaned = strings.ReplaceAll(cleaned, "__", "_")
+	}
+	return cleaned
 }
 
 func createAPI(args []string) {

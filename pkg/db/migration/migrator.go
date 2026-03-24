@@ -50,7 +50,7 @@ func (m *Migrator) Add(version int, name, upSQL, downSQL string) {
 func (m *Migrator) Init(ctx context.Context) error {
 	sql := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
-			version INT PRIMARY KEY,
+			version BIGINT PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)

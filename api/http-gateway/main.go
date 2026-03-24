@@ -14,6 +14,7 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/httpapi"
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/mw"
+	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/routes"
 	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
@@ -103,9 +104,10 @@ func main() {
 	}
 
 	const gatewayServiceName = "api-gateway.http-gateway"
+	routeServices := routes.NewServices()
 
 	// 创建业务处理器 - 框架已内置请求日志中间件
-	bizHandler := httpapi.NewRouter(mergedGwCfg).Handler()
+	bizHandler := httpapi.NewRouter(mergedGwCfg, routeServices).Handler()
 	
 	if err := boot.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{
 		Name:   gatewayServiceName,

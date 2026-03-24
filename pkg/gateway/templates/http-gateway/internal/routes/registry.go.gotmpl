@@ -1,13 +1,24 @@
 package routes
 
 import (
+	"__MODULE__/__API_PATH__/internal/service"
 	"github.com/alldev-run/golang-gin-rpc/pkg/router"
 )
 
+type Services struct {
+	HelloService *service.HelloService
+}
+
+func NewServices() *Services {
+	return &Services{
+		HelloService: service.NewHelloService(),
+	}
+}
+
 // RegisterAll 注册所有路由（工厂方法入口）
-func RegisterAll(registry *router.RouteRegistry) {
+func RegisterAll(registry *router.RouteRegistry, services *Services) {
 	// 注册各个模块路由
-	RegisterUserRoutes(registry)
+	RegisterUserRoutes(registry, services)
 	
 	// 可以继续添加其他模块
 	// RegisterOrderRoutes(registry)
@@ -15,8 +26,8 @@ func RegisterAll(registry *router.RouteRegistry) {
 }
 
 // NewRegistryWithRoutes 创建带所有路由的注册器（工厂方法）
-func NewRegistryWithRoutes() *router.RouteRegistry {
+func NewRegistryWithRoutes(services *Services) *router.RouteRegistry {
 	registry := router.NewRouteRegistry()
-	RegisterAll(registry)
+	RegisterAll(registry, services)
 	return registry
 }

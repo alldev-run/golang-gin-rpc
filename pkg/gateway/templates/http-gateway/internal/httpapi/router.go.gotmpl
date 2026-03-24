@@ -14,7 +14,7 @@ type Router struct {
 	handler http.Handler
 }
 
-func NewRouter(cfg *gateway.Config) *Router {
+func NewRouter(cfg *gateway.Config, services *routes.Services) *Router {
 	// 使用 pkg 下的路由工厂创建构建器
 	builder := router.CreateRouter(cfg)
 	
@@ -22,7 +22,7 @@ func NewRouter(cfg *gateway.Config) *Router {
 	builder.RegisterDebugRoutes()
 	
 	// 注册业务路由
-	builder.RegisterBusinessRoutes(&RouteRegistrarAdapter{})
+	builder.RegisterBusinessRoutes(&RouteRegistrarAdapter{services: services})
 	
 	// 构建最终处理器
 	handler := builder.Build()
@@ -34,11 +34,13 @@ func NewRouter(cfg *gateway.Config) *Router {
 }
 
 // RouteRegistrarAdapter 适配器，将 routes.RegisterAll 适配为 RouteRegistrar 接口
-type RouteRegistrarAdapter struct{}
+type RouteRegistrarAdapter struct {
+	services *routes.Services
+}
 
 // RegisterAll 实现 RouteRegistrar 接口
 func (a *RouteRegistrarAdapter) RegisterAll(registry *router.RouteRegistry) {
-	routes.RegisterAll(registry)
+	routes.RegisterAll(registry, a.services)
 }
 
 func (r *Router) Handler() http.Handler {
