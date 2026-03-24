@@ -12,10 +12,10 @@ mkdir myapp && cd myapp
 go mod init example.com/myapp
 
 # 2) 引入框架（确保模板在模块缓存可见）
-go get github.com/alldev-run/golang-gin-rpc@v0.0.2
+go get github.com/alldev-run/golang-gin-rpc@latest
 
 # 3) 安装脚手架命令
-go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
 
 # 4) 若 scaffold 未在 PATH，先临时加入
 export PATH="$(go env GOPATH)/bin:$PATH"
@@ -34,10 +34,10 @@ cd myapp
 go mod init example.com/myapp
 
 # 2) 引入框架（确保模板在模块缓存可见）
-go get github.com/alldev-run/golang-gin-rpc@v0.0.2
+go get github.com/alldev-run/golang-gin-rpc@latest
 
 # 3) 安装脚手架命令
-go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
 
 # 4) 若 scaffold 未在 PATH，先临时加入
 $env:Path = "$(go env GOPATH)\bin;$env:Path"
@@ -100,6 +100,45 @@ go run ./cmd/scaffold export-template --name <api-name> --template <template>
 go run .\cmd\scaffold export-template --name demo-api --template http-gateway
 ```
 
+## 生成与执行数据库迁移（纯 migration 能力）
+
+`scaffold` 提供独立的 migration 文件生成与执行能力，不依赖 `api-gateway` 目录结构。
+
+在仓库根目录执行：
+
+```bash
+# 1) 生成 up/down SQL 模板
+go run ./cmd/scaffold gen-migration --name create_users_table
+
+# 2) 执行 up 迁移
+go run ./cmd/scaffold run-migration \
+  --driver mysql \
+  --dsn "root:password@tcp(127.0.0.1:3306)/myblog?parseTime=true" \
+  --dir migrations \
+  --action up
+
+# 3) 查看状态
+go run ./cmd/scaffold run-migration \
+  --driver mysql \
+  --dsn "root:password@tcp(127.0.0.1:3306)/myblog?parseTime=true" \
+  --dir migrations \
+  --action status
+
+# 4) 回滚一步
+go run ./cmd/scaffold run-migration \
+  --driver mysql \
+  --dsn "root:password@tcp(127.0.0.1:3306)/myblog?parseTime=true" \
+  --dir migrations \
+  --action down \
+  --steps 1
+```
+
+说明：
+
+- `gen-migration` 只创建 SQL 文件模板。
+- 需要先在 `.up.sql/.down.sql` 写入真实 SQL，再用 `run-migration` 执行。
+- 默认 migration 目录是 `migrations/`，可通过 `--dir` 覆盖。
+
 ## 模板文件约定
 
 - 模板内的 Go 文件使用 `.gotmpl` 后缀，例如：
@@ -128,7 +167,7 @@ go run .\cmd\scaffold export-template --name demo-api --template http-gateway
 macOS / Linux：
 
 ```bash
-go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
 export PATH="$(go env GOPATH)/bin:$PATH"
 echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
@@ -137,6 +176,6 @@ source ~/.zshrc
 Windows PowerShell：
 
 ```powershell
-go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
 $env:Path = "$(go env GOPATH)\bin;$env:Path"
 ```
