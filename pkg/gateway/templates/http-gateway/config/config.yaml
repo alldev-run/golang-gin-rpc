@@ -306,3 +306,132 @@ protocols:
 logging:
   level: "info"
   format: "json"
+  
+  # HTTP 请求日志配置
+  http_logging:
+    # 启用 HTTP 请求日志
+    enabled: true
+    
+    # 记录请求体（调试时启用，生产环境建议关闭）
+    log_request_body: true
+    
+    # 记录响应体（调试时启用，生产环境建议关闭）
+    log_response_body: true
+    
+    # 最大请求/响应体大小（字节）
+    max_body_size: 524288  # 512KB
+    
+    # 记录请求头
+    log_headers: true
+    
+    # 敏感请求头列表（这些头会被跳过或脱敏）
+    sensitive_headers:
+      - "Authorization"
+      - "Cookie"
+      - "X-API-Key"
+      - "X-Auth-Token"
+      - "X-CSRF-Token"
+    
+    # 跳过日志记录的路径
+    skip_paths:
+      - "/health"
+      - "/ready"
+      - "/metrics"
+      - "/favicon.ico"
+    
+    # 慢请求阈值
+    slow_request_threshold: "2s"
+    
+    # 启用请求 ID 生成
+    enable_request_id: true
+    
+    # 自定义请求 ID 头名称（可选，默认 X-Request-ID）
+    # request_id_header: "X-Trace-ID"
+    
+    # 日志级别阈值配置
+    log_level_thresholds:
+      # 状态码 >= 500 记录为 ERROR
+      error_threshold: 500
+      # 状态码 >= 400 记录为 WARN  
+      warn_threshold: 400
+      # 状态码 >= 200 记录为 INFO
+      info_threshold: 200
+  
+  # 服务日志器配置
+  service_logging:
+    enabled: true
+    base_dir: "./logs/__API_NAME__"
+    enable_date_folders: true
+    separate_by_level: true  # API 网关需要按级别分离日志便于调试
+    inherit_global_config: true
+    
+    # 覆盖配置
+    override_config:
+      level: "debug"  # 网关需要详细日志
+      format: "json"
+      max_size: 200  # 网关日志量较大
+      max_backups: 15
+      max_age: 45
+      compress: true
+      enable_caller: true
+      enable_stacktrace: true
+      time_format: "2006-01-02T15:04:05.000Z07:00"
+      
+      # 生产环境采样配置
+      sampling:
+        enabled: false  # 开发环境不启用采样
+        rate: 0.05     # 生产环境可设为 5%
+        tick: "1s"
+        initial: 10
+        thereafter: 100
+    
+    # 按组件分类的日志配置
+    components:
+      router:
+        base_dir: "./logs/__API_NAME__/router"
+        separate_by_level: true
+        override_config:
+          level: "debug"
+          max_size: 150
+          max_backups: 10
+      
+      middleware:
+        base_dir: "./logs/__API_NAME__/middleware"
+        separate_by_level: true
+        override_config:
+          level: "info"
+          max_size: 100
+          max_backups: 8
+      
+      discovery:
+        base_dir: "./logs/__API_NAME__/discovery"
+        separate_by_level: false
+        override_config:
+          level: "info"
+          max_size: 50
+          max_backups: 5
+      
+      load_balancer:
+        base_dir: "./logs/__API_NAME__/load-balancer"
+        separate_by_level: false
+        override_config:
+          level: "info"
+          max_size: 50
+          max_backups: 5
+      
+      security:
+        base_dir: "./logs/__API_NAME__/security"
+        separate_by_level: true  # 安全日志需要级别分离
+        override_config:
+          level: "info"
+          max_size: 100
+          max_backups: 30  # 安全日志保留更久
+          max_age: 90
+    
+    # 日志清理配置
+    cleanup:
+      enabled: true
+      schedule: "0 2 * * *"  # 每天凌晨2点清理
+      max_age_days: 30
+      exclude_components: ["security"]  # 安全日志保留更久
+      compress_old: true
