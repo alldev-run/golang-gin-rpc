@@ -518,6 +518,9 @@ func copyTreeWithReplace(srcDir, dstDir string, opt copyOptions, replace func(re
 			if strings.HasSuffix(base, ".go") {
 				return nil
 			}
+			if strings.HasSuffix(base, "_example.go.gotmpl") {
+				return nil
+			}
 		}
 
 		dstRel := rel

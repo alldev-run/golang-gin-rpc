@@ -11,6 +11,18 @@ read_timeout: "30s"
 write_timeout: "30s"
 idle_timeout: "60s"
 
+framework:
+  init_databases: false
+  init_cache: false
+  init_discovery: false
+  init_tracing: false
+  init_auth: false
+  init_metrics: true
+  init_health: true
+  init_errors: true
+  validate_dependency_coverage: true
+  services: ["api-gateway"]
+
 # =============================================================================
 # CORS 跨域配置
 # =============================================================================
