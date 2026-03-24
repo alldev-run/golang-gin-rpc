@@ -5,8 +5,23 @@ import (
 	"testing"
 	"time"
 
-	"alldev-gin-rpc/pkg/discovery"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery"
 )
+
+func testManagerConfigWithEphemeralPorts() ManagerConfig {
+	config := DefaultManagerConfig()
+	if grpcConfig, ok := config.Servers["grpc"]; ok {
+		grpcConfig.Host = "127.0.0.1"
+		grpcConfig.Port = 0
+		config.Servers["grpc"] = grpcConfig
+	}
+	if jsonrpcConfig, ok := config.Servers["jsonrpc"]; ok {
+		jsonrpcConfig.Host = "127.0.0.1"
+		jsonrpcConfig.Port = 0
+		config.Servers["jsonrpc"] = jsonrpcConfig
+	}
+	return config
+}
 
 func TestDefaultManagerConfig(t *testing.T) {
 	config := DefaultManagerConfig()
@@ -114,7 +129,7 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestManager_StartStop(t *testing.T) {
-	config := DefaultManagerConfig()
+	config := testManagerConfigWithEphemeralPorts()
 	manager := NewManager(config)
 
 	// Test starting all servers
@@ -172,7 +187,7 @@ func TestManager_RegisterService(t *testing.T) {
 }
 
 func TestManager_GetStatus(t *testing.T) {
-	config := DefaultManagerConfig()
+	config := testManagerConfigWithEphemeralPorts()
 	manager := NewManager(config)
 
 	// Get status before starting

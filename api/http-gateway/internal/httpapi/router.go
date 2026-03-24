@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"alldev-gin-rpc/api/http-gateway/internal/routes"
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/routes"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/router"
 )
 
 type Router struct {

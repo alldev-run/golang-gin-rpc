@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"alldev-gin-rpc/pkg/db/mysql"
-	"alldev-gin-rpc/pkg/db/orm"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
 )
 
 type UserEntity struct {

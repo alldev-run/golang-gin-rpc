@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"alldev-gin-rpc/pkg/ratelimit"
+	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimit"
 )
 
 // RateLimiter creates a rate limiting middleware

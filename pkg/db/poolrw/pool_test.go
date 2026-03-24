@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"alldev-gin-rpc/pkg/db"
-	"alldev-gin-rpc/pkg/db/rwproxy"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/rwproxy"
 )
 
 func TestDefaultRWPoolConfig(t *testing.T) {

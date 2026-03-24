@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"alldev-gin-rpc/pkg/health"
+	"github.com/alldev-run/golang-gin-rpc/pkg/health"
 )
 
 func TestUpstreamHealthChecker(t *testing.T) {

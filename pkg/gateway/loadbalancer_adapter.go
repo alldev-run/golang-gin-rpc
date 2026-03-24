@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"alldev-gin-rpc/pkg/loadbalancer"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/loadbalancer"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.uber.org/zap"
 )
 

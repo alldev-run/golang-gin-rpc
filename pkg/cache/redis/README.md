@@ -13,7 +13,7 @@
 ## 安装
 
 ```go
-import "alldev-gin-rpc/pkg/cache/redis"
+import "github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
 ```
 
 ## 快速开始

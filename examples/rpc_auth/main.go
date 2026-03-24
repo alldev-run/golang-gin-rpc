@@ -2,10 +2,10 @@
 package main
 
 import (
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/rpc"
-	"alldev-gin-rpc/pkg/rpc/examples"
-	"alldev-gin-rpc/pkg/rpc/jsonrpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/examples"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/jsonrpc"
 	"context"
 	"log"
 

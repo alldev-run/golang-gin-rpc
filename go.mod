@@ -1,4 +1,4 @@
-module alldev-gin-rpc
+module github.com/alldev-run/golang-gin-rpc
 
 go 1.25.7
 

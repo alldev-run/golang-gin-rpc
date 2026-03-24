@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"alldev-gin-rpc/internal/app"
-	"alldev-gin-rpc/internal/bootstrap"
-	"alldev-gin-rpc/internal/router"
+	"github.com/alldev-run/golang-gin-rpc/internal/app"
+	"github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/internal/router"
 )
 
 func main() {

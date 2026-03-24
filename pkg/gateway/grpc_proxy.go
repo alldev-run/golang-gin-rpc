@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/rpc/grpc"
-	"alldev-gin-rpc/pkg/rpc/jsonrpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/grpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/jsonrpc"
 )
 
 // GRPCProxy handles gRPC proxy requests using pkg/rpc

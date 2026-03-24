@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // RequestLoggerConfig holds configuration for request logging middleware

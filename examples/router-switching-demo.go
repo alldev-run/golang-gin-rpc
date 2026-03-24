@@ -1,12 +1,14 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
 	"fmt"
 	"net/http"
 
-	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/router"
 )
 
 // CustomRouterBuilder 自定义路由构建器示例
@@ -65,9 +67,9 @@ func main() {
 		Port:        8080,
 	}
 
-	// 使用默认路由
-	defaultRouter := httpapi.NewRouter(cfg)
-	fmt.Printf("Default router type: %T\n", defaultRouter.Handler())
+	// 使用默认路由工厂创建路由构建器
+	defaultBuilder := router.NewRouterFactory().CreateRouterBuilder(cfg)
+	fmt.Printf("Default router type: %T\n", defaultBuilder.Build())
 
 	// 示例2：更换为自定义路由实现
 	fmt.Println("\n=== Switching to Custom Router ===")
@@ -76,14 +78,14 @@ func main() {
 	router.SetRouterFactory(&CustomRouterFactory{})
 	
 	// 现在创建的路由将使用自定义实现
-	customRouter := httpapi.NewRouter(cfg)
-	fmt.Printf("Custom router type: %T\n", customRouter.Handler())
+	customBuilder := router.GetRouterFactory().CreateRouterBuilder(cfg)
+	fmt.Printf("Custom router type: %T\n", customBuilder.Build())
 
 	// 示例3：恢复默认路由
 	fmt.Println("\n=== Restoring Default Router ===")
 	router.SetRouterFactory(router.NewRouterFactory())
-	restoredRouter := httpapi.NewRouter(cfg)
-	fmt.Printf("Restored router type: %T\n", restoredRouter.Handler())
+	restoredBuilder := router.GetRouterFactory().CreateRouterBuilder(cfg)
+	fmt.Printf("Restored router type: %T\n", restoredBuilder.Build())
 
 	fmt.Println("\n=== Router Switching Demo Complete ===")
 	fmt.Println("This demonstrates how easy it is to switch router implementations")

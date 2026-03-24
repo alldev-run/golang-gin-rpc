@@ -1,10 +1,13 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
 	"fmt"
 	"log"
 
-	"alldev-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 )
 
 func main() {

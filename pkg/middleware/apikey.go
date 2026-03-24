@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"alldev-gin-rpc/pkg/response"
+	"github.com/alldev-run/golang-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

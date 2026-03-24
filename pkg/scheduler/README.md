@@ -14,7 +14,7 @@
 ## 安装
 
 ```go
-import "alldev-gin-rpc/pkg/scheduler"
+import "github.com/alldev-run/golang-gin-rpc/pkg/scheduler"
 ```
 
 ## 快速开始
@@ -153,7 +153,7 @@ import (
     "fmt"
     "time"
     
-    "alldev-gin-rpc/pkg/scheduler"
+    "github.com/alldev-run/golang-gin-rpc/pkg/scheduler"
 )
 
 func main() {

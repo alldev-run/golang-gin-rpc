@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/websocket"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/websocket"
 )
 
 const (

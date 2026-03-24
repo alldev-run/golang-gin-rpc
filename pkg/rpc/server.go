@@ -11,14 +11,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"alldev-gin-rpc/pkg/ratelimiter"
+	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimiter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
-	"alldev-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
 // ServerType represents the type of RPC server

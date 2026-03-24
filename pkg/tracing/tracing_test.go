@@ -149,7 +149,7 @@ func TestGRPCInterceptor(t *testing.T) {
 func TestConfiguration(t *testing.T) {
 	// Test default config
 	config := DefaultConfig()
-	assert.Equal(t, "alldev-gin-rpc", config.ServiceName)
+	assert.Equal(t, "github.com/alldev-run/golang-gin-rpc", config.ServiceName)
 	assert.Equal(t, "1.0.0", config.ServiceVersion)
 	assert.Equal(t, "development", config.Environment)
 	assert.False(t, config.Enabled)

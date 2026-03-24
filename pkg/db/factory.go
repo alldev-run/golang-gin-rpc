@@ -8,13 +8,13 @@ import (
 	"errors"
 	"fmt"
 
-	"alldev-gin-rpc/pkg/db/clickhouse"
-	"alldev-gin-rpc/pkg/search/elasticsearch"
-	"alldev-gin-rpc/pkg/cache/memcache"
-	"alldev-gin-rpc/pkg/db/mongodb"
-	"alldev-gin-rpc/pkg/db/mysql"
-	"alldev-gin-rpc/pkg/db/postgres"
-	"alldev-gin-rpc/pkg/cache/redis"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/clickhouse"
+	"github.com/alldev-run/golang-gin-rpc/pkg/search/elasticsearch"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/memcache"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/mongodb"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
 )
 
 // Type represents the database type.

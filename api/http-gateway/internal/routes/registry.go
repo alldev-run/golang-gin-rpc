@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"alldev-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/pkg/router"
 )
 
 // RegisterAll 注册所有路由（工厂方法入口）

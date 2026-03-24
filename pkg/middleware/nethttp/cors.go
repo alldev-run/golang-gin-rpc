@@ -3,8 +3,8 @@ package nethttp
 import (
 	"net/http"
 
-	"alldev-gin-rpc/pkg/cors"
-	"alldev-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cors"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 )
 
 func CORSFromGatewayConfig(cfg *gateway.Config) Middleware {

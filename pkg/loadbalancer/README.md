@@ -24,7 +24,7 @@ import (
     "fmt"
     "log"
     
-    "alldev-gin-rpc/pkg/loadbalancer"
+    "github.com/alldev-run/golang-gin-rpc/pkg/loadbalancer"
 )
 
 func main() {

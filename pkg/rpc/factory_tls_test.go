@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"alldev-gin-rpc/pkg/discovery"
-	"alldev-gin-rpc/pkg/metrics"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery"
+	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

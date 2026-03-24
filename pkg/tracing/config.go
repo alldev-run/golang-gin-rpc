@@ -51,7 +51,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Type:               "zipkin",
-		ServiceName:        "alldev-gin-rpc",
+		ServiceName:        "github.com/alldev-run/golang-gin-rpc",
 		ServiceVersion:     "1.0.0",
 		Environment:        "development",
 		Enabled:            false,

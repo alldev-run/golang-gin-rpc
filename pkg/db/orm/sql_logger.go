@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // LogLevel represents the logging level.

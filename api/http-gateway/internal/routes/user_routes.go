@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"alldev-gin-rpc/api/http-gateway/internal/model"
-	"alldev-gin-rpc/pkg/middleware"
-	"alldev-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/model"
+	"github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+	"github.com/alldev-run/golang-gin-rpc/pkg/router"
 
 	"github.com/gin-gonic/gin"
 )

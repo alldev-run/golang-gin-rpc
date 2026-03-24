@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // State represents the circuit breaker state.

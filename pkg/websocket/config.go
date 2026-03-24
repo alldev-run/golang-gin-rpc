@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"alldev-gin-rpc/pkg/messaging"
+	"github.com/alldev-run/golang-gin-rpc/pkg/messaging"
 )
 
 type NodeConfig struct {

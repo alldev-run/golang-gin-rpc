@@ -44,7 +44,7 @@ discovery:
   timeout: 30s
   health_check_interval: 30s
   auto_register: true
-  service_name: "alldev-gin-rpc"
+  service_name: "github.com/alldev-run/golang-gin-rpc"
   service_address: "localhost"
   service_port: 8080
   service_tags:
@@ -65,7 +65,7 @@ package main
 
 import (
     "log"
-    "alldev-gin-rpc/internal/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
 )
 
 func main() {
@@ -98,7 +98,7 @@ package main
 import (
     "context"
     "log"
-    "alldev-gin-rpc/pkg/discovery"
+    "github.com/alldev-run/golang-gin-rpc/pkg/discovery"
 )
 
 func main() {
@@ -149,7 +149,7 @@ package main
 import (
     "context"
     "log"
-    "alldev-gin-rpc/pkg/discovery"
+    "github.com/alldev-run/golang-gin-rpc/pkg/discovery"
 )
 
 func main() {

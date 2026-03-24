@@ -2,8 +2,8 @@
 package failover
 
 import (
-	"alldev-gin-rpc/pkg/cache/memcache"
-	"alldev-gin-rpc/pkg/cache/redis"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/memcache"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
 	"context"
 	"encoding/json"
 	"fmt"

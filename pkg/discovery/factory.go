@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"alldev-gin-rpc/pkg/discovery/consul"
-	"alldev-gin-rpc/pkg/discovery/etcd"
-	"alldev-gin-rpc/pkg/discovery/zookeeper"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery/consul"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery/etcd"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery/zookeeper"
 )
 
 // NewDiscovery 根据配置返回具体的实现实例

@@ -3,7 +3,7 @@ package httplog
 import (
 	"time"
 
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.uber.org/zap"
 )
 

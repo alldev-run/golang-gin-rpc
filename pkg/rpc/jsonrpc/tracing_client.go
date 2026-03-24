@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"alldev-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
 // TracedClient wraps a JSON-RPC client with tracing capabilities
@@ -63,7 +63,7 @@ func (tc *TracedClient) CallWithID(ctx context.Context, method string, params in
 	// Set span attributes
 	span.SetAttributes(
 		attribute.Int64("jsonrpc.duration_ms", duration.Milliseconds()),
-		attribute.String("jsonrpc.client", "alldev-gin-rpc-jsonrpc"),
+		attribute.String("jsonrpc.client", "github.com/alldev-run/golang-gin-rpc-jsonrpc"),
 	)
 
 	// Set span status based on result

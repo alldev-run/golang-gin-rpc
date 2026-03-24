@@ -11,13 +11,13 @@ import (
 	
 	"gopkg.in/yaml.v3"
 
-	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
-	"alldev-gin-rpc/api/http-gateway/internal/mw"
-	"alldev-gin-rpc/internal/bootstrap"
-	"alldev-gin-rpc/pkg/config"
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/httpapi"
+	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/mw"
+	"github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/pkg/config"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
 func main() {

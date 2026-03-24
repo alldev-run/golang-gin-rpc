@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/ratelimit"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimit"
 )
 
 func RateLimitFromGatewayConfig(cfg *gateway.Config) Middleware {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"alldev-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 	"github.com/stretchr/testify/assert"
 )
 

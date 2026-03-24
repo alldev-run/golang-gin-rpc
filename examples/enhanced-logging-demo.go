@@ -1,13 +1,14 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
-	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 func main() {
@@ -21,29 +22,21 @@ func main() {
 	}
 	logger.Init(loggerCfg)
 
-	// 创建基础配置
-	cfg := &gateway.Config{
-		ServiceName: "test-gateway",
-		Host:        "localhost",
-		Port:        8080,
-		CORS: gateway.CORSConfig{
-			AllowedOrigins:   []string{"*"},
-			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowedHeaders:   []string{"*"},
-			ExposedHeaders:   []string{"X-Request-ID"},
-			AllowCredentials: false,
-			MaxAge:           86400,
-		},
-		RateLimit: gateway.RateLimitConfig{
-			Enabled:  true,
-			Requests: 100,
-			Window:   "1m",
-		},
-	}
-
-	// 创建路由器
-	router := httpapi.NewRouter(cfg)
-	handler := router.Handler()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": "ok"})
+	})
+	mux.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"message": "users",
+			"data": map[string]any{
+				"users": []map[string]any{{"id": "1", "name": "demo"}},
+			},
+		})
+	})
 
 	// 启动服务器
 	fmt.Println("Starting test server on :8080")
@@ -70,7 +63,7 @@ func main() {
 	fmt.Println(`{"level":"ERROR","ts":"2026-03-22T02:09:17+08:00","caller":"logger/logger.go:42","msg":"HTTP Request","method":"GET","path":"/api/error","client_ip":"::1","status":500,"latency":0,"request_id":"...","user_agent":"..."}`)
 	fmt.Println(`{"level":"WARN","ts":"2026-03-22T02:09:17+08:00","caller":"logger/logger.go:42","msg":"HTTP Slow Request","threshold":1000000000,"method":"GET","path":"/api/slow","client_ip":"::1","status":200,"latency":1500000000,"request_id":"...","user_agent":"..."}`)
 
-	if err := http.ListenAndServe(":8080", handler); err != nil {
+	if err := http.ListenAndServe(":8080", mux); err != nil {
 		panic(err)
 	}
 }

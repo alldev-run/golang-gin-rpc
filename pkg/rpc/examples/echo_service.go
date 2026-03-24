@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"alldev-gin-rpc/pkg/rpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
 )
 
 // EchoService represents an echo service

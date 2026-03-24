@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"alldev-gin-rpc/pkg/cors"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cors"
 )
 
 

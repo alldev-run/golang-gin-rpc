@@ -7,9 +7,9 @@ import (
 	"time"
 	"strings"
 
-	"alldev-gin-rpc/pkg/health"
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/pkg/health"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
 // Gateway represents the HTTP gateway

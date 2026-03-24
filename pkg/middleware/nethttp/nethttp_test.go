@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"alldev-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 )
 
 func TestRequestIDHeader(t *testing.T) {

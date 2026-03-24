@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	pkgtracing "alldev-gin-rpc/pkg/tracing"
+	pkgtracing "github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"

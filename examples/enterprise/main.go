@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"time"
 
-	"alldev-gin-rpc/pkg/cache"
-	"alldev-gin-rpc/pkg/db/pool"
-	"alldev-gin-rpc/pkg/errors"
-	"alldev-gin-rpc/pkg/health"
-	"alldev-gin-rpc/pkg/metrics"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/pool"
+	"github.com/alldev-run/golang-gin-rpc/pkg/errors"
+	"github.com/alldev-run/golang-gin-rpc/pkg/health"
+	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gin-gonic/gin"

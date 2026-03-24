@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"alldev-gin-rpc/pkg/requestid"
+	"github.com/alldev-run/golang-gin-rpc/pkg/requestid"
 )
 
 type requestIDCtxKey struct{}

@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"alldev-gin-rpc/pkg/discovery"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 
 	"go.uber.org/zap"
 )

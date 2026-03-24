@@ -37,7 +37,7 @@ logs/
 ### Basic Usage
 
 ```go
-import "alldev-gin-rpc/pkg/logger"
+import "github.com/alldev-run/golang-gin-rpc/pkg/logger"
 
 // Simple service logger with default configuration
 apiLogger := logger.GetServiceLogger("api-gateway")

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"alldev-gin-rpc/pkg/httplog"
+	"github.com/alldev-run/golang-gin-rpc/pkg/httplog"
 )
 
 type statusWriter struct {

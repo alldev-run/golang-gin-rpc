@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"alldev-gin-rpc/pkg/cache/failover"
-	"alldev-gin-rpc/pkg/cache/memcache"
-	"alldev-gin-rpc/pkg/cache/redis"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/failover"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/memcache"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // CacheEntry represents a cached query result.

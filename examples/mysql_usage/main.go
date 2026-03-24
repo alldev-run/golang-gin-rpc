@@ -7,11 +7,11 @@ import (
 	"log"
 	"time"
 
-	"alldev-gin-rpc/pkg/db"
-	"alldev-gin-rpc/pkg/db/mysql"
-	"alldev-gin-rpc/pkg/db/orm"
-	"alldev-gin-rpc/pkg/db/pool"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/pool"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // User 示例用户模型

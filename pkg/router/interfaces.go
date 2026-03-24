@@ -3,7 +3,7 @@ package router
 import (
 	"net/http"
 
-	"alldev-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 )
 
 // RouteRegistrar 路由注册器接口

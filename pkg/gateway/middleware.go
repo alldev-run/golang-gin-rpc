@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"alldev-gin-rpc/pkg/cors"
-	"alldev-gin-rpc/pkg/httplog"
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/ratelimit"
-	"alldev-gin-rpc/pkg/requestid"
+	"github.com/alldev-run/golang-gin-rpc/pkg/cors"
+	"github.com/alldev-run/golang-gin-rpc/pkg/httplog"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimit"
+	"github.com/alldev-run/golang-gin-rpc/pkg/requestid"
 )
 
 // GatewayAuth provides gateway authentication middleware

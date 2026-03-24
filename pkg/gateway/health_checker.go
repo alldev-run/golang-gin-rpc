@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"alldev-gin-rpc/pkg/health"
+	"github.com/alldev-run/golang-gin-rpc/pkg/health"
 )
 
 type upstreamHealthChecker struct {

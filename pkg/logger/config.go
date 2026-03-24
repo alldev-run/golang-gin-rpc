@@ -180,7 +180,7 @@ func ProductionConfig() Config {
 		LocalTime:          false,
 		Fields: map[string]interface{}{
 			"env": "production",
-			"service": "alldev-gin-rpc",
+			"service": "github.com/alldev-run/golang-gin-rpc",
 		},
 		Sampling: SamplingConfig{
 			Enabled:    true,
@@ -241,7 +241,7 @@ func DockerConfig() Config {
 		LocalTime:          false,
 		Fields: map[string]interface{}{
 			"env": "docker",
-			"service": "alldev-gin-rpc",
+			"service": "github.com/alldev-run/golang-gin-rpc",
 		},
 		Sampling: SamplingConfig{
 			Enabled:    false,

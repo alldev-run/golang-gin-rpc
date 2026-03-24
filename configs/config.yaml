@@ -79,7 +79,7 @@ logger:
   compress: true
   local_time: false
   fields:
-    service: "alldev-gin-rpc"
+    service: "github.com/alldev-run/golang-gin-rpc"
   sampling:
     enabled: false
     rate: 0.1
@@ -172,7 +172,7 @@ logger:
 # Tracing Configuration
 tracing:
   type: "zipkin"
-  service_name: "alldev-gin-rpc"
+  service_name: "github.com/alldev-run/golang-gin-rpc"
   service_version: "1.0.0"
   environment: "development"
   enabled: false
@@ -225,7 +225,7 @@ discovery:
   timeout: 30s
   health_check_interval: 30s
   auto_register: true
-  service_name: "alldev-gin-rpc"
+  service_name: "github.com/alldev-run/golang-gin-rpc"
   service_address: "localhost"
   service_port: 8080
   service_tags:

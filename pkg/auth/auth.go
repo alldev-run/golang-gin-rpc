@@ -2,7 +2,7 @@ package auth
 
 import (
 	"errors"
-	"alldev-gin-rpc/pkg/auth/jwtx"
+	"github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
 )
 
 var ErrInvalidAuthConfig = errors.New("invalid auth config")

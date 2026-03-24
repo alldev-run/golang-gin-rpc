@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"alldev-gin-rpc/pkg/circuitbreaker"
-	"alldev-gin-rpc/pkg/health"
+	"github.com/alldev-run/golang-gin-rpc/pkg/circuitbreaker"
+	"github.com/alldev-run/golang-gin-rpc/pkg/health"
 )
 
 // DegradationLevel represents the service degradation level

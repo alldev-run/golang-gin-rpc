@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // log helpers to avoid direct zap dependency

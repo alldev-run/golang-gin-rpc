@@ -48,8 +48,8 @@ The `pkg/db` package provides a comprehensive, production-ready database client 
 
 ```go
 import (
-    "alldev-gin-rpc/pkg/db"
-    "alldev-gin-rpc/pkg/db/poolcb"
+    "github.com/alldev-run/golang-gin-rpc/pkg/db"
+    "github.com/alldev-run/golang-gin-rpc/pkg/db/poolcb"
 )
 ```
 
@@ -114,7 +114,7 @@ defer client.Close()
 ### SQL Operations with Read-Write Split
 
 ```go
-import "alldev-gin-rpc/pkg/db/poolrw"
+import "github.com/alldev-run/golang-gin-rpc/pkg/db/poolrw"
 
 // Configure master and replicas
 cfg := poolrw.RWPoolConfig{
@@ -248,7 +248,7 @@ circuit_breaker_failures_total{name}
 - Safe identifier validation
 
 ```go
-import "alldev-gin-rpc/pkg/db/sqlprevention"
+import "github.com/alldev-run/golang-gin-rpc/pkg/db/sqlprevention"
 
 // Validate input
 validator := sqlprevention.New(sqlprevention.DefaultConfig())
@@ -320,7 +320,7 @@ for name, cfg := range cfgs {
 ## Database Migration
 
 ```go
-import "alldev-gin-rpc/pkg/db/migration"
+import "github.com/alldev-run/golang-gin-rpc/pkg/db/migration"
 
 // Create migrator
 m := migration.New(db)

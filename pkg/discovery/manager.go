@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // ManagerConfig holds service discovery manager configuration
@@ -34,7 +34,7 @@ func DefaultManagerConfig() ManagerConfig {
 		Timeout:             30 * time.Second,
 		HealthCheckInterval: 30 * time.Second,
 		AutoRegister:        true,
-		ServiceName:         "alldev-gin-rpc",
+		ServiceName:         "github.com/alldev-run/golang-gin-rpc",
 		ServiceAddress:      "localhost",
 		ServicePort:         8080,
 		ServiceTags:         []string{"go", "rpc", "api"},

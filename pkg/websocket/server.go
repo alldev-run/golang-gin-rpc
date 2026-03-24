@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	pkgtracing "alldev-gin-rpc/pkg/tracing"
+	pkgtracing "github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 	"go.opentelemetry.io/otel/attribute"
 	nws "nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"

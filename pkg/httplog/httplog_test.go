@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 func TestLogNoPanic(t *testing.T) {

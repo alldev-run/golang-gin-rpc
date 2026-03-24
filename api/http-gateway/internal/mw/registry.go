@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	"alldev-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 )
 
 type Middleware = gateway.Middleware

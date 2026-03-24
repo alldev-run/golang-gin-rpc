@@ -146,7 +146,7 @@ func TestAppError_WithStackTrace(t *testing.T) {
 	}
 	
 	// Check if stack trace contains expected patterns
-	if !contains(errWithStack.StackTrace, "alldev-gin-rpc") {
+	if !contains(errWithStack.StackTrace, "github.com/alldev-run/golang-gin-rpc") {
 		t.Error("StackTrace should contain package name")
 	}
 }

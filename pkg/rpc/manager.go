@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"alldev-gin-rpc/pkg/discovery"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery"
 	"go.uber.org/zap"
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/ratelimiter"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimiter"
 )
 
 // ManagerConfig holds RPC manager configuration

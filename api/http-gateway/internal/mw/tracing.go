@@ -3,7 +3,7 @@ package mw
 import (
 	"net/http"
 	
-	"alldev-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
 func init() {

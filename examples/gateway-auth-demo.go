@@ -1,12 +1,13 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
 	"fmt"
 	"log"
 
-	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
-	"alldev-gin-rpc/api/http-gateway/internal/mw"
-	"alldev-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 )
 
 func main() {
@@ -16,18 +17,8 @@ func main() {
 		log.Fatalf("failed to load gateway config: %v", err)
 	}
 
-	// 创建网关服务
-	gwSvc, err := gateway.NewHTTPServiceWithOptions(gwCfg, gateway.HTTPServiceOptions{
-		BizHandler:     httpapi.NewRouter(),
-		IsBusinessPath: httpapi.IsBusinessPath,
-		Middlewares:    mw.Middlewares(),
-	})
-	if err != nil {
-		log.Fatalf("failed to init gateway service: %v", err)
-	}
-
-	// 获取 Gateway 实例
-	gw := gwSvc.GetGateway()
+	// 直接创建 Gateway 实例（使用公开 API）
+	gw := gateway.NewGateway(gwCfg)
 
 	// 演示 API Key 管理
 	fmt.Println("=== Gateway API Key Management Demo ===")

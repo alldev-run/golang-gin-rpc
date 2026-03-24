@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"alldev-gin-rpc/pkg/metrics"
+	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
 )
 
 var (

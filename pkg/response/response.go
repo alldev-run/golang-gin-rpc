@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"alldev-gin-rpc/pkg/status_code"
+	"github.com/alldev-run/golang-gin-rpc/pkg/status_code"
 
 	"github.com/gin-gonic/gin"
 )

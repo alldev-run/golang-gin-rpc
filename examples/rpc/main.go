@@ -9,12 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/ratelimiter"
-	"alldev-gin-rpc/pkg/rpc"
-	"alldev-gin-rpc/pkg/rpc/examples"
-	"alldev-gin-rpc/pkg/rpc/grpc"
-	"alldev-gin-rpc/pkg/rpc/jsonrpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimiter"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/examples"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/grpc"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/jsonrpc"
 
 	"go.uber.org/zap"
 )

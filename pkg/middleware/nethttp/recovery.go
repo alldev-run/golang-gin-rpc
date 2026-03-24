@@ -3,8 +3,8 @@ package nethttp
 import (
 	"net/http"
 
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/panicx"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/panicx"
 )
 
 func Recovery() Middleware {

@@ -1,37 +1,25 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"alldev-gin-rpc/api/http-gateway/internal/httpapi"
-	"alldev-gin-rpc/pkg/gateway"
 )
 
 func main() {
-	// 创建基础配置
-	cfg := &gateway.Config{
-		ServiceName: "test-gateway",
-		Host:        "localhost",
-		Port:        8080,
-		CORS: gateway.CORSConfig{
-			AllowedOrigins:   []string{"*"},
-			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowedHeaders:   []string{"*"},
-			ExposedHeaders:   []string{"X-Request-ID"},
-			AllowCredentials: false,
-			MaxAge:           86400,
-		},
-		RateLimit: gateway.RateLimitConfig{
-			Enabled:  true,
-			Requests: 100,
-			Window:   "1m",
-		},
-	}
-
-	// 创建路由器
-	router := httpapi.NewRouter(cfg)
-	handler := router.Handler()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": "ok"})
+	})
+	mux.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{}})
+	})
 
 	// 启动服务器
 	fmt.Println("Starting test server on :8080")
@@ -56,7 +44,7 @@ func main() {
 	fmt.Println("Log format (unified with http middleware):")
 	fmt.Println(`{"level":"INFO","ts":"2026-03-22T02:09:17+08:00","caller":"logger/logger.go:42","msg":"HTTP Request","method":"GET","path":"/debug/ok","client_ip":"::1","status":200,"latency":0,"request_id":"agordfsr3azu3cttts2pydb46i","user_agent":"Mozilla/5.0..."}`)
 
-	if err := http.ListenAndServe(":8080", handler); err != nil {
+	if err := http.ListenAndServe(":8080", mux); err != nil {
 		panic(err)
 	}
 }

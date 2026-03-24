@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"alldev-gin-rpc/pkg/metrics"
+	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
 )
 
 func TestNewMetricsObserver(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
-	"alldev-gin-rpc/pkg/logger"
-	"alldev-gin-rpc/pkg/panicx"
-	"alldev-gin-rpc/pkg/response"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/panicx"
+	"github.com/alldev-run/golang-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"

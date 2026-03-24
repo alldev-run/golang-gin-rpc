@@ -1,6 +1,6 @@
 package service
 
-import "alldev-gin-rpc/api/http-gateway/internal/model"
+import "github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/model"
 
 type HelloService struct{}
 

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"alldev-gin-rpc/internal/bootstrap"
-	"alldev-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 func main() {

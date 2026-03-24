@@ -226,7 +226,7 @@ func KafkaConfig(hosts []string) Config {
 		MaxReconnectAttempts: 5,
 		Options: map[string]interface{}{
 			"brokers":           hosts,
-			"client_id":         "alldev-gin-rpc",
+			"client_id":         "github.com/alldev-run/golang-gin-rpc",
 			"compression_type":  "gzip",
 			"acks":              "all",
 			"retries":           3,
@@ -270,7 +270,7 @@ func NATSConfig(host string, port int) Config {
 		ReconnectDelay:      2 * time.Second,
 		MaxReconnectAttempts: 10,
 		Options: map[string]interface{}{
-			"client_name": "alldev-gin-rpc",
+			"client_name": "github.com/alldev-run/golang-gin-rpc",
 			"no_echo":    true,
 		},
 		Enabled: true,

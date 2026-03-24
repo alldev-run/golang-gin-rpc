@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"time"
 
-	"alldev-gin-rpc/pkg/gateway"
-	"alldev-gin-rpc/pkg/httplog"
-	"alldev-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/pkg/httplog"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

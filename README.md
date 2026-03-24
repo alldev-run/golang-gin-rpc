@@ -1,6 +1,6 @@
-# alldev-gin-rpc
+# github.com/alldev-run/golang-gin-rpc
  
- `alldev-gin-rpc` 是一个基于 Go 的服务端项目骨架，集成了 HTTP、gRPC / JSON-RPC、数据库、缓存、服务发现、日志、链路追踪、消息队列和网关能力，适合作为微服务或 RPC 服务的基础框架。
+ `github.com/alldev-run/golang-gin-rpc` 是一个基于 Go 的服务端项目骨架，集成了 HTTP、gRPC / JSON-RPC、数据库、缓存、服务发现、日志、链路追踪、消息队列和网关能力，适合作为微服务或 RPC 服务的基础框架。
  
  ## 功能概览
  
@@ -37,7 +37,7 @@
  ## 项目结构
  
  ```text
- alldev-gin-rpc/
+ github.com/alldev-run/golang-gin-rpc/
  ├── configs/                  # 配置文件
  ├── internal/
  │   ├── app/                  # 应用启动与 HTTP Server 封装
@@ -419,7 +419,7 @@ go test ./pkg/rpc/...
 make docker-build
 
 # 运行容器
-docker run -p 8080:8080 alldev-gin-rpc:latest
+docker run -p 8080:8080 github.com/alldev-run/golang-gin-rpc:latest
 ```
 
 ### 使用 Docker Compose
@@ -472,7 +472,7 @@ err = cache.Set(ctx, "key", "value", time.Hour)
 ### 日志使用
 
 ```go
-import "alldev-gin-rpc/pkg/logger"
+import "github.com/alldev-run/golang-gin-rpc/pkg/logger"
 
 logger.Info("Request processed", logger.String("path", "/api/users"))
 logger.Error("Database failed", logger.Error(err))
@@ -484,4 +484,4 @@ logger.Error("Database failed", logger.Error(err))
  
  ## 总结
  
- `alldev-gin-rpc` 现在已经不只是一个数据库示例项目，而是一个包含 HTTP、RPC、缓存、日志、tracing、服务发现和网关能力的 Go 服务端基础框架。
+ `github.com/alldev-run/golang-gin-rpc` 现在已经不只是一个数据库示例项目，而是一个包含 HTTP、RPC、缓存、日志、tracing、服务发现和网关能力的 Go 服务端基础框架。
