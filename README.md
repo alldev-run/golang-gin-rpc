@@ -240,6 +240,28 @@ make docker-build  # 构建 Docker 镜像
 - 从模板生成一个新的 API 项目目录：`api/<name>`
 - 将你修改后的 `api/<name>` 反向导出回模板（用于维护模板演进）
 
+#### 第三方项目一键生成 HTTP Gateway
+
+在你自己的项目中（非本仓库）也可以直接使用脚手架：
+
+```bash
+# 1) 安装脚手架命令
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
+
+# 2) 在你的项目根目录执行（需已有 go.mod）
+scaffold create-api --name my-gateway --template http-gateway
+
+# 3) 启动生成的网关
+go run ./api/my-gateway
+```
+
+如果你想强制使用本地模板目录：
+
+```bash
+export SCAFFOLD_TEMPLATE_DIR=/path/to/templates
+scaffold create-api --name my-gateway --template http-gateway
+```
+
 Makefile：
 
 ```bash

@@ -2,6 +2,33 @@
 
 本目录提供一个用于快速生成/维护 API 项目的脚手架命令：`cmd/scaffold`。
 
+## 在第三方项目中使用（推荐）
+
+你可以在自己的项目里直接安装并使用脚手架命令：
+
+```bash
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
+```
+
+然后在你的项目根目录（含 `go.mod`）执行：
+
+```bash
+scaffold create-api --name my-gateway --template http-gateway
+```
+
+模板解析优先级如下：
+
+1. `SCAFFOLD_TEMPLATE_DIR` 环境变量指定目录
+2. 当前项目内 `./pkg/gateway/templates/<template>`
+3. 已下载模块缓存中的 `github.com/alldev-run/golang-gin-rpc/pkg/gateway/templates/<template>`
+
+可选：强制使用本地模板目录
+
+```bash
+export SCAFFOLD_TEMPLATE_DIR=/path/to/templates
+scaffold create-api --name my-gateway --template http-gateway
+```
+
 ## 生成 API 项目
 
 模板目录位于：

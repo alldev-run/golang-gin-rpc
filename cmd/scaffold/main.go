@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -29,7 +30,7 @@ func main() {
 func createAPI(args []string) {
 	fsFlag := flag.NewFlagSet("create-api", flag.ExitOnError)
 	name := fsFlag.String("name", "", "new api name, e.g. user-gateway")
-	template := fsFlag.String("template", "http-gateway", "template under ./pkg/gateway/templates, e.g. http-gateway")
+	template := fsFlag.String("template", "http-gateway", "template name, e.g. http-gateway")
 	_ = fsFlag.Parse(args)
 
 	if strings.TrimSpace(*name) == "" {
@@ -49,16 +50,16 @@ func createAPI(args []string) {
 		fatalf("read module from go.mod: %v", err)
 	}
 
-	src := filepath.Join(root, "pkg", "gateway", "templates", *template)
+	src, err := resolveTemplateSource(root, *template)
+	if err != nil {
+		fatalf("resolve template failed: %v", err)
+	}
 	dst := filepath.Join(root, "api", *name)
 
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		fatalf("create api dir: %v", err)
 	}
 
-	if _, err := os.Stat(src); err != nil {
-		fatalf("template not found: %s", src)
-	}
 	if _, err := os.Stat(dst); err == nil {
 		fatalf("target already exists: %s", dst)
 	}
@@ -81,6 +82,54 @@ func createAPI(args []string) {
 	}
 
 	fmt.Printf("created: %s\n", dst)
+}
+
+func resolveTemplateSource(projectRoot, template string) (string, error) {
+	if strings.TrimSpace(template) == "" {
+		return "", fmt.Errorf("template is empty")
+	}
+
+	if strings.Contains(template, string(os.PathSeparator)) || strings.Contains(template, "/") || strings.Contains(template, "\\") {
+		return "", fmt.Errorf("invalid --template: %q", template)
+	}
+
+	if customDir := strings.TrimSpace(os.Getenv("SCAFFOLD_TEMPLATE_DIR")); customDir != "" {
+		customSrc := filepath.Join(customDir, template)
+		if stat, err := os.Stat(customSrc); err == nil && stat.IsDir() {
+			return customSrc, nil
+		}
+	}
+
+	localSrc := filepath.Join(projectRoot, "pkg", "gateway", "templates", template)
+	if stat, err := os.Stat(localSrc); err == nil && stat.IsDir() {
+		return localSrc, nil
+	}
+
+	frameworkRoot, err := queryFrameworkRoot(projectRoot)
+	if err == nil {
+		moduleSrc := filepath.Join(frameworkRoot, "pkg", "gateway", "templates", template)
+		if stat, statErr := os.Stat(moduleSrc); statErr == nil && stat.IsDir() {
+			return moduleSrc, nil
+		}
+	}
+
+	return "", fmt.Errorf("template %q not found (checked local repo, SCAFFOLD_TEMPLATE_DIR, and module cache)", template)
+}
+
+func queryFrameworkRoot(projectRoot string) (string, error) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/alldev-run/golang-gin-rpc")
+	cmd.Dir = projectRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	dir := strings.TrimSpace(string(out))
+	if dir == "" {
+		return "", fmt.Errorf("empty module dir")
+	}
+
+	return dir, nil
 }
 
 type copyOptions struct {
