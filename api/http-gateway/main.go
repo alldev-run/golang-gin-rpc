@@ -109,7 +109,7 @@ func main() {
 	// 创建业务处理器 - 框架已内置请求日志中间件
 	bizHandler := httpapi.NewRouter(mergedGwCfg, routeServices).Handler()
 	
-	if err := boot.RegisterAPIGatewayServiceFactory(bootstrap.APIGatewayServiceOptions{
+	if err := bootstrap.RegisterAPIGatewayServiceFactory(boot, bootstrap.APIGatewayServiceOptions{
 		Name:   gatewayServiceName,
 		Config: mergedGwCfg,
 		HTTPOptions: gateway.HTTPServiceOptions{

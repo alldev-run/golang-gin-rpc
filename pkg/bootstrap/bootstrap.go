@@ -46,6 +46,14 @@ func StartFramework(ctx context.Context, boot *Bootstrap, options FrameworkOptio
 	return boot.StartFramework(ctx, options)
 }
 
+// RegisterAPIGatewayServiceFactory registers API gateway service factory via package helper.
+func RegisterAPIGatewayServiceFactory(boot *Bootstrap, options APIGatewayServiceOptions) error {
+	if boot == nil {
+		return fmt.Errorf("bootstrap instance is nil")
+	}
+	return boot.RegisterAPIGatewayServiceFactory(options)
+}
+
 // LoadDatabaseConfig loads database configuration from a YAML file and updates the bootstrap instance
 func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 	if boot == nil {
