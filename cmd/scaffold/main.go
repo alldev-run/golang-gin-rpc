@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -105,10 +106,10 @@ func resolveTemplateSource(projectRoot, template string) (string, error) {
 		return localSrc, nil
 	}
 
-	frameworkRoot, err := queryFrameworkRoot(projectRoot)
-	if err == nil {
+	frameworkRoots := queryFrameworkRoots(projectRoot)
+	for _, frameworkRoot := range frameworkRoots {
 		moduleSrc := filepath.Join(frameworkRoot, "pkg", "gateway", "templates", template)
-		if stat, statErr := os.Stat(moduleSrc); statErr == nil && stat.IsDir() {
+		if stat, err := os.Stat(moduleSrc); err == nil && stat.IsDir() {
 			return moduleSrc, nil
 		}
 	}
@@ -116,20 +117,86 @@ func resolveTemplateSource(projectRoot, template string) (string, error) {
 	return "", fmt.Errorf("template %q not found (checked local repo, SCAFFOLD_TEMPLATE_DIR, and module cache)", template)
 }
 
-func queryFrameworkRoot(projectRoot string) (string, error) {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/alldev-run/golang-gin-rpc")
+func queryFrameworkRoots(projectRoot string) []string {
+	seen := make(map[string]struct{})
+	var roots []string
+
+	if dir, ok := queryModuleDir(projectRoot, "github.com/alldev-run/golang-gin-rpc"); ok {
+		seen[dir] = struct{}{}
+		roots = append(roots, dir)
+	}
+
+	if dir, ok := queryModuleDir(projectRoot, "github.com/alldev-run/golang-gin-rpc@latest"); ok {
+		if _, exists := seen[dir]; !exists {
+			seen[dir] = struct{}{}
+			roots = append(roots, dir)
+		}
+	}
+
+	for _, dir := range queryFrameworkRootsFromModCache(projectRoot) {
+		if _, exists := seen[dir]; exists {
+			continue
+		}
+		seen[dir] = struct{}{}
+		roots = append(roots, dir)
+	}
+
+	return roots
+}
+
+func queryModuleDir(projectRoot, module string) (string, bool) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", module)
 	cmd.Dir = projectRoot
 	out, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return "", false
 	}
 
 	dir := strings.TrimSpace(string(out))
 	if dir == "" {
-		return "", fmt.Errorf("empty module dir")
+		return "", false
 	}
 
-	return dir, nil
+	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
+		return "", false
+	}
+
+	return dir, true
+}
+
+func queryFrameworkRootsFromModCache(projectRoot string) []string {
+	modCache := strings.TrimSpace(os.Getenv("GOMODCACHE"))
+	if modCache == "" {
+		cmd := exec.Command("go", "env", "GOMODCACHE")
+		cmd.Dir = projectRoot
+		if out, err := cmd.Output(); err == nil {
+			modCache = strings.TrimSpace(string(out))
+		}
+	}
+
+	if modCache == "" {
+		return nil
+	}
+
+	pattern := filepath.Join(modCache, "github.com", "alldev-run", "golang-gin-rpc@*")
+	matches, err := filepath.Glob(pattern)
+	if err != nil || len(matches) == 0 {
+		return nil
+	}
+
+	sort.Strings(matches)
+	for i, j := 0, len(matches)-1; i < j; i, j = i+1, j-1 {
+		matches[i], matches[j] = matches[j], matches[i]
+	}
+
+	var roots []string
+	for _, candidate := range matches {
+		if stat, err := os.Stat(candidate); err == nil && stat.IsDir() {
+			roots = append(roots, candidate)
+		}
+	}
+
+	return roots
 }
 
 type copyOptions struct {
