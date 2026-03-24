@@ -443,7 +443,12 @@ go test ./pkg/... -tags=integration
 
 ## License
 
-MIT License - See LICENSE file for details.
+Apache License 2.0 - See LICENSE file for details.
+
+## Author
+
+- John James
+- Email: `nbjohn999@gmail.com`
 
 ## Contributing
 

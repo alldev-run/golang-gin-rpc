@@ -477,6 +477,15 @@ import "github.com/alldev-run/golang-gin-rpc/pkg/logger"
 logger.Info("Request processed", logger.String("path", "/api/users"))
 logger.Error("Database failed", logger.Error(err))
 ```
+
+## License
+
+Apache License 2.0 - See `LICENSE` file for details.
+
+## Author
+
+- John James
+- Email: `nbjohn999@gmail.com`
  
  ## 相关文档
  
