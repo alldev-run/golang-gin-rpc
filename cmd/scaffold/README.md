@@ -7,13 +7,44 @@
 你可以在自己的项目里直接安装并使用脚手架命令：
 
 ```bash
-go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
+# 1) 初始化你的项目（已有 go.mod 可跳过）
+mkdir myapp && cd myapp
+go mod init example.com/myapp
+
+# 2) 引入框架（确保模板在模块缓存可见）
+go get github.com/alldev-run/golang-gin-rpc@v0.0.2
+
+# 3) 安装脚手架命令
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+
+# 4) 若 scaffold 未在 PATH，先临时加入
+export PATH="$(go env GOPATH)/bin:$PATH"
+
+# 5) 生成并启动
+scaffold create-api --name my-gateway --template http-gateway
+go run ./api/my-gateway
 ```
 
-然后在你的项目根目录（含 `go.mod`）执行：
+Windows PowerShell：
 
-```bash
+```powershell
+# 1) 初始化你的项目（已有 go.mod 可跳过）
+mkdir myapp
+cd myapp
+go mod init example.com/myapp
+
+# 2) 引入框架（确保模板在模块缓存可见）
+go get github.com/alldev-run/golang-gin-rpc@v0.0.2
+
+# 3) 安装脚手架命令
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+
+# 4) 若 scaffold 未在 PATH，先临时加入
+$env:Path = "$(go env GOPATH)\bin;$env:Path"
+
+# 5) 生成并启动
 scaffold create-api --name my-gateway --template http-gateway
+go run .\api\my-gateway
 ```
 
 模板解析优先级如下：
@@ -89,3 +120,23 @@ go run .\cmd\scaffold export-template --name demo-api --template http-gateway
 ### 2) api 目录为空是否可以生成？
 
 可以。`create-api` 会自动创建 `api/` 目录。
+
+### 3) `zsh: command not found: scaffold` 怎么办？
+
+说明脚手架尚未安装或 `GOPATH/bin` 不在 `PATH`。
+
+macOS / Linux：
+
+```bash
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+export PATH="$(go env GOPATH)/bin:$PATH"
+echo 'export PATH="$(go env GOPATH)/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Windows PowerShell：
+
+```powershell
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+$env:Path = "$(go env GOPATH)\bin;$env:Path"
+```

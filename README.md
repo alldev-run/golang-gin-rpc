@@ -245,14 +245,46 @@ make docker-build  # 构建 Docker 镜像
 在你自己的项目中（非本仓库）也可以直接使用脚手架：
 
 ```bash
-# 1) 安装脚手架命令
-go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@latest
+# 1) 初始化你的项目（已有 go.mod 可跳过）
+mkdir myapp && cd myapp
+go mod init example.com/myapp
 
-# 2) 在你的项目根目录执行（需已有 go.mod）
+# 2) 引入框架（确保模板在模块缓存可见）
+go get github.com/alldev-run/golang-gin-rpc@v0.0.2
+
+# 3) 安装脚手架命令
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+
+# 4) 若 scaffold 未在 PATH，先临时加入
+export PATH="$(go env GOPATH)/bin:$PATH"
+
+# 5) 在你的项目根目录执行
 scaffold create-api --name my-gateway --template http-gateway
 
-# 3) 启动生成的网关
+# 6) 启动生成的网关
 go run ./api/my-gateway
+```
+
+Windows PowerShell：
+
+```powershell
+# 1) 初始化你的项目（已有 go.mod 可跳过）
+mkdir myapp
+cd myapp
+go mod init example.com/myapp
+
+# 2) 引入框架（确保模板在模块缓存可见）
+go get github.com/alldev-run/golang-gin-rpc@v0.0.2
+
+# 3) 安装脚手架命令
+go install github.com/alldev-run/golang-gin-rpc/cmd/scaffold@v0.0.2
+
+# 4) 若 scaffold 未在 PATH，先临时加入
+$env:Path = "$(go env GOPATH)\bin;$env:Path"
+
+# 5) 生成网关并启动
+scaffold create-api --name my-gateway --template http-gateway
+go run .\api\my-gateway
 ```
 
 如果你想强制使用本地模板目录：
