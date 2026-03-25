@@ -14,15 +14,6 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
-// User 示例用户模型
-type User struct {
-	ID        int       `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`
-	Email     string    `json:"email" db:"email"`
-	Age       int       `json:"age" db:"age"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-}
 
 func main() {
 	// 初始化日志
@@ -261,7 +252,7 @@ func ormExample() {
 		log.Printf("获取插入ID失败: %v", err)
 		return
 	}
-	user.ID = int(userID)
+	user.ID = userID
 
 	fmt.Printf("   ✓ ORM 创建用户成功，ID: %d\n", user.ID)
 
@@ -375,7 +366,7 @@ func transactionExample() {
 		if err != nil {
 			return fmt.Errorf("创建用户1失败: %w", err)
 		}
-		user1.ID = int(userID1)
+		user1.ID = userID1
 
 		fmt.Printf("   ✓ 在事务中创建用户1，ID: %d\n", user1.ID)
 
@@ -394,7 +385,7 @@ func transactionExample() {
 		if err != nil {
 			return fmt.Errorf("创建用户2失败: %w", err)
 		}
-		user2.ID = int(userID2)
+		user2.ID = userID2
 
 		fmt.Printf("   ✓ 在事务中创建用户2，ID: %d\n", user2.ID)
 

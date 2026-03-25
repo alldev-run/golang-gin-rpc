@@ -7,15 +7,6 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
 )
 
-// User 示例用户模型
-type User struct {
-	ID        int       `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`
-	Email     string    `json:"email" db:"email"`
-	Age       int       `json:"age" db:"age"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-}
 
 func main() {
 	fmt.Println("=== ORM 演示示例 ===")

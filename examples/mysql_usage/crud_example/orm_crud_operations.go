@@ -5,22 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
 )
 
-// User 用户模型
-type User struct {
-	ID        int64     `db:"id" json:"id"`
-	Name      string    `db:"name" json:"name"`
-	Email     string    `db:"email" json:"email"`
-	Age       int       `db:"age" json:"age"`
-	Status    string    `db:"status" json:"status"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
-}
 
 func main() {
 	fmt.Println("=== ORM CRUD 操作示例 ===")
@@ -39,7 +27,7 @@ func main() {
 	ctx := context.Background()
 
 	// 初始化数据库表
-	if err := initDatabase(ormInstance, ctx); err != nil {
+	if err := initUserTable(ormInstance, ctx); err != nil {
 		log.Fatalf("初始化数据库失败: %v", err)
 	}
 
@@ -51,60 +39,7 @@ func main() {
 	fmt.Println("=== ORM CRUD 操作示例完成 ===")
 }
 
-// createMySQLConnection 创建 MySQL 连接
-func createMySQLConnection() (*mysql.Client, error) {
-	config := mysql.Config{
-		Host:            "localhost",
-		Port:            3306,
-		Database:        "myblog",
-		Username:        "root",
-		Password:        "q1w2e3r4",
-		Charset:         "utf8mb4",
-		MaxOpenConns:    25,
-		MaxIdleConns:    10,
-		ConnMaxLifetime: time.Hour,
-		ConnMaxIdleTime: 30 * time.Minute,
-	}
 
-	client, err := mysql.New(config)
-	if err != nil {
-		return nil, fmt.Errorf("创建 MySQL 客户端失败: %w", err)
-	}
-
-	// 测试连接
-	ctx := context.Background()
-	if err := client.DB().PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("数据库连接测试失败: %w", err)
-	}
-
-	fmt.Println("✓ 数据库连接成功")
-	return client, nil
-}
-
-// initDatabase 初始化数据库表
-func initDatabase(ormInstance *orm.ORM, ctx context.Context) error {
-	// 创建用户表
-	createTableSQL := `
-	CREATE TABLE IF NOT EXISTS users (
-		id BIGINT AUTO_INCREMENT PRIMARY KEY,
-		name VARCHAR(100) NOT NULL,
-		email VARCHAR(100) UNIQUE NOT NULL,
-		age INT DEFAULT 0,
-		status VARCHAR(20) DEFAULT 'active',
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-		INDEX idx_email (email),
-		INDEX idx_status (status)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-	`
-
-	if _, err := ormInstance.DB().Exec(ctx, createTableSQL); err != nil {
-		return fmt.Errorf("创建表失败: %w", err)
-	}
-
-	fmt.Println("✓ 数据库表初始化成功")
-	return nil
-}
 
 // runCRUDExamples 运行 CRUD 操作示例
 func runCRUDExamples(ormInstance *orm.ORM, ctx context.Context) error {
