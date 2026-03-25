@@ -246,13 +246,19 @@ func ormExample() {
 	}
 
 	// 插入用户
-	userID, err := ormInstance.Insert("users").
+	result, err := ormInstance.Insert("users").
 		Set("name", user.Name).
 		Set("email", user.Email).
 		Set("age", user.Age).
-		InsertGetID(ctx)
+		Exec(ctx)
 	if err != nil {
 		log.Printf("ORM 创建用户失败: %v", err)
+		return
+	}
+
+	userID, err := result.LastInsertId()
+	if err != nil {
+		log.Printf("获取插入ID失败: %v", err)
 		return
 	}
 	user.ID = int(userID)
@@ -261,11 +267,12 @@ func ormExample() {
 
 	// 查询用户
 	var foundUser User
-	err = ormInstance.Select("users").
+	row := ormInstance.Select("users").
 		Columns("id", "name", "email", "age", "created_at", "updated_at").
-		Where("id = ?", user.ID).
-		QueryRow(ctx).
-		Scan(&foundUser.ID, &foundUser.Name, &foundUser.Email, &foundUser.Age, &foundUser.CreatedAt, &foundUser.UpdatedAt)
+		Eq("id", user.ID).
+		QueryRow(ctx)
+
+	err = row.Scan(&foundUser.ID, &foundUser.Name, &foundUser.Email, &foundUser.Age, &foundUser.CreatedAt, &foundUser.UpdatedAt)
 	if err != nil {
 		log.Printf("ORM 查询用户失败: %v", err)
 		return

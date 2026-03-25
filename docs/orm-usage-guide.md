@@ -74,7 +74,7 @@ import (
 )
 
 func directDB() {
-    db, err := sql.Open("mysql", "user:password@tcp(localhost:3306)/dbname")
+    db, err := sql.Open("mysql", "root:q1w2e3r4@tcp(localhost:3306)/myblog")
     if err != nil {
         panic(err)
     }
@@ -89,6 +89,15 @@ func directDB() {
 
 ## 查询构建器详解
 
+**注意**: 以下示例中的 `o` 变量表示已创建的 ORM 实例：
+
+```go
+// 假设已经创建了 ORM 实例
+// o := orm.NewORMWithDB(db, orm.NewMySQLDialect())
+// 或者从 bootstrap 获取
+// o := orm.NewORMWithDB(mysqlClient.DB(), orm.NewMySQLDialect())
+```
+
 ### SELECT 查询
 
 #### 基础查询
@@ -98,185 +107,126 @@ func directDB() {
 query, args := o.Select("users").
     Columns("id", "name", "email").
     Eq("status", "active").
-    OrderByDesc("created_at").
-    Limit(10).
     Build()
 
-// 生成的 SQL: SELECT `id`, `name`, `email` FROM `users` WHERE `status` = ? ORDER BY `created_at` DESC LIMIT 10
-// 参数: [active]
-
 // 执行查询
+rows, err := o.DB().Query(ctx, query, args...)
+defer rows.Close()
+
+// 或者直接执行
 rows, err := o.Select("users").
     Columns("id", "name", "email").
     Eq("status", "active").
     Query(ctx)
-if err != nil {
-    return err
-}
-defer rows.Close()
-
-// 扫描到结构体
-var users []User
-if err := orm.StructScanAll(rows, &users); err != nil {
-    return err
-}
 ```
 
 #### WHERE 条件构建
 
 ```go
 // 简单条件
-sb := o.Select("users").
-    Columns("id", "name").
-    Eq("status", "active").           // WHERE status = ?
-    Ne("role", "deleted").            // AND role != ?
-    Gt("age", 18).                    // AND age > ?
-    Like("name", "john%").            // AND name LIKE ?
-    In("department", []string{"IT", "HR"}). // AND department IN (?, ?)
-    IsNull("deleted_at").             // AND deleted_at IS NULL
-    Between("created_at", "2024-01-01", "2024-12-31") // AND created_at BETWEEN ? AND ?
+o.Select("users").Eq("status", "active")
 
-// 分组条件 (AND/OR 括号)
-sb = o.Select("users").
-    Columns("id", "name").
-    Where("status = ?", "active").
-    AndGroup(func(g *orm.WhereBuilder) {
-        g.Where("role = ?", "admin").Or("level >= ?", 5)
-    }).
-    OrGroup(func(g *orm.WhereBuilder) {
-        g.Where("department = ?", "IT").And("experience > ?", 3)
-    })
+// 多条件
+o.Select("users").
+    Eq("status", "active").
+    Where("age > ?", 18).
+    Where("name LIKE ?", "%John%")
 
-// 生成的 SQL: 
-// SELECT `id`, `name` FROM `users` 
-// WHERE status = ? 
-// AND (role = ? OR level >= ?) 
-// OR (department = ? AND experience > ?)
+// 复杂条件
+o.Select("users").
+    Where("(age BETWEEN ? AND ?) OR (status = ?)", 18, 65, "vip").
+    Where("department IN ?", []string{"IT", "HR"})
+
+// OR 条件
+o.Select("users").
+    Where("age > ?", 30).
+    Or("department = ?", "IT").
+    Or("experience > ?", 5)
 ```
 
 #### JOIN 操作
 
 ```go
 // 基本 JOIN
-query, args := o.Select("users u").
-    Columns("u.id", "u.name", "p.title").
+rows, err := o.Select("users u").
     Join("profiles p", "u.id = p.user_id").
+    Columns("u.name", "p.bio").
+    Query(ctx)
+
+// LEFT JOIN
+rows, err := o.Select("users u").
     LeftJoin("orders o", "u.id = o.user_id").
-    Eq("u.status", "active").
-    Build()
+    Columns("u.name", "COUNT(o.id) as order_count").
+    GroupBy("u.id").
+    Query(ctx)
 
-// JOIN ON 构建器（更安全）
-query, args = o.Select("users u").
-    Columns("u.id", "u.name").
-    JoinOn("profiles p", func(on *orm.JoinOnBuilder) {
-        on.Eq("u.id", "p.user_id").
-           And("p.status = ?", "active").
-           And("p.created_at > ?", "2024-01-01")
-    }).
-    Build()
-
-// 子查询 JOIN
-subQuery := o.Select("orders").
-    Columns("user_id", "COUNT(*) as order_count").
-    Where("status = ?", "completed").
-    GroupBy("user_id")
-
-query, args = o.Select("users u").
-    Columns("u.id", "u.name", "o.order_count").
-    JoinSubquery(subQuery, "o", "o.user_id = u.id").
-    Build()
+// 多表 JOIN
+rows, err := o.Select("users u").
+    Join("profiles p", "u.id = p.user_id").
+    Join("departments d", "u.department_id = d.id").
+    Columns("u.name", "p.bio", "d.name as department").
+    Query(ctx)
 ```
 
 #### 高级查询功能
 
 ```go
 // CTE (Common Table Expression)
-cte := o.Select("orders").
-    Columns("user_id", "COUNT(*) as order_count").
-    Where("status = ?", "paid").
-    GroupBy("user_id").
-    Having("COUNT(*) > ?", 5)
-
-query, args := o.Select("active_users").
-    With("active_users", cte).
-    Columns("user_id", "order_count").
-    Where("order_count > ?", 10).
-    OrderByDesc("order_count").
-    Build()
-
-// 子查询在 FROM 中
-sub := o.Select("users").
-    Columns("id").
-    Where("status = ?", "active")
-
-query, args := o.Select("ignored").
-    FromSubquery(sub, "u").
-    Columns("u.id").
-    Where("u.id > ?", 100).
-    Build()
-
-// EXISTS 子查询
-orderSub := o.Select("orders").
-    Columns("1").
-    Where("user_id = ?", 10).
-    Where("status = ?", "pending")
-
-query, args := o.Select("users").
+cte := o.Select("users").
     Columns("id", "name").
-    WhereBuilder().ExistsSubquery(orderSub).
-    Build()
+    Eq("status", "active")
 
-// UNION / UNION ALL
-usersQuery := o.Select("users").Columns("id", "name").Where("status = ?", "active")
-adminsQuery := o.Select("admins").Columns("id", "name").Where("enabled = ?", true)
+rows, err := o.Select("active_users").
+    With("active_users", cte).
+    Columns("name", "COUNT(*) as order_count").
+    Join("orders", "active_users.id = orders.user_id").
+    GroupBy("active_users.id").
+    Query(ctx)
 
-query, args := usersQuery.UnionAll(adminsQuery).
-    AsDerived("t").
-    Columns("t.id", "t.name").
-    OrderByDesc("t.id").
-    Limit(20).
-    Build()
+// 子查询
+subQuery := o.Select("orders").
+    Columns("user_id").
+    Where("total > ?", 1000)
 
-// 递归 CTE (层次查询)
-seed := o.Select("categories").Columns("id", "parent_id", "name").Where("id = ?", 1)
-recursive := o.Select("categories c").
-    Columns("c.id", "c.parent_id", "c.name").
-    Join("tree t", "c.parent_id = t.id")
+subQuerySQL, subQueryArgs := subQuery.Build()
+rows, err := o.Select("users").
+    Columns("name").
+    Where("id IN ("+subQuerySQL+")", subQueryArgs...).
+    Query(ctx)
 
-query, args := o.Select("tree").
-    WithRecursive("tree", seed, recursive).
-    Columns("id", "parent_id", "name").
-    FromRaw("tree").
-    Build()
+// UNION
+query1 := o.Select("users").Columns("name", "email").Where("status = ?", "active")
+query2 := o.Select("users").Columns("name", "email").Where("status = ?", "vip")
+
+rows, err := query1.Union(query2).Query(ctx)
 ```
 
 #### 分页和排序
 
 ```go
 // 基础分页
-query, args := o.Select("users").
+rows, err := o.Select("users").
     Columns("id", "name", "email").
-    OrderBy("name ASC").           // ORDER BY name ASC
-    OrderByDesc("created_at").     // ORDER BY created_at DESC
-    Limit(20).                     // LIMIT 20
-    Offset(40).                    // OFFSET 40
-    Build()
+    OrderBy("created_at DESC").
+    Limit(20).
+    Offset(0).
+    Query(ctx)
 
-// 使用分页构建器（更便捷）
-paginator := orm.NewPaginator(1, 20) // page=1, pageSize=20
-query, args := o.Select("users").
+// 多字段排序
+rows, err := o.Select("users").
     Columns("id", "name", "email").
+    OrderBy("status ASC").
     OrderBy("name ASC").
-    ApplyPagination(paginator).
-    Build()
+    OrderBy("created_at DESC").
+    Query(ctx)
 
-// 获取总数和分页信息
-countQuery, countArgs := o.Select("users").
-    Columns("COUNT(*) as total").
-    Build()
-
-total, err := getCount(countQuery, countArgs) // 执行查询获取总数
-paginator.SetTotal(total)
+// 动态排序
+sortField := "name"
+sortOrder := "DESC"
+rows, err := o.Select("users").
+    Columns("id", "name", "email").
+    OrderBy(fmt.Sprintf("%s %s", sortField, sortOrder)).
+    Query(ctx)
 ```
 
 ### INSERT 操作
@@ -289,41 +239,28 @@ result, err := o.Insert("users").
     Set("name", "Alice").
     Set("email", "alice@example.com").
     Set("age", 25).
-    Set("status", "active").
     Exec(ctx)
 
-// 获取插入的 ID
-insertID, err := result.LastInsertId()
-if err != nil {
-    return err
-}
-
-// 使用 InsertGetID 辅助函数
-id, err := orm.InsertGetID(ctx, o.DB(), 
-    "INSERT INTO users (name, email) VALUES (?, ?)", 
-    "Alice", "alice@example.com")
+id, err := result.LastInsertId()
+affected, err := result.RowsAffected()
 ```
 
 #### 批量插入
 
 ```go
 // 批量插入
-columns := []string{"name", "email", "age", "status"}
+columns := []string{"name", "email", "age"}
 rows := [][]interface{}{
-    {"Alice", "alice@example.com", 25, "active"},
-    {"Bob", "bob@example.com", 30, "active"},
-    {"Charlie", "charlie@example.com", 28, "inactive"},
+    {"Bob", "bob@example.com", 30},
+    {"Charlie", "charlie@example.com", 28},
+    {"David", "david@example.com", 35},
 }
 
 result, err := o.Insert("users").
     Values(columns, rows...).
     Exec(ctx)
 
-// 检查插入的行数
 affected, err := result.RowsAffected()
-if err != nil {
-    return err
-}
 fmt.Printf("Inserted %d rows\n", affected)
 ```
 
@@ -332,32 +269,28 @@ fmt.Printf("Inserted %d rows\n", affected)
 ```go
 // INSERT IGNORE (忽略重复)
 result, err := o.Insert("users").
+    Set("name", "Alice").
+    Set("email", "alice@example.com").
+    Set("age", 25).
     Ignore().
-    Set("id", 1).
-    Set("name", "Alice").
     Exec(ctx)
 
-// REPLACE INTO (替换重复)
+// INSERT ... ON DUPLICATE KEY UPDATE (UPSERT)
 result, err := o.Insert("users").
+    Set("name", "Alice").
+    Set("email", "alice@example.com").
+    Set("age", 25).
+    OnDuplicateKeyUpdate("age").
+    Set("age", 26).
+    Set("updated_at", "NOW()").
+    Exec(ctx)
+
+// REPLACE INTO
+result, err := o.Insert("users").
+    Set("name", "Alice").
+    Set("email", "alice@example.com").
+    Set("age", 25).
     Replace().
-    Set("id", 1).
-    Set("name", "Alice Updated").
-    Exec(ctx)
-
-// ON DUPLICATE KEY UPDATE (Upsert)
-result, err := o.Insert("users").
-    Set("id", 1).
-    Set("name", "Alice").
-    Set("email", "alice@new.com").
-    OnDuplicateKeyUpdate("name", "email"). // 更新指定字段
-    Exec(ctx)
-
-// 或者使用 VALUES() 函数
-result, err = o.Insert("users").
-    Set("id", 1).
-    Set("name", "Alice").
-    Set("counter", 1).
-    OnDuplicateKeyUpdate("counter", "VALUES(counter) + 1").
     Exec(ctx)
 ```
 
@@ -366,34 +299,25 @@ result, err = o.Insert("users").
 ```go
 // 基础更新
 result, err := o.Update("users").
-    Set("name", "Alice Updated").
-    Set("email", "alice@new.com").
+    Set("status", "inactive").
+    Set("updated_at", time.Now()).
     Eq("id", 1).
     Exec(ctx)
 
 // 条件更新
-result, err = o.Update("users").
-    Set("status", "inactive").
-    Set("updated_at", time.Now()).
-    Where("last_login < ?", time.Now().AddDate(0, -6, 0)). // 6个月未登录
+result, err := o.Update("users").
+    Set("last_login", time.Now()).
+    Where("last_login < ?", time.Now().AddDate(0, 0, -30)).
     Exec(ctx)
 
-// 带排序和限制的更新（MySQL）
-result, err = o.Update("users").
-    Set("status", "expired").
-    OrderBy("created_at ASC").
-    Limit(100).
-    Where("status = ?", "pending").
+// 批量更新
+result, err := o.Update("users").
+    Set("status", "active").
+    Where("department IN ?", []string{"IT", "HR"}).
     Exec(ctx)
 
-// 使用 Update 辅助函数
-affected, err := orm.Update(ctx, o.DB(), 
-    "UPDATE users SET status = ? WHERE created_at < ?", 
-    "inactive", time.Now().AddDate(0, -1, 0))
-
-// 单字段更新
-affected, err = orm.SetFieldByID(ctx, o.DB(), 
-    "users", "id", 1, "status", "active")
+// 使用辅助函数
+affected, err := orm.Update(ctx, o.DB(), "UPDATE users SET status = ? WHERE id = ?", "active", 1)
 ```
 
 ### DELETE 操作
@@ -405,23 +329,18 @@ result, err := o.Delete("users").
     Exec(ctx)
 
 // 条件删除
-result, err = o.Delete("users").
+result, err := o.Delete("users").
     Where("status = ?", "inactive").
-    Where("created_at < ?", time.Now().AddDate(-1, 0, 0)). // 1年前创建
+    Where("last_login < ?", time.Now().AddDate(0, 0, -90)).
     Exec(ctx)
 
 // 限制删除数量
-result, err = o.Delete("users").
-    Where("status = ?", "spam").
-    OrderBy("created_at ASC").
-    Limit(1000).
+result, err := o.Delete("users").
+    Where("status = ?", "inactive").
+    Limit(100).
     Exec(ctx)
 
-// 检查删除的行数
 affected, err := result.RowsAffected()
-if err != nil {
-    return err
-}
 fmt.Printf("Deleted %d rows\n", affected)
 ```
 
@@ -432,8 +351,6 @@ fmt.Printf("Deleted %d rows\n", affected)
 ```go
 err := o.Transaction(ctx, func(txORM *orm.ORM) error {
     // 在事务中执行操作
-    
-    // 插入用户
     _, err := txORM.Insert("users").
         Set("name", "Alice").
         Set("email", "alice@example.com").
@@ -441,105 +358,28 @@ err := o.Transaction(ctx, func(txORM *orm.ORM) error {
     if err != nil {
         return err // 自动回滚
     }
-    
-    // 更新统计
-    _, err = txORM.Update("user_stats").
-        Set("total_users", orm.Raw("total_users + 1")).
+
+    _, err = txORM.Update("accounts").
+        Set("balance", "balance - 100").
+        Eq("user_id", 1).
         Exec(ctx)
     if err != nil {
         return err // 自动回滚
     }
-    
-    // 插入订单
-    _, err = txORM.Insert("orders").
-        Set("user_id", 1).
-        Set("amount", 100.00).
-        Set("status", "pending").
-        Exec(ctx)
-    if err != nil {
-        return err // 自动回滚
-    }
-    
+
     return nil // 自动提交
 })
 
 if err != nil {
-    fmt.Printf("Transaction failed: %v\n", err)
+    // 事务失败
+    log.Printf("Transaction failed: %v", err)
 } else {
-    fmt.Println("Transaction completed successfully")
+    // 事务成功
+    log.Println("Transaction completed successfully")
 }
 ```
 
-### 嵌套事务和保存点
-
-```go
-// 使用事务管理器进行更复杂的操作
-tm := orm.NewTransactionManager(o)
-
-err := tm.ExecuteInTransaction(ctx, func(tx *orm.Transaction) error {
-    // 主事务操作
-    _, err := tx.Insert("users").
-        Set("name", "Alice").
-        Exec(ctx)
-    if err != nil {
-        return err
-    }
-    
-    // 创建保存点
-    sp, err := tx.CreateSavepoint("before_orders")
-    if err != nil {
-        return err
-    }
-    
-    // 尝试插入订单（可能失败）
-    _, err = tx.Insert("orders").
-        Set("user_id", 1).
-        Set("amount", -100.00). // 无效金额
-        Exec(ctx)
-    if err != nil {
-        // 回滚到保存点，但不回滚整个事务
-        if rollbackErr := tx.RollbackToSavepoint(sp); rollbackErr != nil {
-            return rollbackErr
-        }
-        fmt.Println("Rolled back to savepoint, continuing transaction")
-    }
-    
-    // 继续其他操作
-    _, err = tx.Insert("user_profiles").
-        Set("user_id", 1).
-        Set("bio", "New user").
-        Exec(ctx)
-    if err != nil {
-        return err
-    }
-    
-    return nil
-})
-```
-
-### 事务隔离级别
-
-```go
-// 设置事务隔离级别
-err := o.Transaction(ctx, func(txORM *orm.ORM) error {
-    // 使用自定义事务选项
-    return nil
-}, &sql.TxOptions{
-    Isolation: sql.LevelSerializable,
-    ReadOnly:  false,
-})
-
-// 或者使用事务管理器
-tm := orm.NewTransactionManager(o)
-err = tm.ExecuteInTransactionWithOptions(ctx, func(tx *orm.Transaction) error {
-    return tx.Update("accounts").
-        Set("balance", orm.Raw("balance - ?")).
-        Eq("id", 1).
-        Exec(ctx)
-}, &sql.TxOptions{
-    Isolation: sql.LevelReadCommitted,
-})
-```
+**注意**: 更高级的事务管理功能（如嵌套事务、保存点、重试机制）需要使用企业级的 `TransactionManager`，不在基础 ORM 范围内。
 
 ## 结构体扫描
 
@@ -547,25 +387,13 @@ err = tm.ExecuteInTransactionWithOptions(ctx, func(tx *orm.Transaction) error {
 
 ```go
 type User struct {
-    ID        int64     `db:"id" json:"id"`
+    ID        int       `db:"id" json:"id"`
     Name      string    `db:"name" json:"name"`
     Email     string    `db:"email" json:"email"`
     Age       int       `db:"age" json:"age"`
     Status    string    `db:"status" json:"status"`
     CreatedAt time.Time `db:"created_at" json:"created_at"`
     UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
-    
-    // 不映射到数据库的字段
-    Password string `db:"-" json:"-"`
-    TempInfo string `json:"temp_info"`
-}
-
-// 嵌套结构体
-type UserProfile struct {
-    User
-    Bio        string    `db:"bio" json:"bio"`
-    Avatar     string    `db:"avatar" json:"avatar"`
-    LastLogin  time.Time `db:"last_login" json:"last_login"`
 }
 ```
 
@@ -573,17 +401,14 @@ type UserProfile struct {
 
 ```go
 // 扫描到结构体
-var user User
 row := o.Select("users").
-    Columns("id", "name", "email", "age", "status", "created_at").
+    Columns("id", "name", "email", "age", "status", "created_at", "updated_at").
     Eq("id", 1).
     QueryRow(ctx)
 
-err := orm.StructScan(row, &user)
+var user User
+err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Age, &user.Status, &user.CreatedAt, &user.UpdatedAt)
 if err != nil {
-    if err == sql.ErrNoRows {
-        return fmt.Errorf("user not found")
-    }
     return err
 }
 
@@ -594,25 +419,22 @@ fmt.Printf("User: %+v\n", user)
 
 ```go
 // 扫描到切片
-var users []User
 rows, err := o.Select("users").
-    Columns("id", "name", "email", "age", "status", "created_at").
+    Columns("id", "name", "email", "age", "status", "created_at", "updated_at").
     Eq("status", "active").
-    OrderBy("name ASC").
     Query(ctx)
 if err != nil {
     return err
 }
 defer rows.Close()
 
+var users []User
 err = orm.StructScanAll(rows, &users)
 if err != nil {
     return err
 }
 
-for _, user := range users {
-    fmt.Printf("User: %s (%s)\n", user.Name, user.Email)
-}
+fmt.Printf("Found %d users\n", len(users))
 ```
 
 ### 自定义扫描
@@ -621,7 +443,6 @@ for _, user := range users {
 // 扫描到 map
 rows, err := o.Select("users").
     Columns("id", "name", "email").
-    Limit(10).
     Query(ctx)
 if err != nil {
     return err
@@ -630,175 +451,122 @@ defer rows.Close()
 
 var results []map[string]interface{}
 for rows.Next() {
-    result := make(map[string]interface{})
-    if err := rows.MapScan(result); err != nil {
+    var id int
+    var name, email string
+    if err := rows.Scan(&id, &name, &email); err != nil {
         return err
     }
-    results = append(results, result)
+    
+    results = append(results, map[string]interface{}{
+        "id":    id,
+        "name":  name,
+        "email": email,
+    })
 }
 
-// 扫描到自定义字段
-type UserSummary struct {
-    ID       int64  `db:"id"`
-    FullName string `db:"full_name"`
-}
+// 扫描聚合结果
+row := o.Select("users").
+    Columns("COUNT(*) as total", "AVG(age) as avg_age").
+    QueryRow(ctx)
 
-var summaries []UserSummary
-rows, err := o.Select("users").
-    Columns("id", orm.Raw("CONCAT(name, ' (', email, ')') as full_name")).
-    Query(ctx)
-if err != nil {
-    return err
+var summary struct {
+    Total  int     `db:"total"`
+    AvgAge float64 `db:"avg_age"`
 }
-defer rows.Close()
-
-err = orm.StructScanAll(rows, &summaries)
+err = row.Scan(&summary.Total, &summary.AvgAge)
 ```
 
 ## 高级功能
 
-### 软删除
+### 软删除（企业级功能）
+
+软删除功能需要使用独立的 `SoftDelete` 结构体：
 
 ```go
-// 软删除构建器
-softDelete := orm.NewSoftDeleteBuilder("users", "deleted_at")
+import "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
 
-// 软删除（设置 deleted_at）
-result, err := softDelete.Delete(1).Exec(ctx) // WHERE id = 1
+// 创建软删除实例
+softDelete := orm.NewSoftDelete()
 
-// 条件软删除
-result, err = softDelete.
-    Where("status = ?", "inactive").
-    DeleteAll().
-    Exec(ctx)
+// 软删除记录
+result, err := softDelete.SoftDelete(ctx, o.DB(), "users", "id", 1, 2, 3)
+if err != nil {
+    return err
+}
 
-// 查询未删除记录（自动排除软删除）
-query, args := softDelete.
-    Select().
-    Columns("id", "name").
-    Eq("status", "active").
-    Build()
+// 恢复记录
+result, err := softDelete.Restore(ctx, o.DB(), "users", "id", 1, 2)
+if err != nil {
+    return err
+}
 
-// 查询包含软删除记录
-query, args = softDelete.
-    SelectWithDeleted().
-    Columns("id", "name", "deleted_at").
-    Build()
+// 查询未删除的记录
+rows, err := o.Select("users").
+    Where("deleted_at IS NULL").
+    Query(ctx)
 
-// 恢复软删除记录
-result, err = softDelete.
-    Restore(1).
-    Exec(ctx)
+// 查询已删除的记录
+rows, err := o.Select("users").
+    Where("deleted_at IS NOT NULL").
+    Query(ctx)
 
-// 物理删除
-result, err = softDelete.
-    ForceDelete(1).
-    Exec(ctx)
+// 清理软删除记录
+result, err = softDelete.CleanSoftDeleted(ctx, o.DB(), "users")
 ```
 
 ### 乐观锁
 
 ```go
 // 乐观锁更新
-result, err := o.Update("users").
-    Set("name", "Alice Updated").
-    Set("email", "alice@new.com").
+result, err := o.Update("products").
+    Set("price", 99.99).
+    Set("version", "version + 1").
     Eq("id", 1).
-    Eq("version", 5). // 指定当前版本
+    Where("version = ?", currentVersion).
     Exec(ctx)
 
 affected, err := result.RowsAffected()
-if err != nil {
-    return err
-}
-
 if affected == 0 {
-    return fmt.Errorf("update failed: record not found or version mismatch")
-}
-
-// 使用 Save 函数（自动处理乐观锁）
-data := map[string]interface{}{
-    "name":    "Alice Updated",
-    "email":   "alice@new.com",
-    "version": 6, // 新版本
-}
-
-affected, err = orm.Save(ctx, o.DB(), "users", "id", 1, data)
-if err != nil {
-    return err
-}
-
-if affected == 0 {
-    return fmt.Errorf("save failed: optimistic lock conflict")
+    return fmt.Errorf("optimistic lock conflict")
 }
 ```
 
-### 查询缓存
+### 查询缓存（企业级功能）
+
+查询缓存需要使用独立的缓存实现：
 
 ```go
-// 创建查询缓存
-cache := orm.NewQueryCache(redisClient, 5*time.Minute)
+import (
+    "fmt"
+    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+)
 
-// 缓存查询结果
-key := "users:active:page:1"
-var users []User
+// 创建缓存实例
+cache := orm.NewMemoryCache()
 
-err := cache.GetOrSet(ctx, key, &users, func() (interface{}, error) {
-    rows, err := o.Select("users").
-        Columns("id", "name", "email").
-        Eq("status", "active").
-        OrderBy("name ASC").
-        Limit(20).
-        Query(ctx)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+// 创建带缓存的数据库包装
+cachedDB := orm.NewCachedDB(o.DB(), cache)
 
-    var result []User
-    if err := orm.StructScanAll(rows, &result); err != nil {
-        return nil, err
-    }
-    return result, nil
-})
-
-if err != nil {
-    return err
-}
+// 使用缓存查询
+rows, err := cachedDB.Query(ctx, "SELECT * FROM users WHERE status = ?", "active")
 
 // 清除缓存
-err = cache.Delete(ctx, key)
-if err != nil {
-    return err
-}
-
-// 按模式清除缓存
-err = cache.DeleteByPattern(ctx, "users:*")
+cache.Clear()
 ```
 
-### SQL 日志
+### SQL 日志（基础功能）
 
 ```go
-// 创建 SQL 日志器
-logger := orm.NewSQLLogger(os.Stdout, orm.LogLevelInfo)
+// ORM 本身支持基础的查询日志
+query, args := o.Select("users").
+    Columns("id", "name").
+    Eq("status", "active").
+    Build()
 
-// 包装 ORM 实例
-loggedORM := orm.NewLoggedORM(o, logger)
+fmt.Printf("SQL: %s\n", query)
+fmt.Printf("Args: %v\n", args)
 
-// 所有查询都会被记录
-result, err := loggedORM.Insert("users").
-    Set("name", "Alice").
-    Exec(ctx)
-
-// 自定义日志格式
-customLogger := orm.NewSQLLoggerWithFormatter(
-    os.Stdout,
-    func(ctx context.Context, query string, args []interface{}, duration time.Duration, err error) {
-        fmt.Printf("[%s] Query: %s, Args: %v, Duration: %v, Error: %v\n",
-            time.Now().Format("2006-01-02 15:04:05"),
-            query, args, duration, err)
-    },
-)
+rows, err := o.DB().Query(ctx, query, args...)
 ```
 
 ## 数据库方言
@@ -807,50 +575,27 @@ customLogger := orm.NewSQLLoggerWithFormatter(
 
 ```go
 // MySQL 方言
-mysqlDialect := orm.NewMySQLDialect()
+dialect := orm.NewMySQLDialect()
+o := orm.NewORMWithDB(db, dialect)
 
 // MySQL 特定功能
-query, args := o.Select("accounts").
-    Columns("id", "balance").
-    Eq("id", 1).
-    ForUpdateNowait(). // FOR UPDATE NOWAIT
-    Build()
-
-// MySQL 8+ 的 SKIP LOCKED
-query, args = o.Select("accounts").
-    Columns("id", "balance").
-    ForUpdateSkipLocked(). // FOR UPDATE SKIP LOCKED
-    Build()
-
-// MySQL 的 FULLTEXT 搜索
-query, args = o.Select("articles").
-    Columns("id", "title").
-    Where("MATCH(title, content) AGAINST(?)", "search term").
-    Build()
+result, err := o.Insert("users").
+    Set("name", "Alice").
+    Ignore(). // MySQL 特有
+    Exec(ctx)
 ```
 
 ### PostgreSQL
 
 ```go
 // PostgreSQL 方言
-pgDialect := orm.NewPostgreSQLDialect()
+dialect := orm.NewPostgreSQLDialect()
+o := orm.NewORMWithDB(db, dialect)
 
 // PostgreSQL 特定功能
-query, args := o.Select("users").
+rows, err := o.Select("users").
     Columns("id", "name").
-    Where("email ILIKE ?", "%@example.com"). // 不区分大小写的 LIKE
-    Build()
-
-// PostgreSQL 的 JSON 查询
-query, args = o.Select("documents").
-    Columns("id", "title").
-    Where("metadata->>'type' = ?", "article").
-    Build()
-
-// PostgreSQL 的数组查询
-query, args = o.Select("users").
-    Columns("id", "name").
-    Where("tags && ?", []string{"important", "urgent"}). // 数组交集
+    Where("created_at > ?", time.Now().AddDate(0, 0, -7)).
     Build()
 ```
 
@@ -858,24 +603,14 @@ query, args = o.Select("users").
 
 ```go
 // ClickHouse 方言
-chDialect := orm.NewClickHouseDialect()
+dialect := orm.NewClickHouseDialect()
+o := orm.NewORMWithDB(db, dialect)
 
 // ClickHouse 特定功能
-query, args := o.Select("events").
-    Columns("event_id", "timestamp", "user_id").
-    Gte("timestamp", "2024-01-01").
-    Lt("timestamp", "2024-02-01").
-    OrderBy("timestamp DESC").
-    Limit(1000).
-    Build()
-
-// ClickHouse 的聚合查询
-query, args = o.Select("events").
-    Columns("user_id", "COUNT(*) as event_count", "SUM(duration) as total_duration").
-    Gte("timestamp", "2024-01-01").
-    GroupBy("user_id").
-    Having("COUNT(*) > ?", 10).
-    OrderByDesc("event_count").
+rows, err := o.Select("events").
+    Columns("event_type", "COUNT(*)").
+    Where("timestamp >= ?", startDate).
+    GroupBy("event_type").
     Build()
 ```
 
@@ -885,9 +620,9 @@ query, args = o.Select("events").
 
 ```go
 // 优化连接池
-db.SetMaxOpenConns(100)        // 最大连接数
-db.SetMaxIdleConns(20)         // 最大空闲连接数
-db.SetConnMaxLifetime(time.Hour) // 连接最大生命周期
+db.SetMaxOpenConns(25)                // 最大连接数
+db.SetMaxIdleConns(10)                // 最大空闲连接数
+db.SetConnMaxLifetime(time.Hour)      // 连接最大生存时间
 db.SetConnMaxIdleTime(time.Minute * 30) // 空闲连接超时
 ```
 
@@ -895,20 +630,20 @@ db.SetConnMaxIdleTime(time.Minute * 30) // 空闲连接超时
 
 ```go
 // 批量插入优化
-batchSize := 1000
+columns := []string{"name", "email", "age"}
+batchSize := 100
 for i := 0; i < len(users); i += batchSize {
     end := i + batchSize
     if end > len(users) {
         end = len(users)
     }
     
-    batch := users[i:end]
-    _, err := o.Insert("users").
-        Values([]string{"name", "email", "age"}, convertToInterfaceSlice(batch)...).
-        Exec(ctx)
-    if err != nil {
-        return err
+    rows := make([][]interface{}, end-i)
+    for j, user := range users[i:end] {
+        rows[j] = []interface{}{user.Name, user.Email, user.Age}
     }
+    
+    _, err := o.Insert("users").Values(columns, rows...).Exec(ctx)
 }
 ```
 
@@ -916,19 +651,15 @@ for i := 0; i < len(users); i += batchSize {
 
 ```go
 // 预编译常用查询
-stmt, err := o.DB().PrepareContext(ctx, 
-    "SELECT id, name, email FROM users WHERE status = ? ORDER BY name LIMIT ?")
+stmt, err := db.PrepareContext(ctx, "SELECT id, name FROM users WHERE id = ?")
 if err != nil {
     return err
 }
 defer stmt.Close()
 
-// 使用预编译语句
-rows, err := stmt.QueryContext(ctx, "active", 50)
-if err != nil {
-    return err
-}
-defer rows.Close()
+row := stmt.QueryRowContext(ctx, 1)
+var user User
+err = row.Scan(&user.ID, &user.Name)
 ```
 
 ## 错误处理和最佳实践
@@ -937,28 +668,20 @@ defer rows.Close()
 
 ```go
 // 统一错误处理
-func handleDBError(err error) error {
-    if err == nil {
-        return nil
+result, err := o.Insert("users").
+    Set("name", "Alice").
+    Exec(ctx)
+if err != nil {
+    // 检查错误类型
+    if strings.Contains(err.Error(), "Duplicate entry") {
+        return fmt.Errorf("user already exists")
     }
-    
-    switch {
-    case errors.Is(err, sql.ErrNoRows):
-        return fmt.Errorf("record not found")
-    case errors.Is(err, sql.ErrTxDone):
-        return fmt.Errorf("transaction already completed")
-    case errors.Is(err, sql.ErrConnDone):
-        return fmt.Errorf("database connection closed")
-    default:
-        return fmt.Errorf("database error: %w", err)
-    }
+    return fmt.Errorf("failed to create user: %w", err)
 }
 
-// 使用示例
-var user User
-err := orm.StructScan(row, &user)
-if err := handleDBError(err); err != nil {
-    return err
+id, err := result.LastInsertId()
+if err != nil {
+    return fmt.Errorf("failed to get insert ID: %w", err)
 }
 ```
 
@@ -966,268 +689,172 @@ if err := handleDBError(err); err != nil {
 
 1. **使用参数化查询**: 避免字符串拼接，防止 SQL 注入
 2. **合理使用事务**: 保持事务简短，避免长时间锁定
-3. **连接池管理**: 根据应用负载调整连接池大小
-4. **错误处理**: 区分不同类型的数据库错误
-5. **结构体映射**: 使用 `db` 标签明确字段映射关系
-6. **分页查询**: 对大数据集使用分页，避免内存溢出
-7. **索引优化**: 根据查询模式创建合适的数据库索引
-8. **监控日志**: 记录慢查询和错误信息
+3. **正确关闭资源**: 使用 `defer rows.Close()`
+4. **批量操作**: 对于大量数据，使用批量插入/更新
+5. **索引优化**: 根据查询模式创建合适的数据库索引
+6. **连接池管理**: 合理配置连接池参数
+7. **监控日志**: 记录慢查询和错误信息
+8. **结构体映射**: 使用合适的 db tag 进行字段映射
 
-## 完整示例
+## 完整示例集合
 
-### Repository 模式示例
+### 示例文件位置
 
-```go
-package repository
+所有完整的示例代码都可以在 `examples/mysql_usage/` 目录下找到：
 
-import (
-    "context"
-    "database/sql"
-    "errors"
-    "fmt"
-    "time"
-    
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
-)
+- **`examples/mysql_usage/orm_crud_operations.go`** - 基础 CRUD 操作完整示例
+- **`examples/mysql_usage/orm_advanced_operations.go`** - 高级操作完整示例  
+- **`examples/mysql_usage/main_fixed.go`** - MySQL 集成完整示例
+- **`examples/mysql_usage/test_examples.sh`** - 编译测试脚本
 
-type UserRepository struct {
-    orm *orm.ORM
-}
+### 运行示例
 
-func NewUserRepository(ormInstance *orm.ORM) *UserRepository {
-    return &UserRepository{orm: ormInstance}
-}
+```bash
+# 进入示例目录
+cd examples/mysql_usage
 
-type User struct {
-    ID        int64     `db:"id"`
-    Name      string    `db:"name"`
-    Email     string    `db:"email"`
-    Age       int       `db:"age"`
-    Status    string    `db:"status"`
-    CreatedAt time.Time `db:"created_at"`
-    UpdatedAt time.Time `db:"updated_at"`
-}
+# 运行基础 CRUD 示例
+go run orm_crud_operations.go
 
-func (r *UserRepository) Create(ctx context.Context, user *User) error {
-    result, err := r.orm.Insert("users").
-        Set("name", user.Name).
-        Set("email", user.Email).
-        Set("age", user.Age).
-        Set("status", user.Status).
-        Set("created_at", time.Now()).
-        Exec(ctx)
-    if err != nil {
-        return fmt.Errorf("create user failed: %w", err)
-    }
-    
-    id, err := result.LastInsertId()
-    if err != nil {
-        return fmt.Errorf("get insert id failed: %w", err)
-    }
-    
-    user.ID = id
-    return nil
-}
+# 运行高级操作示例
+go run orm_advanced_operations.go
 
-func (r *UserRepository) GetByID(ctx context.Context, id int64) (*User, error) {
-    row := r.orm.Select("users").
-        Columns("id", "name", "email", "age", "status", "created_at", "updated_at").
-        Eq("id", id).
-        QueryRow(ctx)
-    
-    var user User
-    err := orm.StructScan(row, &user)
-    if err != nil {
-        if errors.Is(err, sql.ErrNoRows) {
-            return nil, fmt.Errorf("user %d not found", id)
-        }
-        return nil, fmt.Errorf("scan user failed: %w", err)
-    }
-    
-    return &user, nil
-}
+# 运行 MySQL 集成示例
+go run main_fixed.go
 
-func (r *UserRepository) Update(ctx context.Context, user *User) error {
-    result, err := r.orm.Update("users").
-        Set("name", user.Name).
-        Set("email", user.Email).
-        Set("age", user.Age).
-        Set("status", user.Status).
-        Set("updated_at", time.Now()).
-        Eq("id", user.ID).
-        Exec(ctx)
-    if err != nil {
-        return fmt.Errorf("update user failed: %w", err)
-    }
-    
-    affected, err := result.RowsAffected()
-    if err != nil {
-        return fmt.Errorf("get affected rows failed: %w", err)
-    }
-    
-    if affected == 0 {
-        return fmt.Errorf("user %d not found", user.ID)
-    }
-    
-    return nil
-}
-
-func (r *UserRepository) Delete(ctx context.Context, id int64) error {
-    result, err := r.orm.Delete("users").
-        Eq("id", id).
-        Exec(ctx)
-    if err != nil {
-        return fmt.Errorf("delete user failed: %w", err)
-    }
-    
-    affected, err := result.RowsAffected()
-    if err != nil {
-        return fmt.Errorf("get affected rows failed: %w", err)
-    }
-    
-    if affected == 0 {
-        return fmt.Errorf("user %d not found", id)
-    }
-    
-    return nil
-}
-
-func (r *UserRepository) List(ctx context.Context, opts ListOptions) ([]*User, error) {
-    query := r.orm.Select("users").
-        Columns("id", "name", "email", "age", "status", "created_at", "updated_at")
-    
-    // 应用过滤条件
-    if opts.Status != "" {
-        query = query.Eq("status", opts.Status)
-    }
-    if opts.MinAge > 0 {
-        query = query.Gte("age", opts.MinAge)
-    }
-    if opts.MaxAge > 0 {
-        query = query.Lte("age", opts.MaxAge)
-    }
-    if opts.Search != "" {
-        query = query.Where("(name LIKE ? OR email LIKE ?)", 
-            "%"+opts.Search+"%", "%"+opts.Search+"%")
-    }
-    
-    // 应用排序
-    if opts.SortBy != "" {
-        direction := "ASC"
-        if opts.SortDesc {
-            direction = "DESC"
-        }
-        query = query.OrderBy(fmt.Sprintf("%s %s", opts.SortBy, direction))
-    } else {
-        query = query.OrderBy("created_at DESC")
-    }
-    
-    // 应用分页
-    if opts.Limit > 0 {
-        query = query.Limit(opts.Limit)
-        if opts.Offset > 0 {
-            query = query.Offset(opts.Offset)
-        }
-    }
-    
-    rows, err := query.Query(ctx)
-    if err != nil {
-        return nil, fmt.Errorf("query users failed: %w", err)
-    }
-    defer rows.Close()
-    
-    var users []*User
-    if err := orm.StructScanAll(rows, &users); err != nil {
-        return nil, fmt.Errorf("scan users failed: %w", err)
-    }
-    
-    return users, nil
-}
-
-func (r *UserRepository) Count(ctx context.Context, opts ListOptions) (int64, error) {
-    query := r.orm.Select("users").Columns("COUNT(*)")
-    
-    // 应用相同的过滤条件
-    if opts.Status != "" {
-        query = query.Eq("status", opts.Status)
-    }
-    if opts.MinAge > 0 {
-        query = query.Gte("age", opts.MinAge)
-    }
-    if opts.MaxAge > 0 {
-        query = query.Lte("age", opts.MaxAge)
-    }
-    if opts.Search != "" {
-        query = query.Where("(name LIKE ? OR email LIKE ?)", 
-            "%"+opts.Search+"%", "%"+opts.Search+"%")
-    }
-    
-    row := query.QueryRow(ctx)
-    var count int64
-    if err := row.Scan(&count); err != nil {
-        return 0, fmt.Errorf("scan count failed: %w", err)
-    }
-    
-    return count, nil
-}
-
-func (r *UserRepository) TransferBalance(ctx context.Context, fromID, toID int64, amount float64) error {
-    return r.orm.Transaction(ctx, func(txORM *orm.ORM) error {
-        // 扣除发送者余额
-        result, err := txORM.Update("accounts").
-            Set("balance", orm.Raw("balance - ?")).
-            Set("updated_at", time.Now()).
-            Eq("user_id", fromID).
-            Where("balance >= ?", amount). // 检查余额充足
-            Exec(ctx)
-        if err != nil {
-            return err
-        }
-        
-        affected, err := result.RowsAffected()
-        if err != nil {
-            return err
-        }
-        if affected == 0 {
-            return fmt.Errorf("insufficient balance for user %d", fromID)
-        }
-        
-        // 增加接收者余额
-        _, err = txORM.Update("accounts").
-            Set("balance", orm.Raw("balance + ?")).
-            Set("updated_at", time.Now()).
-            Eq("user_id", toID).
-            Exec(ctx)
-        if err != nil {
-            return err
-        }
-        
-        // 记录转账记录
-        _, err = txORM.Insert("transfers").
-            Set("from_user_id", fromID).
-            Set("to_user_id", toID).
-            Set("amount", amount).
-            Set("status", "completed").
-            Set("created_at", time.Now()).
-            Exec(ctx)
-        if err != nil {
-            return err
-        }
-        
-        return nil
-    })
-}
-
-type ListOptions struct {
-    Status   string
-    MinAge   int
-    MaxAge   int
-    Search   string
-    SortBy   string
-    SortDesc bool
-    Limit    int
-    Offset   int
-}
+# 验证所有示例编译
+./test_examples.sh
 ```
 
-这个详细的 ORM 使用指南涵盖了从基础使用到高级功能的各个方面，为开发者提供了完整的参考资料。
+### ✅ 验证的示例特性
+
+#### 1. `orm_crud_operations.go` - 基础 CRUD 操作
+- ✅ **CREATE**: 单条插入、批量插入
+- ✅ **READ**: 查询单条记录、查询多条记录、复杂条件查询、聚合查询
+- ✅ **UPDATE**: 更新单个字段、更新多个字段、条件更新
+- ✅ **DELETE**: 根据ID删除、条件删除
+
+**特点**:
+- 完整的错误处理
+- 正确的单行扫描（`row.Scan()`）
+- 正确的多行扫描（`orm.StructScanAll()`）
+- 正确的 `defer rows.Close()` 使用
+- 详细的注释和输出
+
+#### 2. `orm_advanced_operations.go` - 高级操作
+- ✅ **JOIN 查询**: INNER JOIN
+- ✅ **子查询**: EXISTS、IN、FROM 子查询（使用正确的 Build() 方法）
+- ✅ **分页和排序**: 基础分页、多字段排序、条件分页
+- ✅ **聚合和分组**: 基础聚合、分组聚合
+- ✅ **事务管理**: 基础事务、事务回滚
+
+**特点**:
+- 多表关联查询
+- 复杂的 SQL 构建技巧
+- 事务的完整生命周期管理
+- 实际业务场景模拟
+- 正确的子查询语法
+
+#### 3. `main_fixed.go` - MySQL 集成示例
+- ✅ **直接 MySQL 客户端**: 原生 SQL 操作
+- ✅ **工厂模式**: 使用 db.Factory 创建客户端
+- ✅ **ORM 集成**: MySQL + ORM 完整示例
+- ✅ **事务管理**: ORM 事务使用
+- ✅ **连接池**: 多连接池管理
+
+**特点**:
+- 多种连接方式的对比
+- 完整的配置示例
+- 连接池的使用方法
+- 错误处理最佳实践
+- 修正了原文件中的所有 API 错误
+
+### 🔧 修正的问题
+
+原文件中的错误已修正：
+1. **API 调用错误**: `ormInstance.DB().ExecContext()` → `ormInstance.DB().Exec()`
+2. **结构体扫描错误**: `orm.StructScan(row)` → `row.Scan()`（单行）
+3. **子查询语法错误**: `WhereBuilder().ExistsSubquery()` → `Where("EXISTS (?)", subQuery)`
+4. **原始 SQL 错误**: `orm.Raw()` → 直接字符串（Update 中）
+5. **导入错误**: 移除未使用的 `database/sql` 导入
+
+### 🚀 快速验证
+
+运行测试脚本验证所有示例编译正常：
+
+```bash
+cd examples/mysql_usage
+./test_examples.sh
+```
+
+预期输出：
+```
+=== 测试 ORM 示例文件编译 ===
+1. 测试基础 CRUD 操作示例...
+   ✓ orm_crud_operations.go 编译成功
+2. 测试高级操作示例...
+   ✓ orm_advanced_operations.go 编译成功
+3. 测试 MySQL 集成示例...
+   ✓ main_fixed.go 编译成功
+```
+
+### 📋 关键知识点总结
+
+#### 1. 正确的单行查询
+```go
+row := ormInstance.Select("users").Eq("id", 1).QueryRow(ctx)
+var user User
+err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Age)
+```
+
+#### 2. 正确的多行查询
+```go
+rows, err := ormInstance.Select("users").Query(ctx)
+defer rows.Close() // ✅ 确保关闭
+
+var users []User
+err := orm.StructScanAll(rows, &users)
+```
+
+#### 3. 正确的子查询
+```go
+subQuerySQL, subQueryArgs := ormInstance.Select("order_items").
+    Columns("1").
+    Eq("product_id", 1).
+    Build()
+
+rows, err := ormInstance.Select("products").
+    Where("EXISTS ("+subQuerySQL+")", subQueryArgs...).
+    Query(ctx)
+```
+
+#### 4. 正确的事务使用
+```go
+err := ormInstance.Transaction(ctx, func(txORM *orm.ORM) error {
+    // 在事务中操作
+    _, err := txORM.Insert("users").Set("name", "Alice").Exec(ctx)
+    if err != nil {
+        return err // 自动回滚
+    }
+    return nil // 自动提交
+})
+```
+
+### ⚠️ 注意事项
+
+- 所有示例都已通过编译验证
+- 示例中的数据库连接配置需要根据实际环境调整（默认：root/q1w2e3r4@localhost:3306/myblog）
+- 建议在测试环境中运行示例
+- 如遇到问题，请检查 MySQL 服务状态和连接配置
+
+### 📚 扩展学习
+
+完成基础示例后，可以进一步学习：
+1. 了解企业级功能（软删除、查询缓存、高级事务）
+2. 学习性能优化技巧
+3. 掌握错误处理最佳实践
+4. 查看更多实际应用场景
+
+---
+
+*本指南涵盖了 ORM 的核心功能和最佳实践，帮助开发者快速上手并正确使用 ORM 进行数据库操作。*
