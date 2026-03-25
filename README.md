@@ -542,8 +542,38 @@ Apache License 2.0 - See `LICENSE` file for details.
 - Email: `nbjohn999@gmail.com`
  
  ## 相关文档
- 
- - `pkg/discovery/README.md`
+
+### 📚 核心功能文档
+- `docs/API_USAGE_GUIDE.md` - API 使用指南
+- `docs/RPC_GUIDE.md` - RPC 使用指南  
+- `docs/MESSAGING_GUIDE.md` - 消息队列指南
+- `docs/DISCOVERY_GUIDE.md` - 服务发现指南
+- `docs/TRACING_GUIDE.md` - 链路追踪指南
+
+### 🗄️ 数据库相关
+- `docs/orm-usage-guide.md` - ORM 使用指南
+- `docs/ENTERPRISE_TRANSACTION_MANAGER.md` - 企业级事务管理器
+
+### 🚀 缓存相关
+- `docs/FAILOVER_CACHE_GUIDE.md` - 故障转移缓存指南
+- `docs/FILE_CACHE_GUIDE.md` - 文件缓存指南
+
+### 🌐 网关相关
+- `docs/gateway.md` - 网关基础指南
+- `docs/gateway-discovery.md` - 网关服务发现
+- `docs/gateway-auth-complete-guide.md` - 网关认证完整指南
+
+### 🔐 安全相关
+- `docs/RPC_AUTHENTICATION.md` - RPC 认证
+- `docs/JSON_RPC_TRACING.md` - JSON RPC 追踪
+
+### 🛠️ 框架相关
+- `docs/gin-router-system.md` - Gin 路由系统
+- `docs/production-deployment.md` - 生产环境部署指南
+
+### 📖 其他文档
+- `docs/README.md` - 文档总览
+- `pkg/discovery/README.md` - 服务发现包文档
  
  ## 总结
  
