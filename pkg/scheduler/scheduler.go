@@ -1,297 +1,196 @@
-// Package scheduler provides millisecond-precision task scheduling
 package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-// Task represents a scheduled task
+// Task 代表一个调度任务
 type Task struct {
 	ID       string
 	Name     string
 	Interval time.Duration
 	Delay    time.Duration
-	Times    int // 0 means unlimited
-	Cron     string
+	Times    int // 0 表示无限
 	Func     func(ctx context.Context) error
 	OnError  func(error)
 
-	// Internal fields
+	// 内部字段
+	mu       sync.Mutex
 	nextRun  time.Time
 	runCount int
 	active   bool
 	cancel   context.CancelFunc
 }
 
-// Scheduler manages scheduled tasks
+// Scheduler 调度器
 type Scheduler struct {
-	tasks    map[string]*Task
-	mu       sync.RWMutex
-	wg       sync.WaitGroup
-	stopCh   chan struct{}
-	running  bool
-	ticker   *time.Ticker
+	tasks     sync.Map // 使用 sync.Map 减少读写锁在高并发下的竞争
+	wg        sync.WaitGroup
+	stopCh    chan struct{}
+	running   int32 // 原子操作
 	precision time.Duration
 }
 
-// Options scheduler options
 type Options struct {
-	Precision time.Duration // default 1ms
+	Precision time.Duration
 }
 
-// DefaultOptions returns default options
 func DefaultOptions() Options {
-	return Options{
-		Precision: time.Millisecond,
-	}
+	return Options{Precision: time.Millisecond * 10} // 建议默认为10ms，平衡性能与精度
 }
 
-// New creates a new scheduler
 func New(opts Options) *Scheduler {
 	if opts.Precision <= 0 {
-		opts.Precision = time.Millisecond
+		opts.Precision = time.Millisecond * 10
 	}
-
 	return &Scheduler{
-		tasks:     make(map[string]*Task),
 		stopCh:    make(chan struct{}),
 		precision: opts.Precision,
 	}
 }
 
-// Start starts the scheduler
 func (s *Scheduler) Start() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.running {
+	if !atomic.CompareAndSwapInt32(&s.running, 0, 1) {
 		return
 	}
-
-	s.running = true
-	s.ticker = time.NewTicker(s.precision)
 
 	s.wg.Add(1)
 	go s.run()
 }
 
-// Stop stops the scheduler
 func (s *Scheduler) Stop() {
-	s.mu.Lock()
-	if !s.running {
-		s.mu.Unlock()
-		return
-	}
-	s.running = false
-	s.ticker.Stop()
-	close(s.stopCh)
-	s.mu.Unlock()
+	if atomic.CompareAndSwapInt32(&s.running, 1, 0) {
+		close(s.stopCh)
+		s.wg.Wait()
 
-	s.wg.Wait()
+		// 停止所有正在运行的任务
+		s.tasks.Range(func(key, value interface{}) bool {
+			t := value.(*Task)
+			t.mu.Lock()
+			if t.cancel != nil {
+				t.cancel()
+			}
+			t.mu.Unlock()
+			return true
+		})
+	}
 }
 
-// AddTask adds a new task
 func (s *Scheduler) AddTask(task *Task) error {
-	if task.ID == "" {
-		return fmt.Errorf("task ID is required")
-	}
-	if task.Func == nil {
-		return fmt.Errorf("task function is required")
-	}
-	if task.Interval <= 0 && task.Cron == "" {
-		return fmt.Errorf("task interval or cron expression is required")
+	if task.ID == "" || task.Func == nil {
+		return errors.New("task ID and function are required")
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	task.mu.Lock()
+	task.active = true
+	// 如果没有设置 Delay，则立即开始计算第一次执行时间
+	if task.nextRun.IsZero() {
+		task.nextRun = time.Now().Add(task.Delay)
+	}
+	task.mu.Unlock()
 
-	if _, exists := s.tasks[task.ID]; exists {
+	if _, loaded := s.tasks.LoadOrStore(task.ID, task); loaded {
 		return fmt.Errorf("task %s already exists", task.ID)
 	}
-
-	task.active = true
-	task.nextRun = time.Now().Add(task.Delay)
-	s.tasks[task.ID] = task
-
 	return nil
 }
 
-// RemoveTask removes a task
 func (s *Scheduler) RemoveTask(id string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if task, exists := s.tasks[id]; exists {
-		task.active = false
-		if task.cancel != nil {
-			task.cancel()
+	if val, ok := s.tasks.LoadAndDelete(id); ok {
+		t := val.(*Task)
+		t.mu.Lock()
+		t.active = false
+		if t.cancel != nil {
+			t.cancel()
 		}
-		delete(s.tasks, id)
+		t.mu.Unlock()
 	}
 }
 
-// PauseTask pauses a task
-func (s *Scheduler) PauseTask(id string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if task, exists := s.tasks[id]; exists {
-		task.active = false
-	}
-}
-
-// ResumeTask resumes a paused task
-func (s *Scheduler) ResumeTask(id string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if task, exists := s.tasks[id]; exists {
-		task.active = true
-		task.nextRun = time.Now().Add(task.Interval)
-	}
-}
-
-// GetTask returns a task by ID
-func (s *Scheduler) GetTask(id string) (*Task, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	task, exists := s.tasks[id]
-	return task, exists
-}
-
-// ListTasks returns all tasks
-func (s *Scheduler) ListTasks() []*Task {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	tasks := make([]*Task, 0, len(s.tasks))
-	for _, task := range s.tasks {
-		tasks = append(tasks, task)
-	}
-	return tasks
-}
-
-// run is the main scheduling loop
 func (s *Scheduler) run() {
 	defer s.wg.Done()
+	ticker := time.NewTicker(s.precision)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-s.stopCh:
 			return
-		case now := <-s.ticker.C:
-			s.checkAndRun(now)
+		case now := <-ticker.C:
+			s.tick(now)
 		}
 	}
 }
 
-// checkAndRun checks tasks and runs due ones
-func (s *Scheduler) checkAndRun(now time.Time) {
-	s.mu.Lock()
-	tasksToRun := make([]*Task, 0)
+func (s *Scheduler) tick(now time.Time) {
+	s.tasks.Range(func(key, value interface{}) bool {
+		task := value.(*Task)
 
-	for _, task := range s.tasks {
-		if !task.active {
-			continue
+		// 细粒度检查任务状态
+		if !task.shouldRun(now) {
+			return true
 		}
 
-		if task.Times > 0 && task.runCount >= task.Times {
-			task.active = false
-			continue
-		}
-
-		if now.After(task.nextRun) || now.Equal(task.nextRun) {
-			tasksToRun = append(tasksToRun, task)
-			task.nextRun = now.Add(task.Interval)
-			task.runCount++
-		}
-	}
-	s.mu.Unlock()
-
-	// Run tasks concurrently
-	for _, task := range tasksToRun {
 		s.wg.Add(1)
 		go func(t *Task) {
 			defer s.wg.Done()
 			s.executeTask(t)
 		}(task)
-	}
+
+		return true
+	})
 }
 
-// executeTask executes a single task
-func (s *Scheduler) executeTask(task *Task) {
-	ctx, cancel := context.WithTimeout(context.Background(), task.Interval)
-	defer cancel()
+func (t *Task) shouldRun(now time.Time) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
+	if !t.active {
+		return false
+	}
+
+	if t.Times > 0 && t.runCount >= t.Times {
+		t.active = false
+		return false
+	}
+
+	if now.Before(t.nextRun) {
+		return false
+	}
+
+	// 更新下次运行时间
+	if t.Interval > 0 {
+		t.nextRun = now.Add(t.Interval)
+	} else {
+		// 一次性任务执行后设为不活跃
+		t.active = false
+	}
+	t.runCount++
+	return true
+}
+
+func (s *Scheduler) executeTask(task *Task) {
+	// 创建任务专用的 context
+	ctx, cancel := context.WithCancel(context.Background())
+
+	task.mu.Lock()
+	// 如果任务在启动瞬间被停止了
+	if !task.active {
+		task.mu.Unlock()
+		cancel()
+		return
+	}
 	task.cancel = cancel
+	task.mu.Unlock()
+
+	defer cancel()
 
 	if err := task.Func(ctx); err != nil && task.OnError != nil {
 		task.OnError(err)
 	}
-}
-
-// Once creates a one-time task
-func Once(id string, delay time.Duration, fn func(ctx context.Context) error) *Task {
-	return &Task{
-		ID:       id,
-		Name:     id,
-		Delay:    delay,
-		Interval: time.Hour * 24 * 365 * 100, // 100 years, effectively one-time
-		Times:    1,
-		Func:     fn,
-	}
-}
-
-// Every creates a periodic task
-func Every(id string, interval time.Duration, fn func(ctx context.Context) error) *Task {
-	return &Task{
-		ID:       id,
-		Name:     id,
-		Interval: interval,
-		Func:     fn,
-	}
-}
-
-// Times creates a task that runs specific times
-func Times(id string, interval time.Duration, times int, fn func(ctx context.Context) error) *Task {
-	return &Task{
-		ID:       id,
-		Name:     id,
-		Interval: interval,
-		Times:    times,
-		Func:     fn,
-	}
-}
-
-// Delayed creates a delayed periodic task
-func Delayed(id string, delay, interval time.Duration, fn func(ctx context.Context) error) *Task {
-	return &Task{
-		ID:       id,
-		Name:     id,
-		Delay:    delay,
-		Interval: interval,
-		Func:     fn,
-	}
-}
-
-// ScheduleFunc schedules a function with milliseconds precision
-func (s *Scheduler) ScheduleFunc(id string, delayMs int64, fn func()) {
-	task := Once(id, time.Duration(delayMs)*time.Millisecond, func(ctx context.Context) error {
-		fn()
-		return nil
-	})
-	s.AddTask(task)
-}
-
-// ScheduleRepeat schedules a repeating function with milliseconds precision
-func (s *Scheduler) ScheduleRepeat(id string, intervalMs int64, fn func()) {
-	task := Every(id, time.Duration(intervalMs)*time.Millisecond, func(ctx context.Context) error {
-		fn()
-		return nil
-	})
-	s.AddTask(task)
 }

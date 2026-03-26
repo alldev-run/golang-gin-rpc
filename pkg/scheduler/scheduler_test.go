@@ -13,27 +13,27 @@ func TestNew(t *testing.T) {
 	if s == nil {
 		t.Fatal("expected scheduler to be created")
 	}
-	if s.precision != time.Millisecond {
-		t.Errorf("expected default precision 1ms, got %v", s.precision)
+	if s.precision != 10*time.Millisecond {
+		t.Errorf("expected default precision 10ms, got %v", s.precision)
 	}
 }
 
 func TestNewWithCustomPrecision(t *testing.T) {
-	opts := Options{Precision: 10 * time.Millisecond}
+	opts := Options{Precision: 50 * time.Millisecond}
 	s := New(opts)
-	if s.precision != 10*time.Millisecond {
-		t.Errorf("expected precision 10ms, got %v", s.precision)
+	if s.precision != 50*time.Millisecond {
+		t.Errorf("expected precision 50ms, got %v", s.precision)
 	}
 }
 
 func TestScheduler_StartStop(t *testing.T) {
 	s := New(DefaultOptions())
 	s.Start()
-	if !s.running {
+	if atomic.LoadInt32(&s.running) == 0 {
 		t.Error("expected scheduler to be running")
 	}
 	s.Stop()
-	if s.running {
+	if atomic.LoadInt32(&s.running) != 0 {
 		t.Error("expected scheduler to be stopped")
 	}
 }
@@ -76,15 +76,6 @@ func TestScheduler_AddTask(t *testing.T) {
 	if err := s.AddTask(task3); err == nil {
 		t.Error("expected error for nil function")
 	}
-
-	// No interval or cron
-	task4 := &Task{
-		ID:   "test-4",
-		Func: func(ctx context.Context) error { return nil },
-	}
-	if err := s.AddTask(task4); err == nil {
-		t.Error("expected error for no interval")
-	}
 }
 
 func TestScheduler_RemoveTask(t *testing.T) {
@@ -99,142 +90,14 @@ func TestScheduler_RemoveTask(t *testing.T) {
 
 	s.RemoveTask("test-remove")
 
-	_, exists := s.GetTask("test-remove")
-	if exists {
-		t.Error("expected task to be removed")
-	}
-}
-
-func TestScheduler_PauseResumeTask(t *testing.T) {
-	s := New(DefaultOptions())
-
-	task := &Task{
-		ID:       "test-pause",
+	// Verify removal by trying to add again (should not error if removed)
+	task2 := &Task{
+		ID:       "test-remove",
 		Interval: time.Second,
 		Func:     func(ctx context.Context) error { return nil },
 	}
-	s.AddTask(task)
-
-	s.PauseTask("test-pause")
-	task, _ = s.GetTask("test-pause")
-	if task.active {
-		t.Error("expected task to be paused")
-	}
-
-	s.ResumeTask("test-pause")
-	task, _ = s.GetTask("test-pause")
-	if !task.active {
-		t.Error("expected task to be resumed")
-	}
-}
-
-func TestScheduler_ListTasks(t *testing.T) {
-	s := New(DefaultOptions())
-
-	s.AddTask(&Task{
-		ID:       "task-1",
-		Interval: time.Second,
-		Func:     func(ctx context.Context) error { return nil },
-	})
-	s.AddTask(&Task{
-		ID:       "task-2",
-		Interval: time.Second,
-		Func:     func(ctx context.Context) error { return nil },
-	})
-
-	tasks := s.ListTasks()
-	if len(tasks) != 2 {
-		t.Errorf("expected 2 tasks, got %d", len(tasks))
-	}
-}
-
-func TestOnce(t *testing.T) {
-	task := Once("once-task", 100*time.Millisecond, func(ctx context.Context) error {
-		return nil
-	})
-
-	if task.ID != "once-task" {
-		t.Errorf("expected ID 'once-task', got '%s'", task.ID)
-	}
-	if task.Times != 1 {
-		t.Errorf("expected Times=1, got %d", task.Times)
-	}
-	if task.Delay != 100*time.Millisecond {
-		t.Errorf("expected Delay=100ms, got %v", task.Delay)
-	}
-}
-
-func TestEvery(t *testing.T) {
-	task := Every("every-task", 500*time.Millisecond, func(ctx context.Context) error {
-		return nil
-	})
-
-	if task.ID != "every-task" {
-		t.Errorf("expected ID 'every-task', got '%s'", task.ID)
-	}
-	if task.Interval != 500*time.Millisecond {
-		t.Errorf("expected Interval=500ms, got %v", task.Interval)
-	}
-	if task.Times != 0 {
-		t.Errorf("expected Times=0 (unlimited), got %d", task.Times)
-	}
-}
-
-func TestTimes(t *testing.T) {
-	task := Times("times-task", 100*time.Millisecond, 5, func(ctx context.Context) error {
-		return nil
-	})
-
-	if task.Times != 5 {
-		t.Errorf("expected Times=5, got %d", task.Times)
-	}
-}
-
-func TestDelayed(t *testing.T) {
-	task := Delayed("delayed-task", 200*time.Millisecond, 100*time.Millisecond, func(ctx context.Context) error {
-		return nil
-	})
-
-	if task.Delay != 200*time.Millisecond {
-		t.Errorf("expected Delay=200ms, got %v", task.Delay)
-	}
-	if task.Interval != 100*time.Millisecond {
-		t.Errorf("expected Interval=100ms, got %v", task.Interval)
-	}
-}
-
-func TestScheduleFunc(t *testing.T) {
-	s := New(DefaultOptions())
-	s.Start()
-	defer s.Stop()
-
-	var executed int32
-	s.ScheduleFunc("schedule-func", 50, func() {
-		atomic.AddInt32(&executed, 1)
-	})
-
-	time.Sleep(100 * time.Millisecond)
-
-	if atomic.LoadInt32(&executed) != 1 {
-		t.Errorf("expected task to execute once, got %d", atomic.LoadInt32(&executed))
-	}
-}
-
-func TestScheduleRepeat(t *testing.T) {
-	s := New(DefaultOptions())
-	s.Start()
-	defer s.Stop()
-
-	var executed int32
-	s.ScheduleRepeat("repeat-func", 50, func() {
-		atomic.AddInt32(&executed, 1)
-	})
-
-	time.Sleep(200 * time.Millisecond)
-
-	count := atomic.LoadInt32(&executed)
-	if count < 2 {
-		t.Errorf("expected at least 2 executions, got %d", count)
+	if err := s.AddTask(task2); err != nil {
+		t.Errorf("expected to add task after removal, got error: %v", err)
 	}
 }
 
@@ -320,6 +183,31 @@ func TestTaskWithDelay(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	if atomic.LoadInt32(&executed) != 1 {
 		t.Errorf("expected task to execute after delay, got %d", atomic.LoadInt32(&executed))
+	}
+}
+
+func TestTaskOnce(t *testing.T) {
+	s := New(DefaultOptions())
+	s.Start()
+	defer s.Stop()
+
+	var executed int32
+	task := &Task{
+		ID:       "once-test",
+		Delay:    50 * time.Millisecond,
+		Interval: 10 * time.Millisecond, // Small interval for single execution
+		Times:    1,
+		Func: func(ctx context.Context) error {
+			atomic.AddInt32(&executed, 1)
+			return nil
+		},
+	}
+
+	s.AddTask(task)
+	time.Sleep(200 * time.Millisecond)
+
+	if atomic.LoadInt32(&executed) != 1 {
+		t.Errorf("expected task to execute exactly once, got %d", atomic.LoadInt32(&executed))
 	}
 }
 

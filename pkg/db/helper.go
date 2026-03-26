@@ -289,6 +289,24 @@ func Delete(table string) (*orm.DeleteBuilder, error) {
 	return orm.NewDeleteBuilder(client, withDB(table)), nil
 }
 
+// CreateTable creates a new CREATE TABLE builder using the global MySQL client.
+func CreateTable(table string) (*orm.TableBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	return orm.CreateTable(client, nil, withDB(table)), nil
+}
+
+// DropTable creates a new DROP TABLE builder using the global MySQL client.
+func DropTable(table string) (*orm.TableBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	return orm.DropTable(client, nil, withDB(table)), nil
+}
+
 // ==================== Multi-Database Support (Same MySQL Instance) ====================
 
 var (

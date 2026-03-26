@@ -6,10 +6,39 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 )
-// It uses reflection to map column names to struct fields.
-// Struct tags are supported with "db" key for custom column names.
-// Fields without db tag use field name converted to snake_case.
+
+// --- 新增：结构体元数据缓存，避免高并发下重复反射 ---
+var fieldCache sync.Map
+
+type structMeta struct {
+	fieldMap map[string]int
+}
+
+func getStructMeta(t reflect.Type) *structMeta {
+	if val, ok := fieldCache.Load(t); ok {
+		return val.(*structMeta)
+	}
+	meta := &structMeta{fieldMap: make(map[string]int)}
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		tag := f.Tag.Get("db")
+		if tag != "" {
+			meta.fieldMap[tag] = i
+		} else {
+			meta.fieldMap[ToSnakeCase(f.Name)] = i
+		}
+	}
+	fieldCache.Store(t, meta)
+	return meta
+}
+
+// --- 保持原方法名不变 ---
+
 func StructScan(rows *sql.Rows, dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr || v.IsNil() {
@@ -30,19 +59,20 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 		return sql.ErrNoRows
 	}
 
+	// 优化点：直接准备扫描切片，避免循环分配
 	values := make([]interface{}, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
 	for i := range values {
-		values[i] = new(interface{})
+		valuePtrs[i] = &values[i]
 	}
 
-	if err := rows.Scan(values...); err != nil {
+	if err := rows.Scan(valuePtrs...); err != nil {
 		return err
 	}
 
 	return scanRowToStruct(columns, values, v)
 }
 
-// StructScanAll scans all rows into a slice of structs.
 func StructScanAll(rows *sql.Rows, dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr || v.IsNil() {
@@ -54,67 +84,59 @@ func StructScanAll(rows *sql.Rows, dest interface{}) error {
 		return errors.New("dest must point to a slice")
 	}
 
-	columns, err := rows.Columns()
-	if err != nil {
-		return err
-	}
-
 	elemType := sliceV.Type().Elem()
 	if elemType.Kind() != reflect.Ptr || elemType.Elem().Kind() != reflect.Struct {
 		return errors.New("slice elements must be pointers to structs")
 	}
 
 	structType := elemType.Elem()
-	results := reflect.MakeSlice(reflect.SliceOf(elemType), 0, 0)
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	// 优化点：复用扫描缓冲区
+	colCount := len(columns)
+	values := make([]interface{}, colCount)
+	valuePtrs := make([]interface{}, colCount)
+	for i := range values {
+		valuePtrs[i] = &values[i]
+	}
+
+	results := reflect.MakeSlice(sliceV.Type(), 0, 16)
 
 	for rows.Next() {
-		values := make([]interface{}, len(columns))
+		// 每行需要新的 values 缓冲区，避免数据被覆盖
+		values := make([]interface{}, colCount)
+		valuePtrs := make([]interface{}, colCount)
 		for i := range values {
-			values[i] = new(interface{})
+			valuePtrs[i] = &values[i]
 		}
 
-		if err := rows.Scan(values...); err != nil {
+		if err := rows.Scan(valuePtrs...); err != nil {
 			return err
 		}
 
-		structV := reflect.New(structType)
-		if err := scanRowToStruct(columns, values, structV.Elem()); err != nil {
+		structV := reflect.New(structType).Elem()
+		if err := scanRowToStruct(columns, values, structV); err != nil {
 			return err
 		}
 
-		results = reflect.Append(results, structV)
+		results = reflect.Append(results, structV.Addr())
 	}
 
 	sliceV.Set(results)
 	return rows.Err()
 }
 
-// scanRowToStruct is a helper function that maps column values to struct fields.
 func scanRowToStruct(columns []string, values []interface{}, structV reflect.Value) error {
-	structType := structV.Type()
-
-	// Build field map for efficient lookup
-	fieldMap := make(map[string]int)
-	for i := 0; i < structV.NumField(); i++ {
-		field := structType.Field(i)
-		if !field.IsExported() {
-			continue
-		}
-
-		// Check for db tag
-		tag := field.Tag.Get("db")
-		if tag != "" {
-			fieldMap[tag] = i
-		} else {
-			// Use snake_case field name
-			fieldMap[ToSnakeCase(field.Name)] = i
-		}
-	}
+	// 优化点：从缓存读取字段映射，不再实时解析 Tag 和 SnakeCase
+	meta := getStructMeta(structV.Type())
 
 	for i, col := range columns {
-		fieldIdx, exists := fieldMap[col]
+		fieldIdx, exists := meta.fieldMap[col]
 		if !exists {
-			continue // Skip columns that don't have matching fields
+			continue
 		}
 
 		field := structV.Field(fieldIdx)
@@ -122,134 +144,107 @@ func scanRowToStruct(columns []string, values []interface{}, structV reflect.Val
 			continue
 		}
 
-		val := reflect.ValueOf(*(values[i].(*interface{})))
-		if !val.IsValid() {
-			continue
-		}
-
-		// Handle nil values
-		if val.Kind() == reflect.Ptr && val.IsNil() {
-			continue
-		}
-
-		// Convert value to field type
-		if err := setFieldValue(field, val); err != nil {
-			return fmt.Errorf("cannot set field %s: %w", structType.Field(fieldIdx).Name, err)
+		// 优化点：直接传入 values[i]，避免 reflect.ValueOf(*(values[i].(*interface{}))) 的多重解包开销
+		if err := setFieldValue(field, values[i]); err != nil {
+			return fmt.Errorf("cannot set field %s: %w", structV.Type().Field(fieldIdx).Name, err)
 		}
 	}
-
 	return nil
 }
 
-// setFieldValue sets a value to a struct field with type conversion.
-func setFieldValue(field reflect.Value, val reflect.Value) error {
+func setFieldValue(field reflect.Value, val interface{}) error {
+	// 处理数据库 NULL 值
+	if val == nil {
+		field.Set(reflect.Zero(field.Type()))
+		return nil
+	}
+
 	fieldType := field.Type()
 
-	// Handle nil values for nullable types
-	if val.Kind() == reflect.Ptr && val.IsNil() {
-		switch field.Kind() {
-		case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Interface:
+	// 快速路径：如果类型直接匹配（例如都是 string 或都是 int64）
+	valV := reflect.ValueOf(val)
+	if valV.Type().AssignableTo(fieldType) {
+		field.Set(valV)
+		return nil
+	}
+
+	// 如果 val 是指针（database/sql 扫描出来的有时会带指针），先取其值
+	if valV.Kind() == reflect.Ptr {
+		if valV.IsNil() {
 			field.Set(reflect.Zero(fieldType))
-		case reflect.String:
-			field.SetString("")
-		case reflect.Bool:
-			field.SetBool(false)
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			field.SetInt(0)
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			field.SetUint(0)
-		case reflect.Float32, reflect.Float64:
-			field.SetFloat(0)
-		default:
-			field.Set(reflect.Zero(fieldType))
+			return nil
 		}
-		return nil
+		valV = valV.Elem()
+		val = valV.Interface()
 	}
 
-	// Unwrap pointer if needed
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
-
-	// Direct assignment if types match
-	if val.Type().AssignableTo(fieldType) {
-		field.Set(val)
-		return nil
-	}
-
-	// Type conversion for basic types
+	// 针对不同目标字段类型的优化转换逻辑
 	switch field.Kind() {
 	case reflect.String:
-		field.SetString(fmt.Sprintf("%v", val.Interface()))
-	case reflect.Bool:
-		switch val.Kind() {
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			field.SetBool(val.Int() != 0)
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			field.SetBool(val.Uint() != 0)
+		switch v := val.(type) {
+		case []byte:
+			field.SetString(string(v))
+		case string:
+			field.SetString(v)
 		default:
-			return fmt.Errorf("cannot convert %v to bool", val.Type())
+			// 只有兜底才使用 fmt.Sprintf
+			field.SetString(fmt.Sprintf("%v", v))
 		}
+
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		switch val.Kind() {
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			field.SetInt(val.Int())
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			field.SetInt(int64(val.Uint()))
-		case reflect.Float32, reflect.Float64:
-			field.SetInt(int64(val.Float()))
-		case reflect.String:
-			if intVal, err := strconv.ParseInt(val.String(), 10, 64); err == nil {
-				field.SetInt(intVal)
+		switch v := val.(type) {
+		case int64:
+			field.SetInt(v)
+		case []byte:
+			if iv, err := strconv.ParseInt(string(v), 10, 64); err == nil {
+				field.SetInt(iv)
 			} else {
-				return err
+				return fmt.Errorf("cannot parse int from []byte: %w", err)
 			}
-		default:
-			return fmt.Errorf("cannot convert %v to int", val.Type())
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		switch val.Kind() {
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			field.SetUint(uint64(val.Int()))
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			field.SetUint(val.Uint())
-		case reflect.Float32, reflect.Float64:
-			field.SetUint(uint64(val.Float()))
-		case reflect.String:
-			if uintVal, err := strconv.ParseUint(val.String(), 10, 64); err == nil {
-				field.SetUint(uintVal)
+		case string:
+			if iv, err := strconv.ParseInt(v, 10, 64); err == nil {
+				field.SetInt(iv)
 			} else {
-				return err
+				return fmt.Errorf("cannot parse int from string: %w", err)
 			}
+		case float64:
+			field.SetInt(int64(v))
 		default:
-			return fmt.Errorf("cannot convert %v to uint", val.Type())
+			return fmt.Errorf("cannot convert %T to int", val)
 		}
+
+	case reflect.Bool:
+		switch v := val.(type) {
+		case bool:
+			field.SetBool(v)
+		case int64:
+			field.SetBool(v != 0)
+		case []byte:
+			b, _ := strconv.ParseBool(string(v))
+			field.SetBool(b)
+		}
+
 	case reflect.Float32, reflect.Float64:
-		switch val.Kind() {
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			field.SetFloat(float64(val.Int()))
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			field.SetFloat(float64(val.Uint()))
-		case reflect.Float32, reflect.Float64:
-			field.SetFloat(val.Float())
-		case reflect.String:
-			if floatVal, err := strconv.ParseFloat(val.String(), 64); err == nil {
-				field.SetFloat(floatVal)
+		switch v := val.(type) {
+		case float64:
+			field.SetFloat(v)
+		case []byte:
+			if fv, err := strconv.ParseFloat(string(v), 64); err == nil {
+				field.SetFloat(fv)
 			} else {
-				return err
+				return fmt.Errorf("cannot parse float from []byte: %w", err)
 			}
 		default:
-			return fmt.Errorf("cannot convert %v to float", val.Type())
+			return fmt.Errorf("cannot convert %T to float", val)
 		}
-	case reflect.Slice:
-		if fieldType.Elem().Kind() == reflect.Uint8 && val.Kind() == reflect.Slice && val.Type().Elem().Kind() == reflect.Uint8 {
-			// []byte conversion
-			field.Set(val)
-		} else {
-			return fmt.Errorf("cannot convert %v to slice", val.Type())
-		}
+	// 可以根据需要继续添加其他常用类型
 	default:
-		return fmt.Errorf("unsupported field type: %v", fieldType)
+		// 最后的兜底尝试
+		if valV.Type().ConvertibleTo(fieldType) {
+			field.Set(valV.Convert(fieldType))
+		} else {
+			return fmt.Errorf("unsupported conversion from %T to %v", val, fieldType)
+		}
 	}
 
 	return nil

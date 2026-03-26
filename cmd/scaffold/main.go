@@ -23,12 +23,14 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fatalf("usage: scaffold <command> [args]\ncommands: create-api, export-template, gen-migration, run-migration")
+		fatalf("usage: scaffold <command> [args]\ncommands: create-api, clean-logs, export-template, gen-migration, run-migration")
 	}
 
 	switch os.Args[1] {
 	case "create-api":
 		createAPI(os.Args[2:])
+	case "clean-logs":
+		cleanLogs(os.Args[2:])
 	case "export-template":
 		exportTemplate(os.Args[2:])
 	case "gen-migration":
@@ -711,6 +713,135 @@ func exportTemplate(args []string) {
 	}
 
 	fmt.Printf("exported template: %s\n", dst)
+}
+
+func cleanLogs(args []string) {
+	fsFlag := flag.NewFlagSet("clean-logs", flag.ExitOnError)
+	dirFlag := fsFlag.String("dir", "logs", "log directory path")
+	daysFlag := fsFlag.Int("days", 7, "retention days, delete files older than N days")
+	dryRunFlag := fsFlag.Bool("dry-run", false, "preview files to delete without removing them")
+	patternFlag := fsFlag.String("pattern", "*.log", "file pattern to match (e.g., *.log, *.txt)")
+	recursiveFlag := fsFlag.Bool("recursive", false, "clean subdirectories recursively")
+	_ = fsFlag.Parse(args)
+
+	root, err := os.Getwd()
+	if err != nil {
+		fatalf("getwd: %v", err)
+	}
+
+	logDir := strings.TrimSpace(*dirFlag)
+	if logDir == "" {
+		logDir = "logs"
+	}
+	if !filepath.IsAbs(logDir) {
+		logDir = filepath.Join(root, logDir)
+	}
+
+	stat, err := os.Stat(logDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("log directory not found: %s\n", logDir)
+			return
+		}
+		fatalf("stat log dir: %v", err)
+	}
+	if !stat.IsDir() {
+		fatalf("not a directory: %s", logDir)
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -*daysFlag)
+	pattern := *patternFlag
+	if pattern == "" {
+		pattern = "*.log"
+	}
+
+	var filesToDelete []string
+	var totalSize int64
+
+	walkFn := func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if !*recursiveFlag && path != logDir {
+				return fs.SkipDir
+			}
+			return nil
+		}
+
+		matched, _ := filepath.Match(pattern, d.Name())
+		if !matched {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+
+		if info.ModTime().Before(cutoff) {
+			filesToDelete = append(filesToDelete, path)
+			totalSize += info.Size()
+		}
+		return nil
+	}
+
+	if err := filepath.WalkDir(logDir, walkFn); err != nil {
+		fatalf("walk log dir: %v", err)
+	}
+
+	if len(filesToDelete) == 0 {
+		fmt.Println("no old log files to clean")
+		return
+	}
+
+	fmt.Printf("found %d file(s) older than %d days (total size: %s)\n",
+		len(filesToDelete), *daysFlag, formatBytes(totalSize))
+
+	if *dryRunFlag {
+		fmt.Println("dry-run mode, files to delete:")
+		for _, f := range filesToDelete {
+			fmt.Printf("  - %s\n", f)
+		}
+		return
+	}
+
+	var deleted int
+	var failed int
+	var freed int64
+
+	for _, f := range filesToDelete {
+		info, _ := os.Stat(f)
+		if err := os.Remove(f); err != nil {
+			fmt.Printf("failed to delete %s: %v\n", f, err)
+			failed++
+			continue
+		}
+		deleted++
+		if info != nil {
+			freed += info.Size()
+		}
+	}
+
+	fmt.Printf("cleaned %d file(s), failed %d, freed %s\n", deleted, failed, formatBytes(freed))
+}
+
+func formatBytes(n int64) string {
+	const (
+		KB = 1024
+		MB = 1024 * KB
+		GB = 1024 * MB
+	)
+	switch {
+	case n >= GB:
+		return fmt.Sprintf("%.2f GB", float64(n)/GB)
+	case n >= MB:
+		return fmt.Sprintf("%.2f MB", float64(n)/MB)
+	case n >= KB:
+		return fmt.Sprintf("%.2f KB", float64(n)/KB)
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
 }
 
 func fatalf(format string, args ...any) {
