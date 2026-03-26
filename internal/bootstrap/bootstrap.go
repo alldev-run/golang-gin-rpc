@@ -234,6 +234,8 @@ func (b *Bootstrap) InitializeDatabases() error {
 
 	b.db = factory
 	b.setDependency("db.factory", factory)
+	// Set global factory for db helper functions
+	db.SetGlobalFactory(factory)
 	logger.Info("Database initialization completed")
 	return nil
 }

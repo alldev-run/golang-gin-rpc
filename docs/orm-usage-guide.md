@@ -87,6 +87,407 @@ func directDB() {
 }
 ```
 
+## 全局 Helper 快速使用（推荐）
+
+`pkg/db/helper.go` 提供了更简洁的全局数据库访问方式，无需手动创建 ORM 实例，在 bootstrap 初始化后即可直接使用。
+
+### 3. 使用全局 Helper
+
+```go
+package main
+
+import (
+    "context"
+    
+    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/pkg/db"
+)
+
+func main() {
+    // 初始化 bootstrap（自动设置全局 factory）
+    boot, err := bootstrap.NewBootstrap("configs/config.yaml")
+    if err != nil {
+        panic(err)
+    }
+    defer boot.Close()
+
+    if err := boot.InitializeAll(); err != nil {
+        panic(err)
+    }
+
+    // 直接使用全局 helper，无需创建 ORM 实例
+    useHelper()
+}
+
+func useHelper() {
+    ctx := context.Background()
+    
+    // 查询示例
+    rows, err := db.Select("users").
+        Columns("id", "name", "email").
+        Eq("status", 1).
+        Query(ctx)
+    if err != nil {
+        panic(err)
+    }
+    defer rows.Close()
+    
+    // 插入示例
+    _, err = db.Insert("users").Sets(map[string]interface{}{
+        "name":  "Alice",
+        "email": "alice@example.com",
+    }).Exec(ctx)
+    
+    // 更新示例
+    _, err = db.Update("users").
+        Set("name", "Bob").
+        Eq("id", 1).
+        Exec(ctx)
+    
+    // 删除示例
+    _, err = db.Delete("users").
+        Eq("id", 1).
+        Exec(ctx)
+}
+```
+
+### 多数据库支持
+
+同时访问 MySQL 和 PostgreSQL：
+
+```go
+// MySQL（默认，无需指定）
+users, err := db.Select("users").
+    Columns("id", "name").
+    Query(ctx)
+
+// PostgreSQL（显式指定）
+orders, err := db.Using(db.DBTypePostgres).Select("orders").
+    Columns("id", "amount").
+    Query(ctx)
+
+// 或使用专用函数
+orders, err := db.PostgresSelect("orders").
+    Eq("status", "pending").
+    Query(ctx)
+```
+
+### 同一 MySQL 实例多数据库访问
+
+配置中的 `database` 作为默认库，通过 `Use()` 动态切换其他库：
+
+```go
+// 配置示例 (database.yml):
+// mysql_primary:
+//   type: mysql
+//   mysql:
+//     host: localhost
+//     database: userdb  // 默认库
+
+// 默认使用配置中的 database
+users, err := db.Select("users").Query(ctx)  // 查询 userdb.users
+
+// 切换到 orderdb
+db.Use("orderdb")
+orders, err := db.Select("orders").Query(ctx)  // 查询 orderdb.orders
+
+// 写日志到 logdb
+db.Use("logdb")
+_, err = db.Insert("logs").Sets(...).Exec(ctx)
+
+// 恢复默认库
+db.UseDefault()  // 或 db.Use("")
+users, err = db.Select("users").Query(ctx)  // 回到 userdb.users
+```
+
+### Repository 模式中的多库切换
+
+```go
+type UserRepository struct{}
+
+func (r *UserRepository) FindByID(ctx context.Context, id int64) (*User, error) {
+    db.Use("userdb")
+    defer db.UseDefault()
+    
+    rows, err := db.Select("users").Eq("id", id).Query(ctx)
+    // ...
+}
+
+type OrderRepository struct{}
+
+func (r *OrderRepository) FindByID(ctx context.Context, id int64) (*Order, error) {
+    db.Use("orderdb")
+    defer db.UseDefault()
+    
+    rows, err := db.Select("orders").Eq("id", id).Query(ctx)
+    // ...
+}
+```
+
+### 跨库 JOIN（MySQL 原生支持）
+
+**注意**: 跨库 JOIN 是 **MySQL 原生支持**的特性，只要表在同一 MySQL 实例内，就可以用 `database.table` 语法跨库关联：
+
+```sql
+-- MySQL 原生支持的跨库 JOIN
+SELECT u.name, o.amount 
+FROM userdb.users AS u 
+JOIN orderdb.orders AS o ON u.id = o.user_id
+```
+
+在框架中使用：
+
+```go
+// 方式1: 完整表名（推荐，清晰明确）
+rows, err := db.Select("userdb.users AS u").
+    Join("orderdb.orders AS o", "u.id = o.user_id").
+    Columns("u.name", "o.amount").
+    Query(ctx)
+
+// 方式2: Use 一个库，另一个写完整名
+db.Use("userdb")
+rows, err := db.Select("users AS u").
+    Join("orderdb.orders AS o", "u.id = o.user_id").
+    Query(ctx)
+```
+
+**限制**: 跨库 JOIN 只能在**同一 MySQL 实例**内进行。如果 `userdb` 和 `orderdb` 在不同 MySQL 服务器上，则无法直接 JOIN，需要通过应用层关联或使用分布式查询方案。
+
+### 多库切换注意事项
+
+```go
+// ⚠️ Use() 影响全局状态，并发环境下需谨慎
+// 错误示例
+func Handler(w http.ResponseWriter, r *http.Request) {
+    db.Use("orderdb")  // ❌ 会影响到其他请求！
+    // ...
+}
+
+// ✅ 正确做法：使用 defer 恢复
+func Handler(w http.ResponseWriter, r *http.Request) {
+    db.Use("orderdb")
+    defer db.UseDefault()
+    // ...
+}
+```
+
+### 多数据库查询对照表
+
+| 场景 | 用法 | 示例 |
+|------|------|------|
+| 默认库（配置中的 database）| 直接使用 | `db.Select("users")` |
+| 切换到其他库 | `Use()` + 查询 | `db.Use("orderdb"); db.Select("orders")` |
+| 跨库 JOIN | 完整表名 | `db.Select("db1.table1 AS t1").Join("db2.table2 AS t2", ...)` |
+| 恢复默认 | `UseDefault()` | `db.UseDefault()` |
+
+### 多数据库 Repository 模式示例
+
+```go
+// UserRepository 使用 MySQL
+type UserRepository struct{}
+
+func (r *UserRepository) FindByID(ctx context.Context, id int64) (*User, error) {
+    rows, err := db.Select("users").
+        Columns("id", "name", "email").
+        Eq("id", id).
+        Limit(1).
+        Query(ctx)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    
+    if !rows.Next() {
+        return nil, sql.ErrNoRows
+    }
+    
+    var user User
+    err = rows.Scan(&user.ID, &user.Name, &user.Email)
+    return &user, err
+}
+
+func (r *UserRepository) Create(ctx context.Context, user *User) error {
+    _, err := db.Insert("users").Sets(map[string]interface{}{
+        "name":  user.Name,
+        "email": user.Email,
+    }).Exec(ctx)
+    return err
+}
+
+// OrderRepository 使用 PostgreSQL
+type OrderRepository struct{}
+
+func (r *OrderRepository) FindByID(ctx context.Context, id int64) (*Order, error) {
+    // 方式1: 使用 Using 链式调用
+    rows, err := db.Using(db.DBTypePostgres).Select("orders").
+        Columns("id", "user_id", "amount", "status").
+        Eq("id", id).
+        Limit(1).
+        Query(ctx)
+    // ...
+}
+
+func (r *OrderRepository) Create(ctx context.Context, order *Order) error {
+    // 方式2: 使用专用函数
+    _, err := db.PostgresInsert("orders").Sets(map[string]interface{}{
+        "user_id": order.UserID,
+        "amount":  order.Amount,
+        "status":  order.Status,
+    }).Exec(ctx)
+    return err
+}
+```
+
+### Service 层组合多个数据库
+
+```go
+type OrderService struct {
+    userRepo  *UserRepository  // MySQL
+    orderRepo *OrderRepository // PostgreSQL
+}
+
+func (s *OrderService) CreateOrder(ctx context.Context, userID int64, amount float64) error {
+    // 1. 从 MySQL 验证用户
+    user, err := s.userRepo.FindByID(ctx, userID)
+    if err != nil {
+        return fmt.Errorf("user not found: %w", err)
+    }
+    
+    // 2. 在 PostgreSQL 创建订单
+    order := &Order{
+        UserID: userID,
+        Amount: amount,
+        Status: "pending",
+    }
+    
+    if err := s.orderRepo.Create(ctx, order); err != nil {
+        return fmt.Errorf("failed to create order: %w", err)
+    }
+    
+    // 3. 在 MySQL 更新用户统计
+    _, err = db.Update("users").
+        Set("order_count", "order_count + 1").
+        Eq("id", userID).
+        Exec(ctx)
+    
+    return err
+}
+```
+
+### 配置多数据库
+
+```yaml
+# database.yml - 服务级配置
+mysql_primary:
+  type: mysql
+  mysql:
+    host: localhost
+    port: 3306
+    database: userdb
+    username: root
+    password: secret
+    
+postgres_primary:
+  type: postgres
+  postgres:
+    host: localhost
+    port: 5432
+    database: orderdb
+    username: postgres
+    password: secret
+```
+
+### ⚠️ 跨数据库事务注意事项
+
+框架的 Helper **不支持跨数据库事务**（MySQL 和 PostgreSQL 事务不能混合）：
+
+```go
+// ❌ 错误：不能在同一个事务中操作两个数据库
+err := db.Transaction(ctx, func(tx *sql.Tx) error {
+    // 这是 MySQL 事务
+    tx.Exec("UPDATE users SET ...") 
+    
+    // ❌ PostgreSQL 操作不能在这个事务中！
+    // 下面的代码不会工作，因为它属于不同数据库
+    return nil
+})
+
+// ✅ 正确：分开处理，或使用分布式事务（Saga/TCC 模式）
+func (s *OrderService) CreateOrderWithCompensation(ctx context.Context, userID int64, amount float64) error {
+    // 步骤1：创建订单（PostgreSQL）
+    order, err := s.createOrderInPostgres(ctx, userID, amount)
+    if err != nil {
+        return err
+    }
+    
+    // 步骤2：更新用户（MySQL）
+    if err := s.updateUserInMySQL(ctx, userID); err != nil {
+        // 补偿：回滚订单创建
+        s.cancelOrderInPostgres(ctx, order.ID)
+        return err
+    }
+    
+    return nil
+}
+```
+
+### 推荐的目录结构
+
+```
+internal/
+├── repository/
+│   ├── user_repo.go      # MySQL 操作
+│   ├── order_repo.go     # PostgreSQL 操作
+│   └── product_repo.go    # MySQL 操作
+├── service/
+│   └── order_service.go   # 组合多个 Repository
+└── model/
+    ├── user.go
+    ├── order.go
+    └── product.go
+```
+
+### 多数据库查询函数对照表
+
+| 操作 | MySQL (默认) | PostgreSQL (显式) |
+|------|-------------|------------------|
+| 查询 | `db.Select("table")` | `db.Using(db.DBTypePostgres).Select("table")` |
+| 插入 | `db.Insert("table")` | `db.PostgresInsert("table")` |
+| 更新 | `db.Update("table")` | `db.PostgresUpdate("table")` |
+| 删除 | `db.Delete("table")` | `db.PostgresDelete("table")` |
+| 原始SQL | `db.Query(ctx, sql)` | `db.Postgres().Query(ctx, sql)` |
+
+### 原始 SQL 查询
+
+```go
+// 直接执行 SQL
+rows, err := db.Query(ctx, "SELECT * FROM users WHERE id = ?", 1)
+
+// 执行 INSERT/UPDATE/DELETE
+result, err := db.Exec(ctx, "UPDATE users SET name = ? WHERE id = ?", "John", 1)
+
+// 事务
+err := db.Transaction(ctx, func(tx *sql.Tx) error {
+    _, err := tx.Exec("INSERT INTO accounts ...")
+    if err != nil {
+        return err
+    }
+    _, err = tx.Exec("UPDATE balances ...")
+    return err
+})
+```
+
+### Helper vs ORM 选择
+
+| 场景 | 推荐方式 | 说明 |
+|------|---------|------|
+| 快速开发 | `db.Select/Insert/Update/Delete` | 无需初始化，直接调用 |
+| 多数据库 | `db.Using(dbType)` | 简洁的多数据库切换 |
+| 复杂查询 | `orm.ORM` | 需要更多控制时使用 |
+| 事务 | 两者都支持 | Helper 用 `db.Transaction`，ORM 用 `o.Transaction` |
+
+---
+
 ## 查询构建器详解
 
 **注意**: 以下示例中的 `o` 变量表示已创建的 ORM 实例：

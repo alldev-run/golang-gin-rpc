@@ -16,6 +16,8 @@
 
 ## 目录结构
 
+- `helper.go`
+  - 全局数据库访问助手，提供简洁的 ORM 和 SQL 查询接口
 - `config.go`
   - 数据库配置定义
 - `factory.go`
@@ -63,7 +65,82 @@
 
 ## 核心能力
 
-### 1. 数据库工厂
+### 1. 全局 Helper（推荐）
+
+`helper.go` 提供全局数据库访问助手，在 bootstrap 初始化后，可直接在业务代码中使用，无需手动传递数据库实例。
+
+#### 基本使用
+
+```go
+import "github.com/alldev-run/golang-gin-rpc/pkg/db"
+
+// MySQL 查询（默认）
+rows, err := db.Select("users").
+    Columns("id", "name", "email").
+    Eq("status", 1).
+    Query(ctx)
+
+// 插入
+_, err := db.Insert("users").Sets(map[string]interface{}{
+    "name":  "John",
+    "email": "john@example.com",
+}).Exec(ctx)
+
+// 更新
+_, err := db.Update("users").
+    Set("name", "Jane").
+    Eq("id", 1).
+    Exec(ctx)
+
+// 删除
+_, err := db.Delete("users").
+    Eq("id", 1).
+    Exec(ctx)
+```
+
+#### 多数据库支持
+
+同时支持 MySQL 和 PostgreSQL：
+
+```go
+// MySQL（默认，无需指定）
+rows, err := db.Select("users").Eq("id", 1).Query(ctx)
+
+// PostgreSQL（显式指定）
+rows, err := db.Using(db.DBTypePostgres).Select("orders").
+    Eq("status", "pending").
+    Query(ctx)
+
+// 或使用专用函数
+rows, err := db.PostgresSelect("orders").Eq("id", 1).Query(ctx)
+```
+
+#### 原始 SQL 查询
+
+```go
+// 查询
+rows, err := db.Query(ctx, "SELECT * FROM users WHERE id = ?", 1)
+
+// 执行
+result, err := db.Exec(ctx, "INSERT INTO users (name) VALUES (?)", "John")
+
+// 事务
+err := db.Transaction(ctx, func(tx *sql.Tx) error {
+    _, err := tx.Exec("INSERT INTO ...")
+    return err
+})
+```
+
+#### 初始化
+
+在 main.go 中初始化 bootstrap，helper 会自动可用：
+
+```go
+boot, err := bootstrap.NewBootstrap("config.yaml")
+boot.InitializeAll() // 自动设置全局 factory，db.Select 立即可用
+```
+
+### 2. 数据库工厂
 
 通过工厂模式统一创建数据库实例，适合在 bootstrap 阶段按配置加载。
 
@@ -73,7 +150,7 @@
 - 在多数据库场景下统一入口
 - 屏蔽具体数据库初始化差异
 
-### 2. ORM / 查询构建
+### 3. ORM / 查询构建
 
 `orm/` 提供常见数据库开发所需能力：
 
@@ -88,7 +165,7 @@
 - 常规服务查询接口
 - 列表分页与过滤查询
 
-### 3. 连接池与读写分离
+### 4. 连接池与读写分离
 
 连接池相关子包包括：
 
@@ -103,7 +180,7 @@
 - 池级别保护
 - 读写分离的业务开发
 
-### 4. 可观测性与治理
+### 5. 可观测性与治理
 
 数据库相关治理与观测能力包括：
 
@@ -119,7 +196,7 @@
 - 基础 SQL 风险拦截
 - 故障时的保护性熔断
 
-### 5. 迁移
+### 6. 迁移
 
 `migration/` 适合做：
 
