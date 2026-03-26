@@ -115,7 +115,10 @@ func (f *Factory) createRedis(cfg redis.Config) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redis client: %w", err)
 	}
-	return &redisAdapter{client: client}, nil
+	adapter := &redisAdapter{client: client}
+	// Store the client in the factory for later retrieval
+	f.clients[TypeRedis] = adapter
+	return adapter, nil
 }
 
 // createPostgres creates a PostgreSQL client.
@@ -124,7 +127,10 @@ func (f *Factory) createPostgres(cfg postgres.Config) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create postgres client: %w", err)
 	}
-	return &postgresAdapter{client: client}, nil
+	adapter := &postgresAdapter{client: client}
+	// Store the client in the factory for later retrieval
+	f.clients[TypePostgres] = adapter
+	return adapter, nil
 }
 
 // createClickHouse creates a ClickHouse client.
@@ -133,7 +139,10 @@ func (f *Factory) createClickHouse(cfg clickhouse.Config) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clickhouse client: %w", err)
 	}
-	return &clickhouseAdapter{client: client}, nil
+	adapter := &clickhouseAdapter{client: client}
+	// Store the client in the factory for later retrieval
+	f.clients[TypeClickHouse] = adapter
+	return adapter, nil
 }
 
 // createES creates an Elasticsearch client.
@@ -142,7 +151,10 @@ func (f *Factory) createES(cfg elasticsearch.Config) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create elasticsearch client: %w", err)
 	}
-	return &esAdapter{client: client}, nil
+	adapter := &esAdapter{client: client}
+	// Store the client in the factory for later retrieval
+	f.clients[TypeES] = adapter
+	return adapter, nil
 }
 
 // createMemcache creates a Memcached client.
@@ -151,7 +163,10 @@ func (f *Factory) createMemcache(cfg memcache.Config) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create memcache client: %w", err)
 	}
-	return &memcacheAdapter{client: client}, nil
+	adapter := &memcacheAdapter{client: client}
+	// Store the client in the factory for later retrieval
+	f.clients[TypeMemcache] = adapter
+	return adapter, nil
 }
 
 // createMongoDB creates a MongoDB client.
@@ -160,7 +175,10 @@ func (f *Factory) createMongoDB(cfg mongodb.Config) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mongodb client: %w", err)
 	}
-	return &mongodbAdapter{client: client}, nil
+	adapter := &mongodbAdapter{client: client}
+	// Store the client in the factory for later retrieval
+	f.clients[TypeMongoDB] = adapter
+	return adapter, nil
 }
 
 // ==================== Adapters ====================

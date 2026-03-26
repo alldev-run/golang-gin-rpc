@@ -1,4 +1,9 @@
 # Application Configuration
+app:
+  name: "golang-gin-rpc"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
 
 # Framework Runtime Configuration
 framework:

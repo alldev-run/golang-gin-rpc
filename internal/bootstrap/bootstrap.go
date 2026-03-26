@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/yaml.v3"
+	
 	"github.com/alldev-run/golang-gin-rpc/pkg/auth"
 	"github.com/alldev-run/golang-gin-rpc/pkg/cache"
 	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
@@ -181,51 +183,392 @@ func (b *Bootstrap) InitializeAll() error {
 
 // InitializeDatabases initializes all database connections
 func (b *Bootstrap) InitializeDatabases() error {
-	if !b.config.Database.Primary.Enabled && !b.config.Database.Replica.Enabled {
-		logger.Info("No database configuration found, skipping database initialization")
-		return nil
-	}
-
 	factory := db.NewFactory()
-	configs := map[string]config.DBConfig{
-		"primary": b.config.Database.Primary,
-		"replica": b.config.Database.Replica,
-	}
-
-	for name, dbConfig := range configs {
-		if !dbConfig.Enabled {
-			continue
+	
+	// First, try to load service-level database configurations
+	if err := b.initializeServiceDatabases(factory); err != nil {
+		logger.Warn("Failed to initialize service-level databases, falling back to framework config", logger.Error(err))
+		
+		// Fallback to framework database configuration
+		if !b.config.Database.Primary.Enabled && !b.config.Database.Replica.Enabled {
+			logger.Info("No database configuration found, skipping database initialization")
+			return nil
+		}
+		
+		configs := map[string]config.DBConfig{
+			"primary": b.config.Database.Primary,
+			"replica": b.config.Database.Replica,
 		}
 
-		clientConfig, err := buildDBConfig(dbConfig, b.config.Database.Pool)
-		if err != nil {
-			logger.Errorf("Database configuration build failed",
-				logger.String("name", name),
-				logger.Error(err),
-			)
-			return fmt.Errorf("failed to build database config %s: %w", name, err)
-		}
+		for name, dbConfig := range configs {
+			if !dbConfig.Enabled {
+				continue
+			}
 
-		client, err := factory.Create(clientConfig)
-		if err != nil {
-			logger.Errorf("Database client creation failed",
-				logger.String("name", name),
-				logger.Error(err),
-			)
-			return fmt.Errorf("failed to create database client %s: %w", name, err)
-		}
+			clientConfig, err := buildDBConfig(dbConfig, b.config.Database.Pool)
+			if err != nil {
+				logger.Errorf("Database configuration build failed",
+					logger.String("name", name),
+					logger.Error(err),
+				)
+				return fmt.Errorf("failed to build database config %s: %w", name, err)
+			}
 
-		ctx := context.Background()
-		if err := client.Ping(ctx); err != nil {
-			logger.Errorf("Database connection failed", logger.String("name", name), logger.Error(err))
-		} else {
-			logger.Info("Database connected successfully", logger.String("name", name))
+			client, err := factory.Create(clientConfig)
+			if err != nil {
+				logger.Errorf("Database client creation failed",
+					logger.String("name", name),
+					logger.Error(err),
+				)
+				return fmt.Errorf("failed to create database client %s: %w", name, err)
+			}
+
+			ctx := context.Background()
+			if err := client.Ping(ctx); err != nil {
+				logger.Errorf("Database connection failed", logger.String("name", name), logger.Error(err))
+			} else {
+				logger.Info("Database connected successfully", logger.String("name", name))
+			}
 		}
 	}
 
 	b.db = factory
 	b.setDependency("db.factory", factory)
 	logger.Info("Database initialization completed")
+	return nil
+}
+
+// initializeServiceDatabases initializes databases from service-level configuration format
+func (b *Bootstrap) initializeServiceDatabases(factory *db.Factory) error {
+	// Try to read service-level database configuration from a separate file
+	// This supports the format used by external projects
+	
+	// Check for service database config file in order of preference
+	serviceDBConfigPaths := []string{
+		"database.yml",           // Simplified config (MySQL only)
+		"configs/database.yml",   // Full service config
+		"database.service.yml",  // Explicit service config
+	}
+	
+	var serviceDBData []byte
+	var serviceDBConfigPath string
+	
+	for _, path := range serviceDBConfigPaths {
+		if _, err := os.Stat(path); err == nil {
+			serviceDBConfigPath = path
+			serviceDBData, err = os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to read service database config from %s: %w", path, err)
+			}
+			logger.Info("Found service database config", logger.String("path", path))
+			break
+		}
+	}
+	
+	if serviceDBData == nil {
+		return fmt.Errorf("no service database configuration file found")
+	}
+	
+	var serviceDBConfigs map[string]interface{}
+	if err := yaml.Unmarshal(serviceDBData, &serviceDBConfigs); err != nil {
+		return fmt.Errorf("failed to parse service database config from %s: %w", serviceDBConfigPath, err)
+	}
+	
+	logger.Info("Service database configs found", logger.Int("count", len(serviceDBConfigs)))
+	for key := range serviceDBConfigs {
+		logger.Info("Processing service config", logger.String("key", key))
+	}
+	
+	// Process each service database configuration
+	for key, config := range serviceDBConfigs {
+		if err := b.processServiceDatabaseConfig(key, config, factory); err != nil {
+			return fmt.Errorf("failed to process service database config %s: %w", key, err)
+		}
+	}
+	
+	return nil
+}
+
+// processServiceDatabaseConfig processes a single service database configuration
+func (b *Bootstrap) processServiceDatabaseConfig(key string, config interface{}, factory *db.Factory) error {
+	// Parse key format: mysql_primary, mysql_replica, redis_cache, etc.
+	parts := strings.Split(key, "_")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid database config key format: %s", key)
+	}
+	
+	dbType := parts[0]
+	role := parts[1]
+	
+	// Special handling for Redis with role like "cache"
+	if dbType == "redis" && role == "cache" {
+		role = "primary" // Treat redis_cache as primary Redis instance
+	}
+	
+	// Convert config to map
+	configMap, ok := config.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid database config format for %s", key)
+	}
+	
+	// Check if this is the expected database type
+	typeField, ok := configMap["type"].(string)
+	if !ok || typeField != dbType {
+		return fmt.Errorf("database type mismatch for %s: expected %s", key, dbType)
+	}
+	
+	// Extract database-specific configuration
+	dbSpecificConfig, ok := configMap[dbType].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("missing %s configuration in %s", dbType, key)
+	}
+	
+	// Create database client based on type
+	switch dbType {
+	case "mysql":
+		return b.createMySQLFromServiceConfig(role, dbSpecificConfig, factory)
+	case "postgres", "postgresql":
+		return b.createPostgresFromServiceConfig(role, dbSpecificConfig, factory)
+	case "redis":
+		return b.createRedisFromServiceConfig(role, dbSpecificConfig, factory)
+	default:
+		return fmt.Errorf("unsupported database type: %s", dbType)
+	}
+}
+
+// createMySQLFromServiceConfig creates MySQL client from service configuration
+func (b *Bootstrap) createMySQLFromServiceConfig(role string, config map[string]interface{}, factory *db.Factory) error {
+	mysqlConfig := mysqlpkg.DefaultConfig()
+	
+	// Map configuration fields
+	if host, ok := config["host"].(string); ok {
+		mysqlConfig.Host = host
+	}
+	if port, ok := config["port"].(int); ok {
+		mysqlConfig.Port = port
+	} else if portFloat, ok := config["port"].(float64); ok {
+		mysqlConfig.Port = int(portFloat)
+	}
+	if database, ok := config["database"].(string); ok {
+		mysqlConfig.Database = database
+	}
+	if username, ok := config["username"].(string); ok {
+		mysqlConfig.Username = username
+	}
+	if password, ok := config["password"].(string); ok {
+		mysqlConfig.Password = password
+	}
+	if charset, ok := config["charset"].(string); ok {
+		mysqlConfig.Charset = charset
+	}
+	
+	// Pool configuration
+	if maxOpenConns, ok := config["max_open_conns"].(int); ok {
+		mysqlConfig.MaxOpenConns = maxOpenConns
+	} else if maxOpenConnsFloat, ok := config["max_open_conns"].(float64); ok {
+		mysqlConfig.MaxOpenConns = int(maxOpenConnsFloat)
+	}
+	
+	if maxIdleConns, ok := config["max_idle_conns"].(int); ok {
+		mysqlConfig.MaxIdleConns = maxIdleConns
+	} else if maxIdleConnsFloat, ok := config["max_idle_conns"].(float64); ok {
+		mysqlConfig.MaxIdleConns = int(maxIdleConnsFloat)
+	}
+	
+	if connMaxLifetimeStr, ok := config["conn_max_lifetime"].(string); ok {
+		if duration, err := time.ParseDuration(connMaxLifetimeStr); err == nil {
+			mysqlConfig.ConnMaxLifetime = duration
+		}
+	}
+	
+	if connMaxIdleTimeStr, ok := config["conn_max_idle_time"].(string); ok {
+		if duration, err := time.ParseDuration(connMaxIdleTimeStr); err == nil {
+			mysqlConfig.ConnMaxIdleTime = duration
+		}
+	}
+	
+	// Create database client
+	dbConfig := db.Config{
+		Type:   db.TypeMySQL,
+		MySQL:  mysqlConfig,
+	}
+	
+	client, err := factory.Create(dbConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create MySQL client for role %s: %w", role, err)
+	}
+	
+	// Test connection
+	ctx := context.Background()
+	if err := client.Ping(ctx); err != nil {
+		logger.Errorf("MySQL connection failed for role %s", logger.String("role", role), logger.Error(err))
+	} else {
+		logger.Info("MySQL connected successfully", logger.String("role", role))
+	}
+	
+	return nil
+}
+
+// createPostgresFromServiceConfig creates PostgreSQL client from service configuration
+func (b *Bootstrap) createPostgresFromServiceConfig(role string, config map[string]interface{}, factory *db.Factory) error {
+	postgresConfig := pg.DefaultConfig()
+	
+	// Map configuration fields
+	if host, ok := config["host"].(string); ok {
+		postgresConfig.Host = host
+	}
+	if port, ok := config["port"].(int); ok {
+		postgresConfig.Port = port
+	} else if portFloat, ok := config["port"].(float64); ok {
+		postgresConfig.Port = int(portFloat)
+	}
+	if database, ok := config["database"].(string); ok {
+		postgresConfig.Database = database
+	}
+	if username, ok := config["username"].(string); ok {
+		postgresConfig.Username = username
+	}
+	if password, ok := config["password"].(string); ok {
+		postgresConfig.Password = password
+	}
+	if sslMode, ok := config["ssl_mode"].(string); ok {
+		postgresConfig.SSLMode = sslMode
+	}
+	
+	// Pool configuration
+	if maxOpenConns, ok := config["max_open_conns"].(int); ok {
+		postgresConfig.MaxOpenConns = maxOpenConns
+	} else if maxOpenConnsFloat, ok := config["max_open_conns"].(float64); ok {
+		postgresConfig.MaxOpenConns = int(maxOpenConnsFloat)
+	}
+	
+	if maxIdleConns, ok := config["max_idle_conns"].(int); ok {
+		postgresConfig.MaxIdleConns = maxIdleConns
+	} else if maxIdleConnsFloat, ok := config["max_idle_conns"].(float64); ok {
+		postgresConfig.MaxIdleConns = int(maxIdleConnsFloat)
+	}
+	
+	if connMaxLifetimeStr, ok := config["conn_max_lifetime"].(string); ok {
+		if duration, err := time.ParseDuration(connMaxLifetimeStr); err == nil {
+			postgresConfig.ConnMaxLifetime = duration
+		}
+	}
+	
+	if connMaxIdleTimeStr, ok := config["conn_max_idle_time"].(string); ok {
+		if duration, err := time.ParseDuration(connMaxIdleTimeStr); err == nil {
+			// PostgreSQL config doesn't have ConnMaxIdleTime field, skip for now
+			_ = duration
+		}
+	}
+	
+	// Create database client
+	dbConfig := db.Config{
+		Type: db.TypePostgres,
+		PG:   postgresConfig,
+	}
+	
+	client, err := factory.Create(dbConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create PostgreSQL client for role %s: %w", role, err)
+	}
+	
+	// Test connection
+	ctx := context.Background()
+	if err := client.Ping(ctx); err != nil {
+		logger.Errorf("PostgreSQL connection failed for role %s", logger.String("role", role), logger.Error(err))
+	} else {
+		logger.Info("PostgreSQL connected successfully", logger.String("role", role))
+	}
+	
+	return nil
+}
+
+// createRedisFromServiceConfig creates Redis client from service configuration
+func (b *Bootstrap) createRedisFromServiceConfig(role string, config map[string]interface{}, factory *db.Factory) error {
+	redisConfig := cacheredis.DefaultConfig()
+	
+	// Map configuration fields
+	if host, ok := config["host"].(string); ok {
+		redisConfig.Host = host
+	}
+	if port, ok := config["port"].(int); ok {
+		redisConfig.Port = port
+	} else if portFloat, ok := config["port"].(float64); ok {
+		redisConfig.Port = int(portFloat)
+	}
+	if password, ok := config["password"].(string); ok {
+		redisConfig.Password = password
+	}
+	if database, ok := config["database"].(int); ok {
+		redisConfig.Database = database
+	} else if databaseFloat, ok := config["database"].(float64); ok {
+		redisConfig.Database = int(databaseFloat)
+	}
+	if mode, ok := config["mode"].(string); ok {
+		redisConfig.Mode = redis.Mode(mode)
+	}
+	
+	if poolSize, ok := config["pool_size"].(int); ok {
+		redisConfig.PoolSize = poolSize
+	} else if poolSizeFloat, ok := config["pool_size"].(float64); ok {
+		redisConfig.PoolSize = int(poolSizeFloat)
+	}
+	
+	if minIdleConns, ok := config["min_idle_conns"].(int); ok {
+		redisConfig.MinIdleConns = minIdleConns
+	} else if minIdleConnsFloat, ok := config["min_idle_conns"].(float64); ok {
+		redisConfig.MinIdleConns = int(minIdleConnsFloat)
+	}
+	
+	if maxRetries, ok := config["max_retries"].(int); ok {
+		redisConfig.MaxRetries = maxRetries
+	} else if maxRetriesFloat, ok := config["max_retries"].(float64); ok {
+		redisConfig.MaxRetries = int(maxRetriesFloat)
+	}
+	
+	if dialTimeoutStr, ok := config["dial_timeout"].(string); ok {
+		if duration, err := time.ParseDuration(dialTimeoutStr); err == nil {
+			redisConfig.DialTimeout = duration
+		}
+	}
+	
+	if readTimeoutStr, ok := config["read_timeout"].(string); ok {
+		if duration, err := time.ParseDuration(readTimeoutStr); err == nil {
+			redisConfig.ReadTimeout = duration
+		}
+	}
+	
+	if writeTimeoutStr, ok := config["write_timeout"].(string); ok {
+		if duration, err := time.ParseDuration(writeTimeoutStr); err == nil {
+			redisConfig.WriteTimeout = duration
+		}
+	}
+	
+	if poolTimeoutStr, ok := config["pool_timeout"].(string); ok {
+		if duration, err := time.ParseDuration(poolTimeoutStr); err == nil {
+			redisConfig.PoolTimeout = duration
+		}
+	}
+	
+	// Create database client
+	dbConfig := db.Config{
+		Type:  db.TypeRedis,
+		Redis: redisConfig,
+	}
+	
+	client, err := factory.Create(dbConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create Redis client for role %s: %w", role, err)
+	}
+	
+	// Test connection
+	ctx := context.Background()
+	if err := client.Ping(ctx); err != nil {
+		logger.Errorf("Redis connection failed for role %s", logger.String("role", role), logger.Error(err))
+	} else {
+		logger.Info("Redis connected successfully", logger.String("role", role))
+	}
+	
 	return nil
 }
 
