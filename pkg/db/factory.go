@@ -364,6 +364,26 @@ func (f *Factory) GetPostgres() (*postgres.Client, error) {
 	return nil, fmt.Errorf("PostgreSQL client not found")
 }
 
+// GetMongoDB returns the MongoDB client from the factory.
+func (f *Factory) GetMongoDB() (*mongodb.Client, error) {
+	if client, exists := f.clients[TypeMongoDB]; exists {
+		if adapter, ok := client.(*mongodbAdapter); ok {
+			return adapter.client, nil
+		}
+	}
+	return nil, fmt.Errorf("MongoDB client not found")
+}
+
+// GetClickHouse returns the ClickHouse client from the factory.
+func (f *Factory) GetClickHouse() (*clickhouse.Client, error) {
+	if client, exists := f.clients[TypeClickHouse]; exists {
+		if adapter, ok := client.(*clickhouseAdapter); ok {
+			return adapter.client, nil
+		}
+	}
+	return nil, fmt.Errorf("ClickHouse client not found")
+}
+
 // GetClient returns a client by type.
 func (f *Factory) GetClient(dbType Type) (Client, error) {
 	if client, exists := f.clients[dbType]; exists {

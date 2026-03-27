@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/clickhouse"
+	"github.com/alldev-run/golang-gin-rpc/pkg/db/mongodb"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
@@ -394,6 +396,28 @@ func Postgres() (*postgres.Client, error) {
 		return nil, ErrFactoryNotInitialized
 	}
 	return factory.GetPostgres()
+}
+
+// ==================== MongoDB Helper Functions ====================
+
+// MongoDB returns the global MongoDB client.
+func MongoDB() (*mongodb.Client, error) {
+	factory := GetGlobalFactory()
+	if factory == nil {
+		return nil, ErrFactoryNotInitialized
+	}
+	return factory.GetMongoDB()
+}
+
+// ==================== ClickHouse Helper Functions ====================
+
+// ClickHouse returns the global ClickHouse client.
+func ClickHouse() (*clickhouse.Client, error) {
+	factory := GetGlobalFactory()
+	if factory == nil {
+		return nil, ErrFactoryNotInitialized
+	}
+	return factory.GetClickHouse()
 }
 
 // ==================== Common Errors ====================
