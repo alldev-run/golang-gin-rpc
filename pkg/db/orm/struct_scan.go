@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // --- 新增：结构体元数据缓存，避免高并发下重复反射 ---
@@ -153,7 +154,7 @@ func scanRowToStruct(columns []string, values []interface{}, structV reflect.Val
 }
 
 func setFieldValue(field reflect.Value, val interface{}) error {
-	// 处理数据库 NULL 值
+	// 1. 处理数据库 NULL 值
 	if val == nil {
 		field.Set(reflect.Zero(field.Type()))
 		return nil
@@ -161,14 +162,14 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 
 	fieldType := field.Type()
 
-	// 快速路径：如果类型直接匹配（例如都是 string 或都是 int64）
+	// 2. 快速路径：类型直接匹配
 	valV := reflect.ValueOf(val)
 	if valV.Type().AssignableTo(fieldType) {
 		field.Set(valV)
 		return nil
 	}
 
-	// 如果 val 是指针（database/sql 扫描出来的有时会带指针），先取其值
+	// 3. 处理指针解引用（database/sql 有时返回 *interface{}）
 	if valV.Kind() == reflect.Ptr {
 		if valV.IsNil() {
 			field.Set(reflect.Zero(fieldType))
@@ -178,7 +179,7 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 		val = valV.Interface()
 	}
 
-	// 针对不同目标字段类型的优化转换逻辑
+	// 4. 根据目标字段类型进行逻辑转换
 	switch field.Kind() {
 	case reflect.String:
 		switch v := val.(type) {
@@ -186,8 +187,9 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 			field.SetString(string(v))
 		case string:
 			field.SetString(v)
+		case time.Time: // 处理时间转字符串
+			field.SetString(v.Format("2006-01-02 15:04:05.000"))
 		default:
-			// 只有兜底才使用 fmt.Sprintf
 			field.SetString(fmt.Sprintf("%v", v))
 		}
 
@@ -196,21 +198,13 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 		case int64:
 			field.SetInt(v)
 		case []byte:
-			if iv, err := strconv.ParseInt(string(v), 10, 64); err == nil {
-				field.SetInt(iv)
-			} else {
-				return fmt.Errorf("cannot parse int from []byte: %w", err)
-			}
+			iv, _ := strconv.ParseInt(string(v), 10, 64)
+			field.SetInt(iv)
 		case string:
-			if iv, err := strconv.ParseInt(v, 10, 64); err == nil {
-				field.SetInt(iv)
-			} else {
-				return fmt.Errorf("cannot parse int from string: %w", err)
-			}
+			iv, _ := strconv.ParseInt(v, 10, 64)
+			field.SetInt(iv)
 		case float64:
 			field.SetInt(int64(v))
-		default:
-			return fmt.Errorf("cannot convert %T to int", val)
 		}
 
 	case reflect.Bool:
@@ -229,17 +223,32 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 		case float64:
 			field.SetFloat(v)
 		case []byte:
-			if fv, err := strconv.ParseFloat(string(v), 64); err == nil {
-				field.SetFloat(fv)
-			} else {
-				return fmt.Errorf("cannot parse float from []byte: %w", err)
-			}
-		default:
-			return fmt.Errorf("cannot convert %T to float", val)
+			fv, _ := strconv.ParseFloat(string(v), 64)
+			field.SetFloat(fv)
 		}
-	// 可以根据需要继续添加其他常用类型
+
+	case reflect.Struct:
+		// --- 关键优化：支持 time.Time ---
+		if fieldType.PkgPath() == "time" && fieldType.Name() == "Time" {
+			switch v := val.(type) {
+			case time.Time:
+				field.Set(reflect.ValueOf(v))
+			case []byte: // 处理未开启 parseTime 时的字符串情况
+				t, err := time.Parse("2006-01-02 15:04:05.999999999", string(v))
+				if err == nil {
+					field.Set(reflect.ValueOf(t))
+				}
+			case string:
+				t, err := time.Parse("2006-01-02 15:04:05.999999999", v)
+				if err == nil {
+					field.Set(reflect.ValueOf(t))
+				}
+			}
+			return nil
+		}
+
 	default:
-		// 最后的兜底尝试
+		// 最后的尝试：转换
 		if valV.Type().ConvertibleTo(fieldType) {
 			field.Set(valV.Convert(fieldType))
 		} else {
