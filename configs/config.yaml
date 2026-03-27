@@ -290,6 +290,20 @@ gateway:
     requests: 100
     window: "1m"
 
+  # IP Filter Configuration (Enterprise Security)
+  ip_filter:
+    enabled: false
+    mode: "blacklist"
+    ip_list: []
+    country_blacklist: []
+    country_whitelist: []
+    enable_geoip: false
+    geoip_db_path: ""
+    block_message: "Access denied"
+    block_status_code: 403
+    skip_paths: ["/health", "/metrics", "/ping"]
+    trust_proxy: true
+
   # Service discovery
   discovery:
     type: "static"  # "consul", "etcd", "static"

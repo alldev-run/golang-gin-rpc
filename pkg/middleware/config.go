@@ -1,6 +1,10 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
 
 // AuthConfig holds configuration for authentication middleware
 type AuthConfig struct {
@@ -180,17 +184,21 @@ type Config struct {
 	
 	// Security configuration
 	Security SecurityConfig `yaml:"security" json:"security"`
+	
+	// IPFilter configuration
+	IPFilter IPFilterConfig `yaml:"ip_filter" json:"ip_filter"`
 }
 
 // DefaultConfig returns default middleware configuration
 func DefaultConfig() Config {
 	return Config{
-		Auth: DefaultAuthConfig(),
-		CORS: DefaultCORSConfig(),
+		Auth:        DefaultAuthConfig(),
+		CORS:        DefaultCORSConfig(),
 		RateLimiter: DefaultRateLimiterConfig(),
-		Recovery: DefaultRecoveryConfig(),
-		Logging: DefaultLoggingConfig(),
-		Security: DefaultSecurityConfig(),
+		Recovery:    DefaultRecoveryConfig(),
+		Logging:     DefaultLoggingConfig(),
+		Security:    DefaultSecurityConfig(),
+		IPFilter:    DefaultIPFilterConfig(),
 	}
 }
 
@@ -290,7 +298,7 @@ func APIConfig() Config {
 			SkipPaths:         []string{"/health"},
 			Enabled:           true,
 		},
-		Recovery: DefaultRecoveryConfig(),
+		Recovery:    DefaultRecoveryConfig(),
 		Logging: LoggingConfig{
 			SkipPaths:    []string{"/health"},
 			Output:       "stdout",
@@ -301,6 +309,7 @@ func APIConfig() Config {
 			Enabled:      true,
 		},
 		Security: DefaultSecurityConfig(),
+		IPFilter: DefaultIPFilterConfig(),
 	}
 }
 
@@ -347,6 +356,7 @@ func WebConfig() Config {
 			ReferrerPolicy:        "strict-origin-when-cross-origin",
 			Enabled:               true,
 		},
+		IPFilter: DefaultIPFilterConfig(),
 	}
 }
 
@@ -368,6 +378,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := c.Security.Validate(); err != nil {
+		return err
+	}
+	if err := c.IPFilter.Validate(); err != nil {
 		return err
 	}
 	return nil
@@ -460,5 +473,30 @@ func (c SecurityConfig) Validate() error {
 	if c.ReferrerPolicy == "" {
 		c.ReferrerPolicy = "strict-origin-when-cross-origin"
 	}
+	return nil
+}
+
+// Validate validates the IP filter configuration
+func (c IPFilterConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+
+	if c.Mode != IPFilterModeBlacklist && c.Mode != IPFilterModeWhitelist {
+		c.Mode = IPFilterModeBlacklist
+	}
+
+	if c.BlockStatusCode == 0 {
+		c.BlockStatusCode = http.StatusForbidden
+	}
+
+	if c.BlockMessage == "" {
+		c.BlockMessage = "Access denied"
+	}
+
+	if len(c.SkipPaths) == 0 {
+		c.SkipPaths = []string{"/health", "/metrics", "/ping"}
+	}
+
 	return nil
 }

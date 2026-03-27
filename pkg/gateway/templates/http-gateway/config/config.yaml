@@ -50,6 +50,62 @@ rate_limit:
   window: "1m"
 
 # =============================================================================
+# IP 过滤与 GeoIP 配置（企业级安全）
+# =============================================================================
+ip_filter:
+  # 是否启用 IP 过滤
+  enabled: false
+  
+  # 过滤模式: "blacklist" | "whitelist"
+  mode: "blacklist"
+  
+  # IP 黑名单/白名单列表（支持 CIDR）
+  ip_list: []
+  # 示例:
+  # ip_list:
+  #   - "192.168.1.100"           # 单个 IP
+  #   - "10.0.0.0/8"              # 内网网段
+  #   - "172.16.0.0/12"
+  
+  # 国家代码黑名单（ISO 3166-1 alpha-2）
+  country_blacklist: []
+  # 示例:
+  # country_blacklist:
+  #   - "CN"                      # 中国
+  #   - "RU"                      # 俄罗斯
+  
+  # 国家代码白名单（如果设置，优先于黑名单）
+  country_whitelist: []
+  # 示例:
+  # country_whitelist:
+  #   - "US"                      # 只允许美国
+  #   - "GB"
+  
+  # 是否启用 GeoIP 查询（需要 GeoLite2 数据库）
+  enable_geoip: false
+  
+  # GeoIP2 数据库文件路径
+  geoip_db_path: ""
+  # 示例: "/etc/geoip/GeoLite2-Country.mmdb"
+  
+  # 拦截时的响应消息
+  block_message: "Access denied"
+  
+  # 拦截时的 HTTP 状态码
+  block_status_code: 403
+  
+  # 跳过的路径（不拦截的路径）
+  skip_paths:
+    - "/health"
+    - "/metrics"
+    - "/ping"
+    - "/ready"
+    - "/favicon.ico"
+  
+  # 是否信任代理头（X-Forwarded-For, X-Real-IP）
+  trust_proxy: true
+
+# =============================================================================
 # 服务发现配置
 # =============================================================================
 discovery:

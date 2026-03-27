@@ -21,6 +21,32 @@ gateway:
     requests: 100
     window: "1m"
 
+  # IP Filter Configuration (Enterprise Security)
+  ip_filter:
+    enabled: false                      # Enable IP filtering
+    mode: "blacklist"                   # "blacklist" or "whitelist"
+    ip_list:                            # IP addresses or CIDR blocks
+      # - "192.168.1.100"              # Single IP
+      # - "10.0.0.0/8"                 # CIDR block
+      # - "172.16.0.0/12"              # Private network
+    country_blacklist:                  # Block countries by ISO code
+      # - "CN"
+      # - "RU"
+      # - "KP"
+    country_whitelist:                  # Allow only specific countries (if set, overrides blacklist)
+      # - "US"
+      # - "GB"
+      # - "DE"
+    enable_geoip: false                 # Enable GeoIP2 lookup
+    geoip_db_path: ""                  # Path to GeoLite2-Country.mmdb
+    block_message: "Access denied"     # Response message
+    block_status_code: 403             # HTTP status code
+    skip_paths:                         # Paths to skip filtering
+      - "/health"
+      - "/metrics"
+      - "/ping"
+    trust_proxy: true                   # Trust X-Forwarded-For header
+
   # Service discovery
   discovery:
     type: "static"  # "consul", "etcd", "static"
