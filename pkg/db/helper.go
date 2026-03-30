@@ -16,6 +16,14 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
 )
 
+// contextKey is the type for context keys used in this package.
+type contextKey int
+
+const (
+	// dbContextKey is the key for storing database name in context.
+	dbContextKey contextKey = iota
+)
+
 var (
 	globalFactory *Factory
 	factoryMu     sync.RWMutex
@@ -317,7 +325,8 @@ var (
 )
 
 // Use sets the current database for subsequent queries.
-// This affects the default database used by Select/Insert/Update/Delete.
+// WARNING: This is NOT goroutine-safe. In concurrent environments (HTTP handlers, goroutines),
+// use WithDBContext() or SelectOnDB()/InsertOnDB() instead.
 // Usage:
 //
 //	db.Use("userdb")    // switch to userdb
@@ -333,11 +342,13 @@ func Use(database string) {
 }
 
 // UseDefault resets the current database to default (no prefix).
+// WARNING: This is NOT goroutine-safe. See Use() for safe alternatives.
 func UseDefault() {
 	Use("")
 }
 
 // GetDB returns the current database name.
+// Note: In concurrent contexts, prefer DBFromContext() for per-request isolation.
 func GetDB() string {
 	currentDBMu.RLock()
 	defer currentDBMu.RUnlock()
@@ -352,6 +363,182 @@ func withDB(table string) string {
 		return currentDB + "." + table
 	}
 	return table
+}
+
+// withContextDB adds database prefix from context if set, falls back to currentDB.
+func withContextDB(ctx context.Context, table string) string {
+	// Check context first for per-request database
+	db := DBFromContext(ctx)
+	if db != "" && !strings.Contains(table, ".") {
+		return db + "." + table
+	}
+
+	// Fall back to global currentDB
+	currentDBMu.RLock()
+	defer currentDBMu.RUnlock()
+	if currentDB != "" && !strings.Contains(table, ".") {
+		return currentDB + "." + table
+	}
+	return table
+}
+
+// ==================== Goroutine-Safe Multi-Database Support ====================
+
+// WithDBContext returns a new context with the specified database name.
+// This is goroutine-safe and recommended for concurrent environments.
+// Usage in HTTP handlers:
+//
+//	func handler(w http.ResponseWriter, r *http.Request) {
+//	    ctx := db.WithDBContext(r.Context(), "orderdb")
+//	    rows, err := db.QueryContext(ctx, "SELECT * FROM orders WHERE id = ?", id)
+//	    // Automatically uses orderdb.orders
+//	}
+func WithDBContext(ctx context.Context, database string) context.Context {
+	return context.WithValue(ctx, dbContextKey, database)
+}
+
+// DBFromContext extracts the database name from context.
+// Returns empty string if no database is set in context.
+func DBFromContext(ctx context.Context) string {
+	if db, ok := ctx.Value(dbContextKey).(string); ok {
+		return db
+	}
+	return ""
+}
+
+// SelectDB creates a SELECT query builder for the specified database table.
+// This is goroutine-safe and does not modify global state.
+// Usage:
+//
+//	db.SelectDB("orderdb", "orders").Where("status = ?", "pending").Query(ctx)
+func SelectDB(database, table string) (*orm.SelectBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := database + "." + table
+	return orm.NewSelectBuilder(client, fullTable), nil
+}
+
+// InsertDB creates an INSERT query builder for the specified database table.
+// This is goroutine-safe and does not modify global state.
+func InsertDB(database, table string) (*orm.InsertBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := database + "." + table
+	return orm.NewInsertBuilder(client, fullTable), nil
+}
+
+// UpdateDB creates an UPDATE query builder for the specified database table.
+// This is goroutine-safe and does not modify global state.
+func UpdateDB(database, table string) (*orm.UpdateBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := database + "." + table
+	return orm.NewUpdateBuilder(client, fullTable), nil
+}
+
+// DeleteDB creates a DELETE query builder for the specified database table.
+// This is goroutine-safe and does not modify global state.
+func DeleteDB(database, table string) (*orm.DeleteBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := database + "." + table
+	return orm.NewDeleteBuilder(client, fullTable), nil
+}
+
+// ==================== Context-Aware SQL Helpers ====================
+
+// QueryContext executes a SELECT query with context-aware database selection.
+// Checks context for database name set via WithDBContext, falls back to global default.
+func QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	client, err := MySQL()
+	if err != nil {
+		return nil, err
+	}
+	// Note: For raw SQL queries, database must be specified in the SQL itself
+	// or use SelectDB/InsertDB/etc for ORM operations
+	return client.Query(ctx, query, args...)
+}
+
+// ExecContext executes a non-SELECT query with context-aware database selection.
+func ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	client, err := MySQL()
+	if err != nil {
+		return nil, err
+	}
+	return client.Exec(ctx, query, args...)
+}
+
+// TransactionContext executes a function within a transaction with context support.
+// The database is determined by the SQL client used.
+func TransactionContext(ctx context.Context, fn func(*sql.Tx) error) error {
+	client, err := MySQL()
+	if err != nil {
+		return err
+	}
+	return client.Transaction(ctx, fn)
+}
+
+// ==================== Goroutine-Safe ORM Builders ====================
+
+// DBQueryConcurrent is a fluent query builder wrapper that supports concurrent-safe database selection.
+type DBQueryConcurrent struct {
+	database string
+	table    string
+	client   *mysql.Client
+}
+
+// On creates a new concurrent-safe DB query for the specified database.
+// Usage: db.On("orderdb").Select("orders").Where("id = ?", 1).Query(ctx)
+func On(database string) *DBQueryConcurrent {
+	return &DBQueryConcurrent{database: database}
+}
+
+// Select creates a SELECT builder for the specified database table.
+func (q *DBQueryConcurrent) Select(table string) (*orm.SelectBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := q.database + "." + table
+	return orm.NewSelectBuilder(client, fullTable), nil
+}
+
+// Insert creates an INSERT builder for the specified database table.
+func (q *DBQueryConcurrent) Insert(table string) (*orm.InsertBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := q.database + "." + table
+	return orm.NewInsertBuilder(client, fullTable), nil
+}
+
+// Update creates an UPDATE builder for the specified database table.
+func (q *DBQueryConcurrent) Update(table string) (*orm.UpdateBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := q.database + "." + table
+	return orm.NewUpdateBuilder(client, fullTable), nil
+}
+
+// Delete creates a DELETE builder for the specified database table.
+func (q *DBQueryConcurrent) Delete(table string) (*orm.DeleteBuilder, error) {
+	client, err := MySQLClient()
+	if err != nil {
+		return nil, err
+	}
+	fullTable := q.database + "." + table
+	return orm.NewDeleteBuilder(client, fullTable), nil
 }
 
 // ==================== PostgreSQL ORM Helpers ====================

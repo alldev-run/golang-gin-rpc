@@ -174,7 +174,7 @@ orders, err := db.PostgresSelect("orders").
 
 ### 同一 MySQL 实例多数据库访问
 
-配置中的 `database` 作为默认库，通过 `Use()` 动态切换其他库：
+配置中的 `database` 作为默认库。对于多数据库访问，**推荐使用新的 goroutine-safe API**，避免并发问题。
 
 ```go
 // 配置示例 (database.yml):
@@ -187,7 +187,25 @@ orders, err := db.PostgresSelect("orders").
 // 默认使用配置中的 database
 users, err := db.Select("users").Query(ctx)  // 查询 userdb.users
 
-// 切换到 orderdb
+// ✅ 推荐：goroutine-safe 方式，直接指定数据库
+orders, err := db.SelectDB("orderdb", "orders").Query(ctx)  // 查询 orderdb.orders
+logs, err := db.InsertDB("logdb", "logs").Sets(...).Exec(ctx)
+
+// ✅ 推荐：使用 On() 链式调用（fluent API）
+rows, err := db.On("orderdb").Select("orders").Where("status = ?", "pending").Query(ctx)
+
+// ✅ 推荐：Context 模式（适合在 middleware 中设置数据库）
+ctx := db.WithDBContext(r.Context(), "orderdb")
+// 后续查询会自动使用该数据库（需要配合支持 context 的方法）
+```
+
+#### ⚠️ 旧版 Use() / UseDefault()（不推荐用于并发环境）
+
+```go
+// 警告：以下方式在并发环境下（HTTP handlers、goroutines）会有竞态条件！
+// 仅适用于单协程脚本或初始化流程
+
+// 切换到 orderdb（影响全局状态）
 db.Use("orderdb")
 orders, err := db.Select("orders").Query(ctx)  // 查询 orderdb.orders
 
@@ -200,26 +218,75 @@ db.UseDefault()  // 或 db.Use("")
 users, err = db.Select("users").Query(ctx)  // 回到 userdb.users
 ```
 
+**为什么 `Use()` 在并发下不安全？**
+
+`db.Use()` 修改全局变量 `currentDB`，所有 goroutine 共享这个状态：
+
+```go
+// 竞态条件示例：
+// Goroutine A: db.Use("orderdb")
+// Goroutine B: db.Use("userdb")  // 覆盖了 A 的设置！
+// Goroutine A: db.Select("orders") // 实际查询的是 userdb.orders ❌
+```
+
 ### Repository 模式中的多库切换
+
+**推荐：使用 goroutine-safe 的 SelectDB/InsertDB/UpdateDB/DeleteDB 或 On() API**
 
 ```go
 type UserRepository struct{}
 
 func (r *UserRepository) FindByID(ctx context.Context, id int64) (*User, error) {
-    db.Use("userdb")
-    defer db.UseDefault()
-    
-    rows, err := db.Select("users").Eq("id", id).Query(ctx)
+    // ✅ 推荐：显式指定数据库，无全局状态修改
+    rows, err := db.SelectDB("userdb", "users").Eq("id", id).Query(ctx)
     // ...
 }
 
 type OrderRepository struct{}
 
 func (r *OrderRepository) FindByID(ctx context.Context, id int64) (*Order, error) {
-    db.Use("orderdb")
-    defer db.UseDefault()
+    // ✅ 推荐：使用 On() fluent API
+    rows, err := db.On("orderdb").Select("orders").Eq("id", id).Query(ctx)
+    // ...
+}
+
+// ✅ 完整 Repository 示例
+type ProductRepository struct {
+    dbName string // 可在初始化时指定数据库
+}
+
+func NewProductRepository(dbName string) *ProductRepository {
+    return &ProductRepository{dbName: dbName}
+}
+
+func (r *ProductRepository) FindByID(ctx context.Context, id int64) (*Product, error) {
+    rows, err := db.SelectDB(r.dbName, "products").
+        Columns("id", "name", "price", "stock").
+        Eq("id", id).
+        Limit(1).
+        Query(ctx)
+    // ...
+}
+
+func (r *ProductRepository) Create(ctx context.Context, p *Product) error {
+    _, err := db.InsertDB(r.dbName, "products").Sets(map[string]interface{}{
+        "name":  p.Name,
+        "price": p.Price,
+        "stock": p.Stock,
+    }).Exec(ctx)
+    return err
+}
+```
+
+**旧版不推荐的方式（Use/UseDefault）**
+
+```go
+// ⚠️ 警告：以下方式在并发环境中有竞态条件，不推荐在 Repository 中使用
+func (r *UserRepository) FindByIDUnsafe(ctx context.Context, id int64) (*User, error) {
+    db.Use("userdb")        // ❌ 修改全局状态
+    defer db.UseDefault()   // ❌ defer 在并发下不能解决问题
     
-    rows, err := db.Select("orders").Eq("id", id).Query(ctx)
+    rows, err := db.Select("users").Eq("id", id).Query(ctx)
     // ...
 }
 ```
@@ -253,41 +320,64 @@ rows, err := db.Select("users AS u").
 
 **限制**: 跨库 JOIN 只能在**同一 MySQL 实例**内进行。如果 `userdb` 和 `orderdb` 在不同 MySQL 服务器上，则无法直接 JOIN，需要通过应用层关联或使用分布式查询方案。
 
-### 多库切换注意事项
+### 多数据库使用注意事项（并发安全）
+
+在并发环境（HTTP handlers、goroutines）中，**绝对不要使用 `Use()/UseDefault()` 模式**，因为它会导致竞态条件。
 
 ```go
-// ⚠️ Use() 影响全局状态，并发环境下需谨慎
-// 错误示例
+// ❌ 错误示例：Use() 在并发环境下危险
 func Handler(w http.ResponseWriter, r *http.Request) {
-    db.Use("orderdb")  // ❌ 会影响到其他请求！
+    db.Use("orderdb")  // 会干扰其他正在处理的请求！
+    defer db.UseDefault()  // defer 不能解决并发问题
     // ...
 }
 
-// ✅ 正确做法：使用 defer 恢复
+// ✅ 正确示例：使用 goroutine-safe 的 API
 func Handler(w http.ResponseWriter, r *http.Request) {
-    db.Use("orderdb")
-    defer db.UseDefault()
+    // 方式1：显式指定数据库
+    rows, err := db.SelectDB("orderdb", "orders").
+        Where("status = ?", "pending").
+        Query(r.Context())
+    
+    // 方式2：使用 On() fluent API
+    rows, err := db.On("orderdb").Select("orders").
+        Where("user_id = ?", userID).
+        Query(r.Context())
     // ...
 }
 ```
 
-### 多数据库查询对照表
+### 多数据库查询函数对照表
 
-| 场景 | 用法 | 示例 |
-|------|------|------|
-| 默认库（配置中的 database）| 直接使用 | `db.Select("users")` |
-| 切换到其他库 | `Use()` + 查询 | `db.Use("orderdb"); db.Select("orders")` |
-| 跨库 JOIN | 完整表名 | `db.Select("db1.table1 AS t1").Join("db2.table2 AS t2", ...)` |
-| 恢复默认 | `UseDefault()` | `db.UseDefault()` |
+| 场景 | 用法 | 示例 | 并发安全 |
+|------|------|------|----------|
+| 默认库（配置中的 database）| 直接使用 | `db.Select("users")` | ✅ 是 |
+| 切换到其他库（推荐） | `SelectDB()` / `On()` | `db.SelectDB("orderdb", "orders")` | ✅ 是 |
+| 切换到其他库（旧版） | `Use()` + 查询 | `db.Use("orderdb"); db.Select("orders")` | ❌ 否 |
+| 跨库 JOIN | 完整表名 | `db.Select("db1.table1 AS t1").Join(...)` | ✅ 是 |
+| 恢复默认 | `UseDefault()` | `db.UseDefault()` | ❌ 否（仅单协程） |
+
+### 新版 goroutine-safe API 汇总
+
+| 操作 | 旧方式（不推荐并发） | 新方式（goroutine-safe） |
+|------|---------------------|------------------------|
+| SELECT | `db.Use("db"); db.Select("table")` | `db.SelectDB("db", "table")` 或 `db.On("db").Select("table")` |
+| INSERT | `db.Use("db"); db.Insert("table")` | `db.InsertDB("db", "table")` 或 `db.On("db").Insert("table")` |
+| UPDATE | `db.Use("db"); db.Update("table")` | `db.UpdateDB("db", "table")` 或 `db.On("db").Update("table")` |
+| DELETE | `db.Use("db"); db.Delete("table")` | `db.DeleteDB("db", "table")` 或 `db.On("db").Delete("table")` |
+| Context 设置 | - | `ctx := db.WithDBContext(ctx, "db")` |
 
 ### 多数据库 Repository 模式示例
 
+**推荐做法：使用 goroutine-safe 的 `SelectDB`/`On()` API，避免并发问题**
+
 ```go
-// UserRepository 使用 MySQL
+// UserRepository 使用 MySQL userdb
 type UserRepository struct{}
 
 func (r *UserRepository) FindByID(ctx context.Context, id int64) (*User, error) {
-    rows, err := db.Select("users").
+    // ✅ 推荐：显式指定数据库，无并发问题
+    rows, err := db.SelectDB("userdb", "users").
         Columns("id", "name", "email").
         Eq("id", id).
         Limit(1).
@@ -307,7 +397,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (*User, error) 
 }
 
 func (r *UserRepository) Create(ctx context.Context, user *User) error {
-    _, err := db.Insert("users").Sets(map[string]interface{}{
+    _, err := db.InsertDB("userdb", "users").Sets(map[string]interface{}{
         "name":  user.Name,
         "email": user.Email,
     }).Exec(ctx)
@@ -318,7 +408,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 type OrderRepository struct{}
 
 func (r *OrderRepository) FindByID(ctx context.Context, id int64) (*Order, error) {
-    // 方式1: 使用 Using 链式调用
+    // PostgreSQL 使用 Using 链式调用
     rows, err := db.Using(db.DBTypePostgres).Select("orders").
         Columns("id", "user_id", "amount", "status").
         Eq("id", id).
@@ -328,13 +418,44 @@ func (r *OrderRepository) FindByID(ctx context.Context, id int64) (*Order, error
 }
 
 func (r *OrderRepository) Create(ctx context.Context, order *Order) error {
-    // 方式2: 使用专用函数
     _, err := db.PostgresInsert("orders").Sets(map[string]interface{}{
         "user_id": order.UserID,
         "amount":  order.Amount,
         "status":  order.Status,
     }).Exec(ctx)
     return err
+}
+
+// ProductRepository 使用可配置数据库名
+type ProductRepository struct {
+    dbName string
+}
+
+func NewProductRepository(dbName string) *ProductRepository {
+    return &ProductRepository{dbName: dbName}
+}
+
+func (r *ProductRepository) FindByID(ctx context.Context, id int64) (*Product, error) {
+    // 使用 On() fluent API
+    rows, err := db.On(r.dbName).Select("products").
+        Columns("id", "name", "price").
+        Eq("id", id).
+        Limit(1).
+        Query(ctx)
+    // ...
+}
+```
+
+**不推荐：旧版 Use/UseDefault 方式（有并发风险）**
+
+```go
+// ⚠️ 警告：以下方式在并发环境中有竞态条件，仅适用于单协程脚本
+func (r *UserRepository) FindByIDUnsafe(ctx context.Context, id int64) (*User, error) {
+    db.Use("userdb")        // ❌ 修改全局状态
+    defer db.UseDefault()   // ❌ defer 在并发下不能解决问题
+    
+    rows, err := db.Select("users").Eq("id", id).Query(ctx)
+    // ...
 }
 ```
 
@@ -482,7 +603,9 @@ err := db.Transaction(ctx, func(tx *sql.Tx) error {
 | 场景 | 推荐方式 | 说明 |
 |------|---------|------|
 | 快速开发 | `db.Select/Insert/Update/Delete` | 无需初始化，直接调用 |
-| 多数据库 | `db.Using(dbType)` | 简洁的多数据库切换 |
+| 多数据库（并发安全） | `db.SelectDB/On()` | 推荐的新方式，goroutine-safe |
+| 多数据库（旧版） | `db.Use()` + 查询 | 不推荐，仅适用于单协程脚本 |
+| 不同数据库类型 | `db.Using(dbType)` | MySQL/PostgreSQL 切换 |
 | 复杂查询 | `orm.ORM` | 需要更多控制时使用 |
 | 事务 | 两者都支持 | Helper 用 `db.Transaction`，ORM 用 `o.Transaction` |
 
