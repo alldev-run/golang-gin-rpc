@@ -3,6 +3,7 @@ package zookeeper
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -163,7 +164,7 @@ func (r *Registry) ensurePath(fullPath string) error {
 			continue
 		}
 		_, err = r.conn.Create(current, nil, 0, zk.WorldACL(zk.PermAll))
-		if err != nil && err != zk.ErrNodeExists {
+		if err != nil && !errors.Is(err, zk.ErrNodeExists) {
 			return err
 		}
 	}
