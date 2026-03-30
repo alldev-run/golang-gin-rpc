@@ -260,6 +260,15 @@ func MySQLClient() (*mysql.Client, error) {
 }
 
 // Select creates a new SELECT query builder using the global MySQL client.
+// 
+// ⚠️  WARNING: This function reads global database state set by Use().
+// In concurrent environments, the database may be changed by other goroutines,
+// causing unpredictable query targets.
+//
+// For concurrent-safe operations, use:
+//   db.SelectDB("database", "table")  // Explicit database
+//   db.On("database").Select("table") // Fluent API
+//
 // If a database has been set via Use(), the table will be prefixed with "database."
 func Select(table string) (*orm.SelectBuilder, error) {
 	client, err := MySQLClient()
@@ -270,6 +279,15 @@ func Select(table string) (*orm.SelectBuilder, error) {
 }
 
 // Insert creates a new INSERT query builder using the global MySQL client.
+// 
+// ⚠️  WARNING: This function reads global database state set by Use().
+// In concurrent environments, the database may be changed by other goroutines,
+// causing unpredictable query targets.
+//
+// For concurrent-safe operations, use:
+//   db.InsertDB("database", "table")  // Explicit database
+//   db.On("database").Insert("table") // Fluent API
+//
 // If a database has been set via Use(), the table will be prefixed with "database."
 func Insert(table string) (*orm.InsertBuilder, error) {
 	client, err := MySQLClient()
@@ -280,6 +298,15 @@ func Insert(table string) (*orm.InsertBuilder, error) {
 }
 
 // Update creates a new UPDATE query builder using the global MySQL client.
+// 
+// ⚠️  WARNING: This function reads global database state set by Use().
+// In concurrent environments, the database may be changed by other goroutines,
+// causing unpredictable query targets.
+//
+// For concurrent-safe operations, use:
+//   db.UpdateDB("database", "table")  // Explicit database
+//   db.On("database").Update("table") // Fluent API
+//
 // If a database has been set via Use(), the table will be prefixed with "database."
 func Update(table string) (*orm.UpdateBuilder, error) {
 	client, err := MySQLClient()
@@ -290,6 +317,15 @@ func Update(table string) (*orm.UpdateBuilder, error) {
 }
 
 // Delete creates a new DELETE query builder using the global MySQL client.
+// 
+// ⚠️  WARNING: This function reads global database state set by Use().
+// In concurrent environments, the database may be changed by other goroutines,
+// causing unpredictable query targets.
+//
+// For concurrent-safe operations, use:
+//   db.DeleteDB("database", "table")  // Explicit database
+//   db.On("database").Delete("table") // Fluent API
+//
 // If a database has been set via Use(), the table will be prefixed with "database."
 func Delete(table string) (*orm.DeleteBuilder, error) {
 	client, err := MySQLClient()
@@ -325,9 +361,23 @@ var (
 )
 
 // Use sets the current database for subsequent queries.
-// WARNING: This is NOT goroutine-safe. In concurrent environments (HTTP handlers, goroutines),
-// use WithDBContext() or SelectOnDB()/InsertOnDB() instead.
-// Usage:
+// 
+// 🚨 CRITICAL WARNING: This function is NOT goroutine-safe and causes race conditions in concurrent environments.
+// DO NOT use in HTTP handlers, goroutines, or any concurrent code.
+// 
+// ❌ DANGEROUS - Causes data corruption in concurrent environments:
+//   func handler(w http.ResponseWriter, r *http.Request) {
+//       db.Use("orderdb")  // Affects ALL other requests!
+//       defer db.UseDefault()
+//       // ... query code
+//   }
+//
+// ✅ SAFE alternatives for concurrent environments:
+//   db.SelectDB("orderdb", "orders")    // Explicit database
+//   db.On("orderdb").Select("orders")  // Fluent API
+//   ctx := db.WithDBContext(ctx, "orderdb") // Context-based (if implemented)
+//
+// Usage in single-threaded scripts ONLY:
 //
 //	db.Use("userdb")    // switch to userdb
 //	db.Select("users")  // queries userdb.users
@@ -342,13 +392,18 @@ func Use(database string) {
 }
 
 // UseDefault resets the current database to default (no prefix).
-// WARNING: This is NOT goroutine-safe. See Use() for safe alternatives.
+// 
+// 🚨 CRITICAL WARNING: This function is NOT goroutine-safe.
+// See Use() for detailed warnings and safe alternatives.
 func UseDefault() {
 	Use("")
 }
 
 // GetDB returns the current database name.
-// Note: In concurrent contexts, prefer DBFromContext() for per-request isolation.
+// 
+// ⚠️  WARNING: In concurrent contexts, the returned value may be outdated
+// immediately after this function returns due to race conditions.
+// For per-request isolation, use DBFromContext() or SelectDB/On() APIs.
 func GetDB() string {
 	currentDBMu.RLock()
 	defer currentDBMu.RUnlock()

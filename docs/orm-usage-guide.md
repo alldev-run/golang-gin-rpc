@@ -199,15 +199,15 @@ ctx := db.WithDBContext(r.Context(), "orderdb")
 // 后续查询会自动使用该数据库（需要配合支持 context 的方法）
 ```
 
-#### ⚠️ 旧版 Use() / UseDefault()（不推荐用于并发环境）
+#### ⚠️ 旧版 Use() / UseDefault()（极不推荐用于并发环境）
 
 ```go
-// 警告：以下方式在并发环境下（HTTP handlers、goroutines）会有竞态条件！
-// 仅适用于单协程脚本或初始化流程
+// 🚨 极度危险：以下方式在并发环境下（HTTP handlers、goroutines）会有严重竞态条件！
+// 仅适用于单协程脚本或初始化流程，绝对不要在生产环境使用！
 
 // 切换到 orderdb（影响全局状态）
 db.Use("orderdb")
-orders, err := db.Select("orders").Query(ctx)  // 查询 orderdb.orders
+orders, err := db.Select("orders").Query(ctx)  // 可能查询到错误的数据库！
 
 // 写日志到 logdb
 db.Use("logdb")
@@ -215,19 +215,35 @@ _, err = db.Insert("logs").Sets(...).Exec(ctx)
 
 // 恢复默认库
 db.UseDefault()  // 或 db.Use("")
-users, err = db.Select("users").Query(ctx)  // 回到 userdb.users
+users, err = db.Select("users").Query(ctx)  // 可能查询到错误的数据库！
 ```
 
-**为什么 `Use()` 在并发下不安全？**
+**为什么 `Use()` 在并发下极度危险？**
 
 `db.Use()` 修改全局变量 `currentDB`，所有 goroutine 共享这个状态：
 
 ```go
-// 竞态条件示例：
+// 🚨 严重竞态条件示例：
 // Goroutine A: db.Use("orderdb")
 // Goroutine B: db.Use("userdb")  // 覆盖了 A 的设置！
-// Goroutine A: db.Select("orders") // 实际查询的是 userdb.orders ❌
+// Goroutine A: db.Select("orders") // 实际查询的是 userdb.orders ❌ 数据错乱！
+// Goroutine C: db.Select("users")  // 可能查询到 orderdb.users ❌ 数据错乱！
+
+// 🔴 生产环境后果：
+// - 用户数据错乱
+// - 订单查询到错误数据
+// - 财务数据不一致
+// - 无法复现的间歇性错误
 ```
+
+**并发风险等级评估：**
+
+| API | 风险等级 | 后果 | 适用场景 |
+|-----|---------|------|----------|
+| `Use()` + `Select()` | 🔴 极高 | 数据错乱，生产事故 | 仅单协程脚本 |
+| `GetDB()` | 🟡 中等 | 数据不一致 | 调试用途 |
+| `SelectDB()` | 🟢 低 | 无问题 | 生产推荐 |
+| `On()` | 🟢 低 | 无问题 | 生产推荐 |
 
 ### Repository 模式中的多库切换
 
@@ -320,19 +336,19 @@ rows, err := db.Select("users AS u").
 
 **限制**: 跨库 JOIN 只能在**同一 MySQL 实例**内进行。如果 `userdb` 和 `orderdb` 在不同 MySQL 服务器上，则无法直接 JOIN，需要通过应用层关联或使用分布式查询方案。
 
-### 多数据库使用注意事项（并发安全）
+### 多数据库使用注意事项（并发安全 - 极重要）
 
-在并发环境（HTTP handlers、goroutines）中，**绝对不要使用 `Use()/UseDefault()` 模式**，因为它会导致竞态条件。
+在并发环境（HTTP handlers、goroutines）中，**绝对避免使用 `Use()/UseDefault()` 模式**，因为它会导致严重的数据错乱和竞态条件。
 
 ```go
-// ❌ 错误示例：Use() 在并发环境下危险
+// ❌ 极度危险：Use() 在并发环境下会导致生产事故
 func Handler(w http.ResponseWriter, r *http.Request) {
-    db.Use("orderdb")  // 会干扰其他正在处理的请求！
-    defer db.UseDefault()  // defer 不能解决并发问题
-    // ...
+    db.Use("orderdb")  // 会干扰所有其他正在处理的请求！
+    defer db.UseDefault()  // defer 完全不能解决并发问题
+    // ... 可能查询到错误的数据库
 }
 
-// ✅ 正确示例：使用 goroutine-safe 的 API
+// ✅ 安全：使用 goroutine-safe 的 API
 func Handler(w http.ResponseWriter, r *http.Request) {
     // 方式1：显式指定数据库
     rows, err := db.SelectDB("orderdb", "orders").
@@ -346,6 +362,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
     // ...
 }
 ```
+
+**⚠️ 关键警告：**
+
+1. **`defer db.UseDefault()` 无法解决并发问题** - defer 只在当前函数结束时执行，期间其他 goroutine 已经修改了全局状态
+2. **竞态条件难以测试** - 在低负载下可能正常，高负载下必然出错
+3. **数据错乱后果严重** - 可能导致用户数据泄露、订单错乱、财务数据不一致
+4. **难以调试** - 间歇性错误，难以复现和定位
 
 ### 多数据库查询函数对照表
 
