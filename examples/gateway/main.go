@@ -13,8 +13,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/pkg/audit"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
 )
+
+type exampleAuditSink struct{}
+
+func (exampleAuditSink) Write(ctx context.Context, event audit.Event) error {
+	logger.Info("gateway_audit_event",
+		logger.String("action", string(event.Action)),
+		logger.String("path", event.Path),
+		logger.String("user_id", event.UserID),
+		logger.String("request_id", event.RequestID),
+		logger.Int("status", event.StatusCode),
+	)
+	return nil
+}
 
 func main() {
 	// Initialize logger
@@ -45,6 +60,11 @@ func main() {
 	if gw == nil {
 		log.Fatal("Gateway not initialized")
 	}
+
+	// Configure audit middleware with a custom sink
+	auditCfg := middlewarepkg.DefaultAuditConfig()
+	auditCfg.Sink = audit.NewMultiSink(audit.LogSink{}, exampleAuditSink{})
+	gw.SetAuditConfig(auditCfg)
 
 	// Create Gin engine
 	gin.SetMode(gin.ReleaseMode)

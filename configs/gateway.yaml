@@ -21,6 +21,20 @@ gateway:
     requests: 100
     window: "1m"
 
+  # Audit trail configuration
+  audit:
+    enabled: true
+    skip_paths:
+      - "/health"
+      - "/ready"
+      - "/metrics"
+    sensitive_keys:
+      - "password"
+      - "token"
+      - "authorization"
+      - "api_key"
+      - "secret"
+
   # IP Filter Configuration (Enterprise Security)
   ip_filter:
     enabled: false                      # Enable IP filtering

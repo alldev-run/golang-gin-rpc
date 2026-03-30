@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,10 +10,21 @@ import (
 	"testing"
 	"time"
 
+	auditpkg "github.com/alldev-run/golang-gin-rpc/pkg/audit"
+	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type captureGatewayAuditSink struct {
+	events []auditpkg.Event
+}
+
+func (s *captureGatewayAuditSink) Write(ctx context.Context, event auditpkg.Event) error {
+	s.events = append(s.events, event)
+	return nil
+}
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
@@ -34,6 +46,20 @@ func TestNewGateway(t *testing.T) {
 	assert.NotNil(t, gw)
 	assert.Equal(t, config, gw.GetConfig())
 	assert.NotNil(t, gw.GetRouter())
+}
+
+func TestNewGateway_AuditConfigFromGatewayConfig(t *testing.T) {
+	config := DefaultConfig()
+	config.Audit.Enabled = false
+	config.Audit.SkipPaths = []string{"/internal/health"}
+	config.Audit.SensitiveKeys = []string{"authorization", "secret_key"}
+
+	gw := NewGateway(config)
+	auditCfg := gw.GetAuditConfig()
+
+	assert.False(t, auditCfg.Enabled)
+	assert.Equal(t, []string{"/internal/health"}, auditCfg.SkipPaths)
+	assert.Equal(t, []string{"authorization", "secret_key"}, auditCfg.SensitiveKeys)
 }
 
 func TestRouteKey(t *testing.T) {
@@ -232,6 +258,49 @@ func TestProxy(t *testing.T) {
 	assert.Equal(t, "Hello from backend", response["message"])
 	assert.Equal(t, "/api/test", response["path"])
 	assert.Equal(t, "GET", response["method"])
+}
+
+func TestSetupRoutes_AuditMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer backendServer.Close()
+
+	config := DefaultConfig()
+	config.Routes = []RouteConfig{
+		{
+			Path:        "/api/test",
+			Method:      "GET",
+			Service:     "audit-service",
+			Targets:     []string{backendServer.URL},
+			StripPrefix: false,
+		},
+	}
+
+	gw := NewGateway(config)
+	sink := &captureGatewayAuditSink{}
+	auditCfg := middlewarepkg.DefaultAuditConfig()
+	auditCfg.Sink = sink
+	gw.SetAuditConfig(auditCfg)
+
+	engine := gin.New()
+	gw.SetupRoutes(engine)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/test?from=gateway", nil)
+	req.Header.Set("Authorization", "Bearer sample-token")
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Len(t, sink.events, 1)
+	assert.Equal(t, auditpkg.ActionRead, sink.events[0].Action)
+	assert.Equal(t, "/api/test", sink.events[0].Path)
+	headers, ok := sink.events[0].Metadata["headers"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "***", headers["Authorization"])
 }
 
 // TestProxyWithStripPrefix tests proxy with prefix stripping

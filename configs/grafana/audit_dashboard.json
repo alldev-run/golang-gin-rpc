@@ -1,0 +1,127 @@
+{
+  "id": null,
+  "uid": "audit-observability",
+  "title": "Audit Pipeline Observability",
+  "tags": ["audit", "security", "prometheus"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "sink",
+        "type": "query",
+        "label": "Sink",
+        "datasource": "Prometheus",
+        "query": "label_values(audit_writes_total, sink)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Audit Write Throughput (QPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(audit_writes_total{sink=~\"$sink\"}[5m])) by (sink)",
+          "legendFormat": "{{sink}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Audit Error Ratio (5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(audit_writes_total{sink=~\"$sink\",result=\"error\"}[5m])) / clamp_min(sum(rate(audit_writes_total{sink=~\"$sink\"}[5m])), 0.001)",
+          "legendFormat": "error_ratio"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.02 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Audit Write P95 Latency (s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(audit_write_duration_seconds_bucket{sink=~\"$sink\"}[5m])) by (le, sink))",
+          "legendFormat": "{{sink}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Dropped Events (5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(audit_dropped_total{sink=~\"$sink\"}[5m])) by (sink, reason)",
+          "legendFormat": "{{sink}}/{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Total Writes by Result (1h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(audit_writes_total{sink=~\"$sink\"}[1h])) by (result)",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Top Drop Reasons (1h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(5, sum(increase(audit_dropped_total{sink=~\"$sink\"}[1h])) by (reason))",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    }
+  ]
+}

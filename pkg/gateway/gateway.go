@@ -9,6 +9,7 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/health"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
 	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
@@ -25,6 +26,7 @@ type Gateway struct {
 	jsonProxy  *JSONRPCProxy
 	proxy      *Proxy           // HTTP proxy
 	auth       *GatewayAuth     // Authentication middleware
+	auditConfig middlewarepkg.AuditConfig
 	mu         sync.RWMutex
 	started    bool
 	ctx        context.Context
@@ -70,6 +72,14 @@ func NewGateway(config *Config) *Gateway {
 		routes: make(map[string]*Route),
 	}
 	balancer := NewLoadBalancerFactory().Create(config.LoadBalancer.Strategy)
+	auditCfg := middlewarepkg.DefaultAuditConfig()
+	auditCfg.Enabled = config.Audit.Enabled
+	if len(config.Audit.SkipPaths) > 0 {
+		auditCfg.SkipPaths = append([]string(nil), config.Audit.SkipPaths...)
+	}
+	if len(config.Audit.SensitiveKeys) > 0 {
+		auditCfg.SensitiveKeys = append([]string(nil), config.Audit.SensitiveKeys...)
+	}
 
 	gateway := &Gateway{
 		config: config,
@@ -82,6 +92,7 @@ func NewGateway(config *Config) *Gateway {
 		},
 		router:   router,
 		balancer: balancer,
+		auditConfig: auditCfg,
 		ctx:      ctx,
 		cancel:   cancel,
 	}
@@ -304,6 +315,20 @@ func (g *Gateway) GetRouter() *Router {
 // GetDiscovery returns the service discovery instance
 func (g *Gateway) GetDiscovery() *ServiceDiscovery {
 	return g.discovery
+}
+
+// SetAuditConfig sets audit middleware config used by SetupRoutes.
+func (g *Gateway) SetAuditConfig(cfg middlewarepkg.AuditConfig) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.auditConfig = cfg
+}
+
+// GetAuditConfig returns current audit middleware config.
+func (g *Gateway) GetAuditConfig() middlewarepkg.AuditConfig {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.auditConfig
 }
 
 // min returns the minimum of two integers

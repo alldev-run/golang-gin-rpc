@@ -31,9 +31,11 @@ func TestIPFilter_Blacklist(t *testing.T) {
 		{
 			name: "blocked_ip",
 			config: IPFilterConfig{
-				Enabled: true,
-				Mode:    IPFilterModeBlacklist,
-				IPList:  []string{"192.168.1.100"},
+				Enabled:         true,
+				Mode:            IPFilterModeBlacklist,
+				IPList:          []string{"192.168.1.100"},
+				TrustProxy:      true,
+				BlockStatusCode: http.StatusForbidden,
 			},
 			clientIP:   "192.168.1.100",
 			wantStatus: http.StatusForbidden,
@@ -41,9 +43,11 @@ func TestIPFilter_Blacklist(t *testing.T) {
 		{
 			name: "cidr_blocked",
 			config: IPFilterConfig{
-				Enabled: true,
-				Mode:    IPFilterModeBlacklist,
-				IPList:  []string{"10.0.0.0/8"},
+				Enabled:         true,
+				Mode:            IPFilterModeBlacklist,
+				IPList:          []string{"10.0.0.0/8"},
+				TrustProxy:      true,
+				BlockStatusCode: http.StatusForbidden,
 			},
 			clientIP:   "10.1.2.3",
 			wantStatus: http.StatusForbidden,
@@ -111,10 +115,11 @@ func TestIPFilter_Whitelist(t *testing.T) {
 		{
 			name: "not_in_whitelist",
 			config: IPFilterConfig{
-				Enabled:     true,
-				Mode:        IPFilterModeWhitelist,
-				IPList:      []string{"192.168.1.100"},
-				TrustProxy:  true,
+				Enabled:         true,
+				Mode:            IPFilterModeWhitelist,
+				IPList:          []string{"192.168.1.100"},
+				TrustProxy:      true,
+				BlockStatusCode: http.StatusForbidden,
 			},
 			clientIP:   "192.168.1.200",
 			wantStatus: http.StatusForbidden,
@@ -122,9 +127,10 @@ func TestIPFilter_Whitelist(t *testing.T) {
 		{
 			name: "cidr_whitelist",
 			config: IPFilterConfig{
-				Enabled: true,
-				Mode:    IPFilterModeWhitelist,
-				IPList:  []string{"192.168.0.0/16"},
+				Enabled:    true,
+				Mode:       IPFilterModeWhitelist,
+				IPList:     []string{"192.168.0.0/16"},
+				TrustProxy: true,
 			},
 			clientIP:   "192.168.5.10",
 			wantStatus: http.StatusOK,
@@ -154,11 +160,12 @@ func TestIPFilter_SkipPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	config := IPFilterConfig{
-		Enabled:     true,
-		Mode:        IPFilterModeBlacklist,
-		IPList:      []string{"192.168.1.100"},
-		SkipPaths:   []string{"/health", "/metrics"},
-		TrustProxy:  true,
+		Enabled:         true,
+		Mode:            IPFilterModeBlacklist,
+		IPList:          []string{"192.168.1.100"},
+		SkipPaths:       []string{"/health", "/metrics"},
+		TrustProxy:      true,
+		BlockStatusCode: http.StatusForbidden,
 	}
 	_ = config.Validate()
 

@@ -100,6 +100,33 @@ func TestMetricsCollector_RecordDBError(t *testing.T) {
 	// Test that the method doesn't panic
 }
 
+func TestMetricsCollector_RecordRateLimitHit(t *testing.T) {
+	collector := NewMetricsCollector()
+
+	// Record rate limit hit
+	collector.RecordRateLimitHit("http", "gateway", "GET")
+
+	// Test that the method doesn't panic
+}
+
+func TestMetricsCollector_RecordAuditWrite(t *testing.T) {
+	collector := NewMetricsCollector()
+
+	collector.RecordAuditWrite("log", "success", 10*time.Millisecond)
+	collector.RecordAuditWrite("sql", "error", 15*time.Millisecond)
+
+	// Test that the method doesn't panic
+}
+
+func TestMetricsCollector_RecordAuditDrop(t *testing.T) {
+	collector := NewMetricsCollector()
+
+	collector.RecordAuditDrop("async", "buffer_full")
+	collector.RecordAuditDrop("async", "ctx_done")
+
+	// Test that the method doesn't panic
+}
+
 func TestMetricsCollector_RecordCacheOperation(t *testing.T) {
 	collector := NewMetricsCollector()
 	

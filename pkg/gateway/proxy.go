@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
 	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
 )
 
@@ -68,6 +69,9 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 
 	// Add request ID middleware
 	engine.Use(requestIDMiddleware())
+
+	// Add audit middleware
+	engine.Use(middlewarepkg.Audit(g.GetAuditConfig()))
 
 	// Add logging middleware
 	engine.Use(loggingMiddleware())

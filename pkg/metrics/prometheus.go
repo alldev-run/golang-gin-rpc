@@ -69,6 +69,11 @@ type MetricsCollector struct {
 	authFailuresTotal   *prometheus.CounterVec
 	rateLimitHitsTotal  *prometheus.CounterVec
 
+	// Audit metrics
+	auditWritesTotal    *prometheus.CounterVec
+	auditWriteDuration  *prometheus.HistogramVec
+	auditDroppedTotal   *prometheus.CounterVec
+
 	// Custom metrics registry
 	customMetrics map[string]prometheus.Metric
 	customMetricsMu sync.RWMutex
@@ -161,6 +166,28 @@ func NewMetricsCollector() *MetricsCollector {
 				Help: "Total number of rate limit rejections",
 			},
 			[]string{"protocol", "service", "method"},
+		),
+		auditWritesTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "audit_writes_total",
+				Help: "Total number of audit sink write attempts",
+			},
+			[]string{"sink", "result"},
+		),
+		auditWriteDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "audit_write_duration_seconds",
+				Help:    "Audit sink write latency in seconds",
+				Buckets: prometheus.DefBuckets,
+			},
+			[]string{"sink", "result"},
+		),
+		auditDroppedTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "audit_dropped_total",
+				Help: "Total number of dropped audit events",
+			},
+			[]string{"sink", "reason"},
 		),
 
 		// Database metrics
@@ -265,6 +292,9 @@ func NewMetricsCollector() *MetricsCollector {
 	collector.authAttemptsTotal = registerCounterVec(collector.authAttemptsTotal)
 	collector.authFailuresTotal = registerCounterVec(collector.authFailuresTotal)
 	collector.rateLimitHitsTotal = registerCounterVec(collector.rateLimitHitsTotal)
+	collector.auditWritesTotal = registerCounterVec(collector.auditWritesTotal)
+	collector.auditWriteDuration = registerHistogramVec(collector.auditWriteDuration)
+	collector.auditDroppedTotal = registerCounterVec(collector.auditDroppedTotal)
 
 	return collector
 }
@@ -353,6 +383,17 @@ func (m *MetricsCollector) RecordAuthFailure(protocol, service, method string) {
 
 func (m *MetricsCollector) RecordRateLimitHit(protocol, service, method string) {
 	m.rateLimitHitsTotal.WithLabelValues(protocol, service, method).Inc()
+}
+
+// RecordAuditWrite records an audit sink write result and latency.
+func (m *MetricsCollector) RecordAuditWrite(sink, result string, duration time.Duration) {
+	m.auditWritesTotal.WithLabelValues(sink, result).Inc()
+	m.auditWriteDuration.WithLabelValues(sink, result).Observe(duration.Seconds())
+}
+
+// RecordAuditDrop records a dropped audit event.
+func (m *MetricsCollector) RecordAuditDrop(sink, reason string) {
+	m.auditDroppedTotal.WithLabelValues(sink, reason).Inc()
 }
 
 // RecordDBConnection records database connection

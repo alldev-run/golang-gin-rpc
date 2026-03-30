@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -94,7 +95,7 @@ type ipFilterMiddleware struct {
 
 // newIPFilterMiddleware 创建中间件
 func newIPFilterMiddleware(config IPFilterConfig) *ipFilterMiddleware {
-	// 解析 CIDR
+	// 解析 CIDR 并保留精确 IP
 	for _, ip := range config.IPList {
 		if strings.Contains(ip, "/") {
 			_, ipNet, err := net.ParseCIDR(ip)
@@ -240,13 +241,16 @@ func (m *ipFilterMiddleware) Handle(c *gin.Context) {
 	// 检查是否应该拦截
 	blocked, reason := m.isBlocked(clientIP)
 	if blocked {
-		c.JSON(m.config.BlockStatusCode, gin.H{
+		c.Writer.Header().Set("Content-Type", "application/json")
+		c.Writer.WriteHeader(m.config.BlockStatusCode)
+		c.Abort()
+		resp := map[string]interface{}{
 			"error":   m.config.BlockMessage,
 			"code":    "IP_BLOCKED",
 			"ip":      clientIP,
 			"reason":  reason,
-		})
-		c.Abort()
+		}
+		json.NewEncoder(c.Writer).Encode(resp)
 		return
 	}
 

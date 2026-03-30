@@ -1,0 +1,41 @@
+groups:
+  - name: audit-pipeline
+    rules:
+      - alert: AuditWriteErrorRateHigh
+        expr: |
+          (
+            sum(rate(audit_writes_total{result="error"}[5m]))
+            /
+            clamp_min(sum(rate(audit_writes_total[5m])), 0.001)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: audit
+        annotations:
+          summary: "Audit write error ratio is high"
+          description: "Audit sink write error ratio > 5% for 10m"
+
+      - alert: AuditDroppedEventsDetected
+        expr: sum(increase(audit_dropped_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: audit
+        annotations:
+          summary: "Audit events are being dropped"
+          description: "At least one audit event was dropped in the last 5m"
+
+      - alert: AuditWriteLatencyP95High
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(audit_write_duration_seconds_bucket[5m])) by (le, sink)
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: audit
+        annotations:
+          summary: "Audit write latency p95 is high"
+          description: "Audit write p95 latency > 200ms for 10m"

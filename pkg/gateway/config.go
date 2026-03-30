@@ -40,6 +40,16 @@ type Config struct {
 
 	// Logging configuration
 	Logging LoggingConfig `yaml:"logging" json:"logging"`
+
+	// Audit configuration
+	Audit AuditConfig `yaml:"audit" json:"audit"`
+}
+
+// AuditConfig holds audit middleware configuration.
+type AuditConfig struct {
+	Enabled       bool     `yaml:"enabled" json:"enabled"`
+	SkipPaths     []string `yaml:"skip_paths" json:"skip_paths"`
+	SensitiveKeys []string `yaml:"sensitive_keys" json:"sensitive_keys"`
 }
 
 // CORSConfig holds CORS configuration
@@ -291,6 +301,11 @@ func DefaultConfig() *Config {
 		Logging: LoggingConfig{
 			Level:  "info",
 			Format: "json",
+		},
+		Audit: AuditConfig{
+			Enabled:       true,
+			SkipPaths:     []string{"/health", "/ready", "/metrics"},
+			SensitiveKeys: []string{"password", "token", "authorization", "api_key", "secret"},
 		},
 	}
 }
