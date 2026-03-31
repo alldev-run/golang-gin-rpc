@@ -4,9 +4,10 @@ package examples
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
@@ -16,6 +17,7 @@ import (
 type UserService struct {
 	*rpc.BaseService
 	users map[string]*User
+	mu    sync.RWMutex
 }
 
 // User represents a user entity
@@ -57,16 +59,11 @@ func NewUserService() *UserService {
 	return service
 }
 
-// Register registers the user service with a gRPC server
+// Register registers the user service with a server
 func (s *UserService) Register(server interface{}) error {
-	if _, ok := server.(*grpc.Server); ok {
-		// In a real implementation, you would register the actual gRPC service
-		// For this example, we'll just set metadata
-		s.SetMetadata("grpc_registered", true)
-		s.SetMetadata("registration_time", time.Now())
-		return nil
-	}
-	return fmt.Errorf("server is not a gRPC server")
+	s.SetMetadata("service_type", "user_management")
+	s.SetMetadata("registration_time", time.Now())
+	return nil
 }
 
 // CreateUserRequest represents a request to create a user
@@ -92,6 +89,9 @@ func (s *UserService) CreateUser(ctx context.Context, req *CreateUserRequest) (*
 	if req.Age <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "age must be positive")
 	}
+	
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	
 	// Check if user already exists
 	for _, user := range s.users {
@@ -130,7 +130,10 @@ func (s *UserService) GetUser(ctx context.Context, req *GetUserRequest) (*GetUse
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 	
+	s.mu.RLock()
 	user, exists := s.users[req.ID]
+	s.mu.RUnlock()
+	
 	if !exists {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
@@ -161,6 +164,9 @@ func (s *UserService) ListUsers(ctx context.Context, req *ListUsersRequest) (*Li
 	if offset < 0 {
 		offset = 0
 	}
+	
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	
 	users := make([]*User, 0)
 	count := 0
@@ -196,6 +202,9 @@ func (s *UserService) UpdateUser(ctx context.Context, req *UpdateUserRequest) (*
 	if req.ID == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
+	
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	
 	user, exists := s.users[req.ID]
 	if !exists {
@@ -233,6 +242,9 @@ func (s *UserService) DeleteUser(ctx context.Context, req *DeleteUserRequest) (*
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 	
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
 	_, exists := s.users[req.ID]
 	if !exists {
 		return nil, status.Error(codes.NotFound, "user not found")
@@ -266,6 +278,9 @@ func (s *UserService) SearchUsers(ctx context.Context, req *SearchUsersRequest) 
 		limit = 10 // default limit
 	}
 	
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
 	var users []*User
 	for _, user := range s.users {
 		if len(users) >= limit {
@@ -284,26 +299,16 @@ func (s *UserService) SearchUsers(ctx context.Context, req *SearchUsersRequest) 
 	}, nil
 }
 
-// contains checks if a string contains another string (case-insensitive)
+// contains checks if a string contains a substring (case-insensitive)
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		hasSubstring(s, substr)))
-}
-
-// hasSubstring checks if a string contains a substring (case-insensitive)
-func hasSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
 // GetStats returns service statistics
 func (s *UserService) GetStats(ctx context.Context, req interface{}) (interface{}, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
 	return map[string]interface{}{
 		"total_users":    len(s.users),
 		"service_name":   s.Name(),
@@ -315,6 +320,9 @@ func (s *UserService) GetStats(ctx context.Context, req interface{}) (interface{
 
 // Health returns the health status of the user service
 func (s *UserService) Health(ctx context.Context, req interface{}) (interface{}, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
 	health := s.BaseService.Health()
 	health.Metadata["total_users"] = len(s.users)
 	health.Metadata["service_type"] = "user_management"
