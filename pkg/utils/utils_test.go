@@ -304,14 +304,20 @@ func TestRandomBytes(t *testing.T) {
 }
 
 func TestRandomString(t *testing.T) {
-	result := RandomString(16)
+	result, err := RandomString(16)
+	if err != nil {
+		t.Errorf("RandomString() error = %v", err)
+	}
 	if len(result) != 16 {
 		t.Errorf("RandomString() returned length %d, want 16", len(result))
 	}
 }
 
 func TestRandomHex(t *testing.T) {
-	result := RandomHex(8)
+	result, err := RandomHex(8)
+	if err != nil {
+		t.Errorf("RandomHex() error = %v", err)
+	}
 	if len(result) != 16 { // 8 bytes = 16 hex chars
 		t.Errorf("RandomHex() returned length %d, want 16", len(result))
 	}
@@ -564,15 +570,23 @@ func TestPointerHelpersExtended(t *testing.T) {
 func TestRandomStringEdgeCases(t *testing.T) {
 	// Test with different lengths
 	for n := 0; n < 20; n++ {
-		result := RandomString(n)
+		result, err := RandomString(n)
+		if err != nil {
+			t.Errorf("RandomString(%d) error = %v", n, err)
+			continue
+		}
 		if len(result) != n {
 			t.Errorf("RandomString(%d) returned length %d, want %d", n, len(result), n)
 		}
 	}
 	
 	// Test that random strings are different
-	s1 := RandomString(10)
-	s2 := RandomString(10)
+	s1, err1 := RandomString(10)
+	s2, err2 := RandomString(10)
+	if err1 != nil || err2 != nil {
+		t.Errorf("RandomString() errors: %v, %v", err1, err2)
+		return
+	}
 	if s1 == s2 {
 		t.Error("RandomString() should produce different strings")
 	}
@@ -581,7 +595,11 @@ func TestRandomStringEdgeCases(t *testing.T) {
 func TestRandomHexEdgeCases(t *testing.T) {
 	// Test with different lengths
 	for n := 0; n < 10; n++ {
-		result := RandomHex(n)
+		result, err := RandomHex(n)
+		if err != nil {
+			t.Errorf("RandomHex(%d) error = %v", n, err)
+			continue
+		}
 		expectedLen := n * 2 // hex encoding doubles the length
 		if len(result) != expectedLen {
 			t.Errorf("RandomHex(%d) returned length %d, want %d", n, len(result), expectedLen)
@@ -589,7 +607,11 @@ func TestRandomHexEdgeCases(t *testing.T) {
 	}
 	
 	// Test that hex strings contain only valid hex characters
-	result := RandomHex(5)
+	result, err := RandomHex(5)
+	if err != nil {
+		t.Errorf("RandomHex(5) error = %v", err)
+		return
+	}
 	for _, c := range result {
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
 			t.Errorf("RandomHex() contains invalid hex character: %c", c)
