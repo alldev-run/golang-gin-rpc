@@ -35,6 +35,21 @@ gateway:
       - "api_key"
       - "secret"
 
+  # RBAC configuration
+  rbac:
+    enabled: true
+    role_permissions:
+      admin:
+        - "user.read"
+        - "user.write"
+        - "order.read"
+        - "order.write"
+      auditor:
+        - "audit.read"
+        - "order.read"
+      operator:
+        - "order.read"
+
   # IP Filter Configuration (Enterprise Security)
   ip_filter:
     enabled: false                      # Enable IP filtering
@@ -78,6 +93,8 @@ gateway:
     - path: "/api/user/*"
       method: "*"
       service: "user-service"
+      required_permissions: ["user.read"]
+      permission_mode: "any"
       strip_prefix: true
       timeout: "30s"
       retries: 3
@@ -88,6 +105,8 @@ gateway:
     - path: "/api/order/*"
       method: "*"
       service: "order-service"
+      required_permissions: ["order.read"]
+      permission_mode: "any"
       strip_prefix: true
       timeout: "30s"
       retries: 3

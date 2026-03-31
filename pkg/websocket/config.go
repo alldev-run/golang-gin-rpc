@@ -8,6 +8,28 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/messaging"
 )
 
+const (
+	MessageFormatJSON     = "json"
+	MessageFormatProtobuf = "protobuf"
+)
+
+func normalizeMessageFormat(format string) string {
+	format = strings.ToLower(strings.TrimSpace(format))
+	if format == "" {
+		return MessageFormatJSON
+	}
+	return format
+}
+
+func validateMessageFormat(format string) error {
+	switch normalizeMessageFormat(format) {
+	case MessageFormatJSON, MessageFormatProtobuf:
+		return nil
+	default:
+		return fmt.Errorf("unsupported websocket message format: %s", format)
+	}
+}
+
 type NodeConfig struct {
 	Enabled            bool          `yaml:"enabled" json:"enabled"`
 	NodeID             string        `yaml:"node_id" json:"node_id"`
@@ -139,9 +161,18 @@ func (c *ConfigFile) Normalize() {
 	if c.Cluster.Transport.Messaging.Options == nil {
 		c.Cluster.Transport.Messaging.Options = map[string]interface{}{}
 	}
+	c.Client.MessageFormat = normalizeMessageFormat(c.Client.MessageFormat)
+	c.Server.MessageFormat = normalizeMessageFormat(c.Server.MessageFormat)
 }
 
 func (c ConfigFile) Validate() error {
+	if err := validateMessageFormat(c.Client.MessageFormat); err != nil {
+		return err
+	}
+	if err := validateMessageFormat(c.Server.MessageFormat); err != nil {
+		return err
+	}
+
 	if !c.Node.Enabled {
 		return nil
 	}

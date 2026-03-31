@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -305,6 +306,7 @@ func (h *HealthChecker) GetServiceInfo(ctx context.Context) (*ServiceInfo, error
 
 // ClientPool manages a pool of JSON-RPC clients
 type ClientPool struct {
+	mu      sync.RWMutex
 	clients map[string]*Client
 	config  ClientConfig
 }
@@ -319,30 +321,44 @@ func NewClientPool(config ClientConfig) *ClientPool {
 
 // Get returns a client for the given URL, creating one if necessary
 func (p *ClientPool) Get(url string) *Client {
+	p.mu.RLock()
 	if client, exists := p.clients[url]; exists {
+		p.mu.RUnlock()
 		return client
 	}
+	p.mu.RUnlock()
 
 	config := p.config
 	config.URL = url
 	
 	client := NewClient(config)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if existing, exists := p.clients[url]; exists {
+		return existing
+	}
 	p.clients[url] = client
 	return client
 }
 
 // Remove removes a client from the pool
 func (p *ClientPool) Remove(url string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	delete(p.clients, url)
 }
 
 // Size returns the number of clients in the pool
 func (p *ClientPool) Size() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return len(p.clients)
 }
 
 // URLs returns all URLs in the pool
 func (p *ClientPool) URLs() []string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	urls := make([]string, 0, len(p.clients))
 	for url := range p.clients {
 		urls = append(urls, url)

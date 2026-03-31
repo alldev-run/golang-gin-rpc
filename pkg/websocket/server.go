@@ -9,7 +9,9 @@ import (
 	"sync"
 	"time"
 
+	apperrors "github.com/alldev-run/golang-gin-rpc/pkg/errors"
 	pkgtracing "github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+	"google.golang.org/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"
 	nws "nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -18,6 +20,7 @@ import (
 type ServerConfig struct {
 	Addr             string        `yaml:"addr" json:"addr"`
 	Path             string        `yaml:"path" json:"path"`
+	MessageFormat    string        `yaml:"message_format" json:"message_format"`
 	ReadTimeout      time.Duration `yaml:"read_timeout" json:"read_timeout"`
 	WriteTimeout     time.Duration `yaml:"write_timeout" json:"write_timeout"`
 	RequireAuth      bool          `yaml:"require_auth" json:"require_auth"`
@@ -32,6 +35,7 @@ func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
 		Addr:             ":8080",
 		Path:             "/ws",
+		MessageFormat:    MessageFormatJSON,
 		ReadTimeout:      30 * time.Second,
 		WriteTimeout:     30 * time.Second,
 		HeartbeatTimeout: 90 * time.Second,
@@ -70,6 +74,10 @@ func NewServer(config ServerConfig) *Server {
 	}
 	if config.Path == "" {
 		config.Path = "/ws"
+	}
+	config.MessageFormat = normalizeMessageFormat(config.MessageFormat)
+	if err := validateMessageFormat(config.MessageFormat); err != nil {
+		config.MessageFormat = MessageFormatJSON
 	}
 	if config.ReadTimeout <= 0 {
 		config.ReadTimeout = 30 * time.Second
@@ -258,6 +266,65 @@ func (c *Conn) SendJSON(ctx context.Context, payload interface{}) error {
 		return err
 	}
 	return c.SendText(ctx, string(data))
+}
+
+func (c *Conn) SendProto(ctx context.Context, message proto.Message) error {
+	if message == nil {
+		return apperrors.New(apperrors.ErrCodeWebSocketProtoMessageNil, "protobuf message is nil")
+	}
+	data, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+	return c.SendBinary(ctx, data)
+}
+
+func (c *Conn) ReceiveProto(ctx context.Context, dest proto.Message) error {
+	if dest == nil {
+		return apperrors.New(apperrors.ErrCodeWebSocketProtoDestinationNil, "protobuf destination is nil")
+	}
+	msgType, payload, err := c.Receive(ctx)
+	if err != nil {
+		return err
+	}
+	if msgType != int(nws.MessageBinary) {
+		return apperrors.New(apperrors.ErrCodeWebSocketProtoFrameType, "expected binary frame for protobuf").WithDetails(map[string]interface{}{"frame_type": msgType})
+	}
+	return proto.Unmarshal(payload, dest)
+}
+
+// SendMessage sends payload using configured server message format.
+// For protobuf mode, payload must implement proto.Message.
+func (c *Conn) SendMessage(ctx context.Context, payload interface{}) error {
+	switch normalizeMessageFormat(c.config.MessageFormat) {
+	case MessageFormatProtobuf:
+		msg, ok := payload.(proto.Message)
+		if !ok {
+			return apperrors.New(apperrors.ErrCodeWebSocketProtoPayloadType, "protobuf mode requires proto.Message payload")
+		}
+		return c.SendProto(ctx, msg)
+	case MessageFormatJSON:
+		fallthrough
+	default:
+		return c.SendJSON(ctx, payload)
+	}
+}
+
+// ReceiveMessage receives payload using configured server message format.
+// For protobuf mode, dest must implement proto.Message.
+func (c *Conn) ReceiveMessage(ctx context.Context, dest interface{}) error {
+	switch normalizeMessageFormat(c.config.MessageFormat) {
+	case MessageFormatProtobuf:
+		msg, ok := dest.(proto.Message)
+		if !ok {
+			return apperrors.New(apperrors.ErrCodeWebSocketProtoDestinationType, "protobuf mode requires proto.Message destination")
+		}
+		return c.ReceiveProto(ctx, msg)
+	case MessageFormatJSON:
+		fallthrough
+	default:
+		return c.ReceiveJSON(ctx, dest)
+	}
 }
 
 func (c *Conn) Close() error {

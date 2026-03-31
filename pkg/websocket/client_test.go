@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	userpb "github.com/alldev-run/golang-gin-rpc/proto"
 	nws "nhooyr.io/websocket"
 )
 
@@ -91,6 +92,128 @@ func TestClient_SendReceiveJSON(t *testing.T) {
 	encodedReceived, _ := json.Marshal(received)
 	if string(encodedSent) != string(encodedReceived) {
 		t.Fatalf("expected %s, got %s", string(encodedSent), string(encodedReceived))
+	}
+}
+
+func TestClient_SendReceiveProto(t *testing.T) {
+	server := newTestWebsocketServer(t)
+	defer server.Close()
+
+	client := NewClient(Config{URL: wsURLFromHTTP(server.URL), Origin: server.URL})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer client.Close()
+
+	msg := &userpb.UserRequest{Id: 42}
+	if err := client.SendProto(ctx, msg); err != nil {
+		t.Fatalf("SendProto() error = %v", err)
+	}
+
+	var got userpb.UserRequest
+	if err := client.ReceiveProto(ctx, &got); err != nil {
+		t.Fatalf("ReceiveProto() error = %v", err)
+	}
+
+	if got.Id != 42 {
+		t.Fatalf("expected id 42, got %d", got.Id)
+	}
+}
+
+func TestClient_SendReceiveMessage_JSONByConfig(t *testing.T) {
+	server := newTestWebsocketServer(t)
+	defer server.Close()
+
+	client := NewClient(Config{URL: wsURLFromHTTP(server.URL), Origin: server.URL, MessageFormat: MessageFormatJSON})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer client.Close()
+
+	sent := map[string]interface{}{"type": "ping", "count": float64(7)}
+	if err := client.SendMessage(ctx, sent); err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+
+	var got map[string]interface{}
+	if err := client.ReceiveMessage(ctx, &got); err != nil {
+		t.Fatalf("ReceiveMessage() error = %v", err)
+	}
+
+	if got["type"] != "ping" {
+		t.Fatalf("expected type ping, got %v", got["type"])
+	}
+}
+
+func TestClient_SendReceiveMessage_ProtoByConfig(t *testing.T) {
+	server := newTestWebsocketServer(t)
+	defer server.Close()
+
+	client := NewClient(Config{URL: wsURLFromHTTP(server.URL), Origin: server.URL, MessageFormat: MessageFormatProtobuf})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer client.Close()
+
+	sent := &userpb.UserRequest{Id: 99}
+	if err := client.SendMessage(ctx, sent); err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+
+	var got userpb.UserRequest
+	if err := client.ReceiveMessage(ctx, &got); err != nil {
+		t.Fatalf("ReceiveMessage() error = %v", err)
+	}
+
+	if got.Id != 99 {
+		t.Fatalf("expected id 99, got %d", got.Id)
+	}
+}
+
+func TestClient_ReceiveMessage_ProtoByConfigFrameTypeMismatch(t *testing.T) {
+	server := newTestWebsocketServer(t)
+	defer server.Close()
+
+	client := NewClient(Config{URL: wsURLFromHTTP(server.URL), Origin: server.URL, MessageFormat: MessageFormatProtobuf})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer client.Close()
+
+	if err := client.SendText(ctx, "text-frame"); err != nil {
+		t.Fatalf("SendText() error = %v", err)
+	}
+
+	var got userpb.UserRequest
+	if err := client.ReceiveMessage(ctx, &got); !IsProtobufFrameTypeMismatchError(err) {
+		t.Fatalf("expected protobuf frame type mismatch error, got err=%v", err)
+	}
+}
+
+func TestClient_SendReceiveMessage_ProtoByConfigTypeMismatch(t *testing.T) {
+	client := NewClient(Config{MessageFormat: MessageFormatProtobuf})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if err := client.SendMessage(ctx, map[string]interface{}{"type": "not-proto"}); !IsProtobufPayloadTypeMismatchError(err) {
+		t.Fatalf("expected protobuf payload type mismatch error, got err=%v", err)
+	}
+
+	var nonProto map[string]interface{}
+	if err := client.ReceiveMessage(ctx, &nonProto); !IsProtobufDestinationTypeMismatchError(err) {
+		t.Fatalf("expected protobuf destination type mismatch error, got err=%v", err)
 	}
 }
 

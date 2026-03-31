@@ -19,7 +19,7 @@ GOMOD = $(GOCMD) mod
 BUILD_FLAGS = -v
 LDFLAGS = -ldflags "-X main.version=$(shell git describe --tags --always 2>/dev/null || echo 'dev')"
 
-.PHONY: help build run test clean deps fmt vet lint docker-build docker-run
+.PHONY: help build run test clean deps fmt vet lint docker-build docker-run proto proto-tools
 
 # Default target
 help: ## Show this help message
@@ -142,6 +142,15 @@ install-tools: ## Install development tools
 	go install github.com/go-delve/delve/cmd/dlv@latest
 	@echo "Installing air for hot reload..."
 	go install github.com/air-verse/air@latest
+
+proto: ## Generate Go code from proto files
+	@echo "Generating protobuf and gRPC stubs..."
+	@bash ./script/gen-proto.sh
+
+proto-tools: ## Install protobuf codegen plugins
+	@echo "Installing protoc Go plugins..."
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # Development targets
 dev: ## Run with hot reload (requires air)

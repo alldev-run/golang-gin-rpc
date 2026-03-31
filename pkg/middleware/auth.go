@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rbac"
 	"github.com/alldev-run/golang-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -54,6 +55,82 @@ func JWT(config AuthConfig) gin.HandlerFunc {
 		c.Set("username", claims.Username)
 		c.Set("device_id", claims.DeviceID)
 		c.Set("claims", claims)
+
+		c.Next()
+	}
+}
+
+// RequirePermission creates a middleware that requires one RBAC permission.
+func RequirePermission(policy *rbac.Policy, permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if policy == nil {
+			response.Error(c, "RBAC policy is not configured", nil)
+			c.Abort()
+			return
+		}
+
+		claims, exists := c.Get("claims")
+		if !exists {
+			response.Error(c, "Authentication required", nil)
+			c.Abort()
+			return
+		}
+
+		userClaims, ok := claims.(*jwtx.Claims)
+		if !ok {
+			response.Error(c, "Invalid claims", nil)
+			c.Abort()
+			return
+		}
+
+		if hasDirectPermission(userClaims, permission) {
+			c.Next()
+			return
+		}
+
+		if !policy.HasPermission(getUserRoles(userClaims), permission) {
+			response.Error(c, "Insufficient permissions", nil)
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequireAnyPermission creates a middleware that requires any of the given permissions.
+func RequireAnyPermission(policy *rbac.Policy, permissions ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if policy == nil {
+			response.Error(c, "RBAC policy is not configured", nil)
+			c.Abort()
+			return
+		}
+
+		claims, exists := c.Get("claims")
+		if !exists {
+			response.Error(c, "Authentication required", nil)
+			c.Abort()
+			return
+		}
+
+		userClaims, ok := claims.(*jwtx.Claims)
+		if !ok {
+			response.Error(c, "Invalid claims", nil)
+			c.Abort()
+			return
+		}
+
+		if hasAnyDirectPermission(userClaims, permissions) {
+			c.Next()
+			return
+		}
+
+		if !policy.HasAnyPermission(getUserRoles(userClaims), permissions) {
+			response.Error(c, "Insufficient permissions", nil)
+			c.Abort()
+			return
+		}
 
 		c.Next()
 	}
@@ -267,6 +344,44 @@ func getUserRoles(claims *jwtx.Claims) []string {
 		roles[i] = strings.TrimSpace(role)
 	}
 	return roles
+}
+
+func getUserPermissions(claims *jwtx.Claims) []string {
+	if claims.Payload == nil {
+		return []string{}
+	}
+
+	permissionsStr, exists := claims.Payload["permissions"]
+	if !exists {
+		return []string{}
+	}
+
+	permissions := strings.Split(permissionsStr, ",")
+	for i, permission := range permissions {
+		permissions[i] = strings.TrimSpace(permission)
+	}
+	return permissions
+}
+
+func hasDirectPermission(claims *jwtx.Claims, permission string) bool {
+	for _, perm := range getUserPermissions(claims) {
+		if perm == permission {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAnyDirectPermission(claims *jwtx.Claims, permissions []string) bool {
+	userPerms := getUserPermissions(claims)
+	for _, required := range permissions {
+		for _, existing := range userPerms {
+			if required == existing {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // GetUserID gets the user ID from the context

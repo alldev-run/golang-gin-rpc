@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package user;
 
+option go_package = "github.com/alldev-run/golang-gin-rpc/proto;userpb";
+
 service UserService {
 
   rpc GetUser(UserRequest) returns (UserResponse);

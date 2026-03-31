@@ -126,6 +126,9 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 		// Register route based on method
 		if route.Method == "*" || route.Method == "ANY" {
 			engine.Any(route.Path, func(c *gin.Context) {
+				if !g.checkRoutePermission(c, route) {
+					return
+				}
 				// 设置协议信息到上下文
 				c.Set("protocol", route.Protocol)
 				c.Set("service", route.Service)
@@ -133,6 +136,9 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 			})
 		} else {
 			engine.Handle(route.Method, route.Path, func(c *gin.Context) {
+				if !g.checkRoutePermission(c, route) {
+					return
+				}
 				// 设置协议信息到上下文
 				c.Set("protocol", route.Protocol)
 				c.Set("service", route.Service)
@@ -148,6 +154,52 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 	// Gateway info endpoint
 	engine.GET("/info", g.gatewayInfo)
 	engine.GET("/metrics", gin.WrapH(metrics.Handler()))
+}
+
+func (g *Gateway) checkRoutePermission(c *gin.Context, route RouteConfig) bool {
+	if len(route.RequiredPermissions) == 0 {
+		return true
+	}
+
+	policy := g.GetRBACPolicy()
+	if policy == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "RBAC policy is not configured"})
+		c.Abort()
+		return false
+	}
+
+	claims, ok := middlewarepkg.GetClaims(c)
+	if !ok || claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		c.Abort()
+		return false
+	}
+
+	mode := strings.ToLower(strings.TrimSpace(route.PermissionMode))
+	if mode == "" {
+		mode = "any"
+	}
+
+	userRoles := strings.Split(strings.TrimSpace(claims.Payload["roles"]), ",")
+	for i, role := range userRoles {
+		userRoles[i] = strings.TrimSpace(role)
+	}
+
+	allowed := false
+	switch mode {
+	case "all":
+		allowed = policy.HasAllPermissions(userRoles, route.RequiredPermissions)
+	default:
+		allowed = policy.HasAnyPermission(userRoles, route.RequiredPermissions)
+	}
+
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+		c.Abort()
+		return false
+	}
+
+	return true
 }
 
 // handleRoute handles a specific route

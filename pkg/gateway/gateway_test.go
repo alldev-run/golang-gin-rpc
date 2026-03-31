@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
 	auditpkg "github.com/alldev-run/golang-gin-rpc/pkg/audit"
 	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
 	"github.com/gin-gonic/gin"
@@ -60,6 +61,19 @@ func TestNewGateway_AuditConfigFromGatewayConfig(t *testing.T) {
 	assert.False(t, auditCfg.Enabled)
 	assert.Equal(t, []string{"/internal/health"}, auditCfg.SkipPaths)
 	assert.Equal(t, []string{"authorization", "secret_key"}, auditCfg.SensitiveKeys)
+}
+
+func TestNewGateway_RBACPolicyFromGatewayConfig(t *testing.T) {
+	config := DefaultConfig()
+	config.RBAC.Enabled = true
+	config.RBAC.RolePermissions = map[string][]string{
+		"admin": {"user.read", "user.write"},
+	}
+
+	gw := NewGateway(config)
+	policy := gw.GetRBACPolicy()
+	require.NotNil(t, policy)
+	assert.True(t, policy.HasPermission([]string{"admin"}, "user.write"))
 }
 
 func TestRouteKey(t *testing.T) {
@@ -301,6 +315,86 @@ func TestSetupRoutes_AuditMiddleware(t *testing.T) {
 	headers, ok := sink.events[0].Metadata["headers"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "***", headers["Authorization"])
+}
+
+func TestSetupRoutes_RBACPermissionDenied(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer backendServer.Close()
+
+	config := DefaultConfig()
+	config.RBAC.Enabled = true
+	config.RBAC.RolePermissions = map[string][]string{
+		"user": {"profile.read"},
+	}
+	config.Routes = []RouteConfig{
+		{
+			Path:                "/api/secure",
+			Method:              "GET",
+			Service:             "secure-service",
+			Targets:             []string{backendServer.URL},
+			RequiredPermissions: []string{"profile.write"},
+			PermissionMode:      "any",
+		},
+	}
+
+	gw := NewGateway(config)
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) {
+		c.Set("claims", &jwtx.Claims{Payload: map[string]string{"roles": "user"}})
+		c.Next()
+	})
+	gw.SetupRoutes(engine)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/secure", nil)
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusForbidden, resp.Code)
+}
+
+func TestSetupRoutes_RBACPermissionAllowed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer backendServer.Close()
+
+	config := DefaultConfig()
+	config.RBAC.Enabled = true
+	config.RBAC.RolePermissions = map[string][]string{
+		"editor": {"doc.read", "doc.write"},
+	}
+	config.Routes = []RouteConfig{
+		{
+			Path:                "/api/doc",
+			Method:              "GET",
+			Service:             "doc-service",
+			Targets:             []string{backendServer.URL},
+			RequiredPermissions: []string{"doc.write"},
+			PermissionMode:      "any",
+		},
+	}
+
+	gw := NewGateway(config)
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) {
+		c.Set("claims", &jwtx.Claims{Payload: map[string]string{"roles": "editor"}})
+		c.Next()
+	})
+	gw.SetupRoutes(engine)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/doc", nil)
+	resp := httptest.NewRecorder()
+	engine.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 // TestProxyWithStripPrefix tests proxy with prefix stripping

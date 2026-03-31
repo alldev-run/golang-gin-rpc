@@ -43,6 +43,9 @@ type Config struct {
 
 	// Audit configuration
 	Audit AuditConfig `yaml:"audit" json:"audit"`
+
+	// RBAC configuration
+	RBAC RBACConfig `yaml:"rbac" json:"rbac"`
 }
 
 // AuditConfig holds audit middleware configuration.
@@ -50,6 +53,12 @@ type AuditConfig struct {
 	Enabled       bool     `yaml:"enabled" json:"enabled"`
 	SkipPaths     []string `yaml:"skip_paths" json:"skip_paths"`
 	SensitiveKeys []string `yaml:"sensitive_keys" json:"sensitive_keys"`
+}
+
+// RBACConfig holds role-permission policy configuration.
+type RBACConfig struct {
+	Enabled         bool                `yaml:"enabled" json:"enabled"`
+	RolePermissions map[string][]string `yaml:"role_permissions" json:"role_permissions"`
 }
 
 // CORSConfig holds CORS configuration
@@ -156,6 +165,8 @@ type RouteConfig struct {
 	Headers     map[string]string `yaml:"headers" json:"headers"`
 	Query       map[string]string `yaml:"query" json:"query"`
 	Protocol    string            `yaml:"protocol" json:"protocol"` // "http", "grpc", "jsonrpc"
+	RequiredPermissions []string  `yaml:"required_permissions" json:"required_permissions"`
+	PermissionMode      string    `yaml:"permission_mode" json:"permission_mode"` // "any" or "all"
 }
 
 // ProtocolConfig holds protocol support configuration
@@ -306,6 +317,10 @@ func DefaultConfig() *Config {
 			Enabled:       true,
 			SkipPaths:     []string{"/health", "/ready", "/metrics"},
 			SensitiveKeys: []string{"password", "token", "authorization", "api_key", "secret"},
+		},
+		RBAC: RBACConfig{
+			Enabled:         false,
+			RolePermissions: map[string][]string{},
 		},
 	}
 }

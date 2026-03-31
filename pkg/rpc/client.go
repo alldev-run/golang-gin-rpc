@@ -112,6 +112,8 @@ type JSONRPCClient struct {
 	config      ClientConfig
 	httpClient  *http.Client
 	baseURL     string
+	mu          sync.RWMutex
+	requestID   uint64
 	degradation *DegradationManager
 	rateLimiter *ratelimiter.Manager
 	discovery   discoveryServiceResolver
@@ -372,7 +374,8 @@ func (c *JSONRPCClient) Connect() error {
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/rpc?ping=true", nil)
+	baseURL := c.getBaseURL()
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/rpc?ping=true", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create ping request: %w", err)
 	}
@@ -448,12 +451,13 @@ func (c *JSONRPCClient) Call(ctx context.Context, method string, params interfac
 
 	start := time.Now()
 	status := "ok"
+	currentBaseURL := c.getBaseURL()
 	defer func() {
 		if c.degradation != nil {
 			c.degradation.RecordMetrics(time.Since(start), nil)
 		}
 		if c.observer != nil {
-			c.observer.RecordRequest(ClientTypeJSONRPC, method, c.baseURL, status, time.Since(start))
+			c.observer.RecordRequest(ClientTypeJSONRPC, method, currentBaseURL, status, time.Since(start))
 		}
 	}()
 
@@ -461,11 +465,12 @@ func (c *JSONRPCClient) Call(ctx context.Context, method string, params interfac
 		return err
 	}
 
+	currentBaseURL = c.getBaseURL()
 	req := JSONRPCRequest{
 		JSONRPC: "2.0",
 		Method:  method,
 		Params:  params,
-		ID:      1,
+		ID:      atomic.AddUint64(&c.requestID, 1),
 	}
 
 	reqBody, err := json.Marshal(req)
@@ -473,19 +478,19 @@ func (c *JSONRPCClient) Call(ctx context.Context, method string, params interfac
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/rpc", bytes.NewReader(reqBody))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", currentBaseURL+"/rpc", bytes.NewReader(reqBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	if c.config.APIKey != "" {
-		headerName := c.config.AuthHeader
+	apiKey, headerName := c.authConfigSnapshot()
+	if apiKey != "" {
 		if headerName == "" {
 			headerName = "X-API-Key"
 		}
-		httpReq.Header.Set(headerName, c.config.APIKey)
+		httpReq.Header.Set(headerName, apiKey)
 	}
 
 	resp, err := c.doJSONRPCRequestWithRetry(httpReq)
@@ -520,10 +525,9 @@ func (c *JSONRPCClient) Call(ctx context.Context, method string, params interfac
 
 // SetAPIKey sets the API key for authentication
 func (c *JSONRPCClient) SetAPIKey(apiKey string) {
-	c.httpClient.Transport = &apiKeyTransport{
-		Base:   c.httpClient.Transport,
-		APIKey: apiKey,
-	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.config.APIKey = apiKey
 }
 
 // apiKeyTransport adds API key to requests
@@ -571,7 +575,7 @@ func (c *GRPCClient) resolveGRPCTarget(ctx context.Context) (string, error) {
 
 func (c *JSONRPCClient) refreshJSONRPCBaseURL(ctx context.Context) error {
 	if target, ok := c.getCachedTarget(); ok {
-		c.baseURL = target
+		c.setBaseURL(target)
 		return nil
 	}
 	if c.discovery == nil || c.config.ServiceName == "" {
@@ -599,12 +603,30 @@ func (c *JSONRPCClient) refreshJSONRPCBaseURL(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	c.baseURL = selected
+	c.setBaseURL(selected)
 	logger.Debug("RPC client resolved discovery target",
 		logger.String("type", string(ClientTypeJSONRPC)),
 		logger.String("service", c.config.ServiceName),
 		logger.String("target", selected))
 	return nil
+}
+
+func (c *JSONRPCClient) getBaseURL() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.baseURL
+}
+
+func (c *JSONRPCClient) setBaseURL(baseURL string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.baseURL = baseURL
+}
+
+func (c *JSONRPCClient) authConfigSnapshot() (apiKey, authHeader string) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.config.APIKey, c.config.AuthHeader
 }
 
 func newClientTargetSelector(strategy string) *clientTargetSelector {

@@ -10,6 +10,7 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/health"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+	"github.com/alldev-run/golang-gin-rpc/pkg/rbac"
 	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
@@ -27,6 +28,7 @@ type Gateway struct {
 	proxy      *Proxy           // HTTP proxy
 	auth       *GatewayAuth     // Authentication middleware
 	auditConfig middlewarepkg.AuditConfig
+	rbacPolicy *rbac.Policy
 	mu         sync.RWMutex
 	started    bool
 	ctx        context.Context
@@ -81,6 +83,11 @@ func NewGateway(config *Config) *Gateway {
 		auditCfg.SensitiveKeys = append([]string(nil), config.Audit.SensitiveKeys...)
 	}
 
+	var rbacPolicy *rbac.Policy
+	if config.RBAC.Enabled {
+		rbacPolicy = rbac.NewPolicy(config.RBAC.RolePermissions)
+	}
+
 	gateway := &Gateway{
 		config: config,
 		server: &Server{
@@ -93,6 +100,7 @@ func NewGateway(config *Config) *Gateway {
 		router:   router,
 		balancer: balancer,
 		auditConfig: auditCfg,
+		rbacPolicy: rbacPolicy,
 		ctx:      ctx,
 		cancel:   cancel,
 	}
@@ -329,6 +337,20 @@ func (g *Gateway) GetAuditConfig() middlewarepkg.AuditConfig {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return g.auditConfig
+}
+
+// SetRBACPolicy sets RBAC policy used by route permission checks.
+func (g *Gateway) SetRBACPolicy(policy *rbac.Policy) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.rbacPolicy = policy
+}
+
+// GetRBACPolicy returns current RBAC policy.
+func (g *Gateway) GetRBACPolicy() *rbac.Policy {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.rbacPolicy
 }
 
 // min returns the minimum of two integers

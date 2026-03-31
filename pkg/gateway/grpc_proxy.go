@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
@@ -18,6 +19,7 @@ import (
 type GRPCProxy struct {
 	gateway *Gateway
 	clients map[string]*grpc.Client
+	mu      sync.RWMutex
 }
 
 // NewGRPCProxy creates a new gRPC proxy
@@ -120,12 +122,12 @@ func (p *GRPCProxy) handleGRPCWeb(c *gin.Context, client *grpc.Client, route *Ro
 
 // getOrCreateGRPCClient gets or creates a gRPC client using pkg/rpc/grpc
 func (p *GRPCProxy) getOrCreateGRPCClient(target string) (*grpc.Client, error) {
-	p.gateway.mu.Lock()
-	defer p.gateway.mu.Unlock()
-
+	p.mu.RLock()
 	if client, exists := p.clients[target]; exists {
+		p.mu.RUnlock()
 		return client, nil
 	}
+	p.mu.RUnlock()
 
 	// Create gRPC client configuration
 	config := grpc.DefaultClientConfig()
@@ -142,6 +144,12 @@ func (p *GRPCProxy) getOrCreateGRPCClient(target string) (*grpc.Client, error) {
 		return nil, fmt.Errorf("failed to create gRPC client: %w", err)
 	}
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if existing, exists := p.clients[target]; exists {
+		_ = client.Close()
+		return existing, nil
+	}
 	p.clients[target] = client
 	return client, nil
 }
@@ -149,13 +157,13 @@ func (p *GRPCProxy) getOrCreateGRPCClient(target string) (*grpc.Client, error) {
 // Close closes all gRPC clients
 func (p *GRPCProxy) Close() error {
 	logger.Info("Starting gRPC proxy close...")
-	
-	// 在关闭阶段，完全避免使用 Gateway 的锁
-	// 直接操作 clients 映射，因为在关闭时不会有并发访问
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	var lastErr error
 	var clientCount int
-	
-	// 直接遍历并关闭客户端
+
 	for target, client := range p.clients {
 		clientCount++
 		logger.Debug("Closing gRPC client", logger.String("target", target))
@@ -163,9 +171,8 @@ func (p *GRPCProxy) Close() error {
 			logger.Debug("Failed to close gRPC client", logger.Error(err))
 			lastErr = err
 		}
-		// 从映射中移除已关闭的客户端
-		delete(p.clients, target)
 	}
+	p.clients = make(map[string]*grpc.Client)
 	
 	logger.Info("Found gRPC clients to close", logger.Int("count", clientCount))
 	logger.Info("gRPC proxy closed successfully")
@@ -176,6 +183,7 @@ func (p *GRPCProxy) Close() error {
 type JSONRPCProxy struct {
 	gateway *Gateway
 	clients map[string]*jsonrpc.Client
+	mu      sync.RWMutex
 }
 
 // NewJSONRPCProxy creates a new JSON-RPC proxy
@@ -286,12 +294,12 @@ func (p *JSONRPCProxy) ProxyJSONRPC(c *gin.Context, route *Route) error {
 
 // getOrCreateJSONRPCClient gets or creates a JSON-RPC client using pkg/rpc/jsonrpc
 func (p *JSONRPCProxy) getOrCreateJSONRPCClient(target string) (*jsonrpc.Client, error) {
-	p.gateway.mu.Lock()
-	defer p.gateway.mu.Unlock()
-
+	p.mu.RLock()
 	if client, exists := p.clients[target]; exists {
+		p.mu.RUnlock()
 		return client, nil
 	}
+	p.mu.RUnlock()
 
 	// Create JSON-RPC client configuration
 	config := jsonrpc.DefaultClientConfig()
@@ -302,6 +310,11 @@ func (p *JSONRPCProxy) getOrCreateJSONRPCClient(target string) (*jsonrpc.Client,
 	// Create JSON-RPC client
 	client := jsonrpc.NewClient(config)
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if existing, exists := p.clients[target]; exists {
+		return existing, nil
+	}
 	p.clients[target] = client
 	return client, nil
 }
@@ -309,13 +322,12 @@ func (p *JSONRPCProxy) getOrCreateJSONRPCClient(target string) (*jsonrpc.Client,
 // Close closes all JSON-RPC clients
 func (p *JSONRPCProxy) Close() error {
 	logger.Info("Starting JSON-RPC proxy close...")
-	
-	// 在关闭阶段，完全避免使用 Gateway 的锁
-	// 直接操作 clients 映射，因为在关闭时不会有并发访问
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	clientCount := len(p.clients)
-	
-	// JSON-RPC clients don't need explicit closing in pkg/rpc/jsonrpc
-	// 直接清空映射
+
 	p.clients = make(map[string]*jsonrpc.Client)
 	
 	logger.Info("Found JSON-RPC clients to close", logger.Int("count", clientCount))

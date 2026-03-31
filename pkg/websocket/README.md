@@ -42,8 +42,12 @@
 - `SendText(ctx, message)`
 - `SendBinary(ctx, payload)`
 - `SendJSON(ctx, payload)`
+- `SendProto(ctx, message)`
+- `SendMessage(ctx, payload)`
 - `Receive(ctx)`
 - `ReceiveJSON(ctx, dest)`
+- `ReceiveProto(ctx, dest)`
+- `ReceiveMessage(ctx, dest)`
 - `Ping(ctx)`
 
 ### Client 配置
@@ -52,6 +56,7 @@
 
 - `URL`
 - `Origin`
+- `MessageFormat`
 - `Headers`
 - `HandshakeTimeout`
 - `ReadTimeout`
@@ -62,6 +67,17 @@
 - `HeartbeatInterval`
 - `HeartbeatMessage`
 - `Tracer`
+
+`MessageFormat` 可选值：
+
+- `json`（默认）
+- `protobuf`
+
+当配置为 `protobuf` 时：
+
+- `SendMessage` 要求 `payload` 为 `proto.Message`
+- `ReceiveMessage` 要求 `dest` 为 `proto.Message`
+- 传输使用 WebSocket binary frame
 
 ### 自动重连
 
@@ -100,6 +116,7 @@
 
 - `Addr`
 - `Path`
+- `MessageFormat`
 - `ReadTimeout`
 - `WriteTimeout`
 - `RequireAuth`
@@ -113,10 +130,117 @@
 
 - `Receive(ctx)`
 - `ReceiveJSON(ctx, dest)`
+- `ReceiveProto(ctx, dest)`
+- `ReceiveMessage(ctx, dest)`
 - `SendText(ctx, message)`
 - `SendBinary(ctx, payload)`
 - `SendJSON(ctx, payload)`
+- `SendProto(ctx, payload)`
+- `SendMessage(ctx, payload)`
 - `Close()`
+
+### 消息协议选择（json / protobuf）
+
+`Client` 与 `Server` 均支持配置：
+
+- `message_format: "json"`
+- `message_format: "protobuf"`
+
+推荐实践：
+
+- 业务已使用 protobuf 的场景，设置为 `protobuf` 并统一走 `SendMessage/ReceiveMessage`
+- 前端浏览器轻量交互场景，保留 `json`
+
+示例（protobuf）：
+
+```go
+client := websocket.NewClient(websocket.Config{
+    URL:           "ws://localhost:8080/ws",
+    Origin:        "http://localhost/",
+    MessageFormat: websocket.MessageFormatProtobuf,
+})
+
+_ = client.SendMessage(ctx, &userpb.UserRequest{Id: 1})
+
+var req userpb.UserRequest
+_ = client.ReceiveMessage(ctx, &req)
+```
+
+### 错误分支判断建议
+
+业务代码里建议优先使用 `websocket` 提供的 helper 做错误分支判断，而不是直接匹配错误字符串。
+
+常用方法：
+
+- `websocket.IsProtobufPayloadTypeMismatchError(err)`
+- `websocket.IsProtobufDestinationTypeMismatchError(err)`
+- `websocket.IsProtobufFrameTypeMismatchError(err)`
+
+示例：
+
+```go
+if err := client.ReceiveMessage(ctx, &req); err != nil {
+    switch {
+    case websocket.IsProtobufFrameTypeMismatchError(err):
+        // 收到非 binary frame，按协议错误处理
+    case websocket.IsProtobufDestinationTypeMismatchError(err):
+        // 目标类型不是 proto.Message
+    default:
+        // 其他错误
+    }
+}
+```
+
+### 服务端 handler 统一映射示例
+
+下面示例展示在服务端 `handler` 里如何把 websocket 错误统一映射到业务错误码，并在握手阶段映射 HTTP 状态。
+
+```go
+import (
+    "context"
+    "net/http"
+
+    apperrors "github.com/alldev-run/golang-gin-rpc/pkg/errors"
+    "github.com/alldev-run/golang-gin-rpc/pkg/websocket"
+    userpb "github.com/alldev-run/golang-gin-rpc/proto"
+)
+
+func wsHandler(ctx context.Context, conn *websocket.Conn) {
+    defer conn.Close()
+
+    var req userpb.UserRequest
+    if err := conn.ReceiveMessage(ctx, &req); err != nil {
+        var appErr *apperrors.AppError
+
+        switch {
+        case websocket.IsProtobufFrameTypeMismatchError(err):
+            appErr = apperrors.New(apperrors.ErrCodeWebSocketProtoFrameType, "invalid websocket frame type")
+        case websocket.IsProtobufPayloadTypeMismatchError(err):
+            appErr = apperrors.New(apperrors.ErrCodeWebSocketProtoPayloadType, "invalid protobuf payload type")
+        default:
+            appErr = apperrors.Wrap(err, apperrors.ErrCodeInternalServer, "failed to receive websocket message")
+        }
+
+        // 可按业务协议把 appErr.Code 回写给客户端
+        _ = conn.SendJSON(ctx, map[string]interface{}{
+            "code":    appErr.Code,
+            "message": appErr.Message,
+        })
+        return
+    }
+}
+
+// 握手阶段（HTTP）错误可直接映射 HTTP 状态
+func authErrorToHTTP(err error) int {
+    if apperrors.IsCode(err, apperrors.ErrCodeUnauthorized) {
+        return http.StatusUnauthorized
+    }
+    if apperrors.IsCode(err, apperrors.ErrCodeForbidden) {
+        return http.StatusForbidden
+    }
+    return http.StatusInternalServerError
+}
+```
 
 ## 连接管理器与广播
 
@@ -178,6 +302,7 @@ _ = manager.BroadcastText(context.Background(), "hello all")
 
 - **服务端参数**
   - `server.addr`
+  - `server.message_format`
   - `server.read_timeout`
   - `server.write_timeout`
   - `server.heartbeat_timeout`
@@ -186,6 +311,7 @@ _ = manager.BroadcastText(context.Background(), "hello all")
 
 - **客户端参数**
   - `client.url`
+  - `client.message_format`
   - `client.auto_reconnect`
   - `client.heartbeat_interval`
   - `client.max_reconnect_interval`

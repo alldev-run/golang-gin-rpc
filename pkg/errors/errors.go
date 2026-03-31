@@ -1,6 +1,7 @@
 package errors
 
 import (
+	stdErrors "errors"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -65,6 +66,11 @@ const (
 	ErrCodeValidationFailed  ErrorCode = "VALIDATION_7000"
 	ErrCodeInvalidInput      ErrorCode = "VALIDATION_7001"
 	ErrCodeMissingField      ErrorCode = "VALIDATION_7002"
+	ErrCodeWebSocketProtoMessageNil       ErrorCode = "VALIDATION_7010"
+	ErrCodeWebSocketProtoDestinationNil   ErrorCode = "VALIDATION_7011"
+	ErrCodeWebSocketProtoPayloadType      ErrorCode = "VALIDATION_7012"
+	ErrCodeWebSocketProtoDestinationType  ErrorCode = "VALIDATION_7013"
+	ErrCodeWebSocketProtoFrameType        ErrorCode = "VALIDATION_7014"
 
 	// External service errors (8000-8999)
 	ErrCodeExternalService  ErrorCode = "EXTERNAL_8000"
@@ -183,6 +189,18 @@ func Wrap(err error, code ErrorCode, message string) *AppError {
 	}
 
 	return New(code, message).WithCause(err)
+}
+
+// IsCode checks whether the given error is an AppError with the specified code.
+func IsCode(err error, code ErrorCode) bool {
+	if err == nil {
+		return false
+	}
+	var appErr *AppError
+	if !stdErrors.As(err, &appErr) {
+		return false
+	}
+	return appErr.Code == code
 }
 
 // IsSystem checks if the error is a system error

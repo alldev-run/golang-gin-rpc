@@ -9,7 +9,9 @@ import (
 	"sync"
 	"time"
 
+	apperrors "github.com/alldev-run/golang-gin-rpc/pkg/errors"
 	pkgtracing "github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+	"google.golang.org/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	nws "nhooyr.io/websocket"
@@ -19,6 +21,7 @@ import (
 type Config struct {
 	URL                  string            `yaml:"url" json:"url"`
 	Origin               string            `yaml:"origin" json:"origin"`
+	MessageFormat        string            `yaml:"message_format" json:"message_format"`
 	Headers              map[string]string `yaml:"headers" json:"headers"`
 	HandshakeTimeout     time.Duration     `yaml:"handshake_timeout" json:"handshake_timeout"`
 	ReadTimeout          time.Duration     `yaml:"read_timeout" json:"read_timeout"`
@@ -39,6 +42,7 @@ func DefaultConfig() Config {
 	return Config{
 		URL:                  "ws://localhost:8080/ws",
 		Origin:               "http://localhost/",
+		MessageFormat:        MessageFormatJSON,
 		Headers:              make(map[string]string),
 		HandshakeTimeout:     10 * time.Second,
 		ReadTimeout:          30 * time.Second,
@@ -73,6 +77,10 @@ func NewClient(config Config) *Client {
 	}
 	if config.Headers == nil {
 		config.Headers = make(map[string]string)
+	}
+	config.MessageFormat = normalizeMessageFormat(config.MessageFormat)
+	if err := validateMessageFormat(config.MessageFormat); err != nil {
+		config.MessageFormat = MessageFormatJSON
 	}
 	if config.HandshakeTimeout <= 0 {
 		config.HandshakeTimeout = 10 * time.Second
@@ -199,6 +207,34 @@ func (c *Client) SendJSON(ctx context.Context, payload interface{}) error {
 	return nil
 }
 
+func (c *Client) SendProto(ctx context.Context, message proto.Message) error {
+	if message == nil {
+		return apperrors.New(apperrors.ErrCodeWebSocketProtoMessageNil, "protobuf message is nil")
+	}
+	payload, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+	return c.SendBinary(ctx, payload)
+}
+
+// SendMessage sends payload using configured message format.
+// For protobuf mode, payload must implement proto.Message.
+func (c *Client) SendMessage(ctx context.Context, payload interface{}) error {
+	switch normalizeMessageFormat(c.config.MessageFormat) {
+	case MessageFormatProtobuf:
+		msg, ok := payload.(proto.Message)
+		if !ok {
+			return apperrors.New(apperrors.ErrCodeWebSocketProtoPayloadType, "protobuf mode requires proto.Message payload")
+		}
+		return c.SendProto(ctx, msg)
+	case MessageFormatJSON:
+		fallthrough
+	default:
+		return c.SendJSON(ctx, payload)
+	}
+}
+
 func (c *Client) Receive(ctx context.Context) (int, []byte, error) {
 	conn, err := c.getConn()
 	if err != nil {
@@ -239,6 +275,37 @@ func (c *Client) ReceiveJSON(ctx context.Context, dest interface{}) error {
 	c.observer.OnMessage("in", Identity{Path: c.config.URL}, 1)
 	endSpan(span, nil)
 	return nil
+}
+
+func (c *Client) ReceiveProto(ctx context.Context, dest proto.Message) error {
+	if dest == nil {
+		return apperrors.New(apperrors.ErrCodeWebSocketProtoDestinationNil, "protobuf destination is nil")
+	}
+	msgType, payload, err := c.Receive(ctx)
+	if err != nil {
+		return err
+	}
+	if msgType != int(nws.MessageBinary) {
+		return apperrors.New(apperrors.ErrCodeWebSocketProtoFrameType, "expected binary frame for protobuf").WithDetails(map[string]interface{}{"frame_type": msgType})
+	}
+	return proto.Unmarshal(payload, dest)
+}
+
+// ReceiveMessage receives payload using configured message format.
+// For protobuf mode, dest must implement proto.Message.
+func (c *Client) ReceiveMessage(ctx context.Context, dest interface{}) error {
+	switch normalizeMessageFormat(c.config.MessageFormat) {
+	case MessageFormatProtobuf:
+		msg, ok := dest.(proto.Message)
+		if !ok {
+			return apperrors.New(apperrors.ErrCodeWebSocketProtoDestinationType, "protobuf mode requires proto.Message destination")
+		}
+		return c.ReceiveProto(ctx, msg)
+	case MessageFormatJSON:
+		fallthrough
+	default:
+		return c.ReceiveJSON(ctx, dest)
+	}
 }
 
 func (c *Client) Ping(ctx context.Context) error {
