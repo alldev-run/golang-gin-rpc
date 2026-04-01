@@ -132,50 +132,53 @@ func replaceConditionPlaceholders(condition string, dialect Dialect, startIndex 
 
 // SelectBuilder provides a fluent interface for building SELECT queries.
 type SelectBuilder struct {
-	db       DB
-	table    string
-	rawTable bool
-	tableArgs []interface{}
-	columns  []string
-	joins    []Join
-	where    *WhereBuilder
-	groupBy  []string
-	having   *WhereBuilder
-	orderBy  []string
-	limit    int
-	offset   int
-	lockMode string
-	dialect  Dialect
-	ctes     []cteClause
-	unions   []unionClause
+	db            DB
+	table         string
+	rawTable      bool
+	tableArgs     []interface{}
+	columns       []string
+	joins         []Join
+	where         *WhereBuilder
+	groupBy       []string
+	having        *WhereBuilder
+	orderBy       []string
+	limit         int
+	offset        int
+	lockMode      string
+	dialect       Dialect
+	ctes          []cteClause
+	unions        []unionClause
+	appliedScopes []string // 追踪已应用的scope名称
 }
 
 // NewSelectBuilder creates a new SELECT query builder.
 func NewSelectBuilder(db DB, table string) *SelectBuilder {
 	dialect := NewDefaultDialect()
 	return &SelectBuilder{
-		db:      db,
-		table:   table,
-		columns: []string{"*"},
-		joins:   []Join{},
-		where:   NewWhereBuilder(dialect),
-		groupBy: []string{},
-		having:  NewWhereBuilder(dialect),
-		dialect: dialect,
+		db:            db,
+		table:         table,
+		columns:       []string{"*"},
+		joins:         []Join{},
+		where:         NewWhereBuilder(dialect),
+		groupBy:       []string{},
+		having:        NewWhereBuilder(dialect),
+		dialect:       dialect,
+		appliedScopes: []string{}, // 初始化appliedScopes
 	}
 }
 
 // NewSelectBuilderWithDialect creates a new SELECT query builder with a specific dialect.
 func NewSelectBuilderWithDialect(db DB, table string, dialect Dialect) *SelectBuilder {
 	return &SelectBuilder{
-		db:      db,
-		table:   table,
-		columns: []string{"*"},
-		joins:   []Join{},
-		where:   NewWhereBuilder(dialect),
-		groupBy: []string{},
-		having:  NewWhereBuilder(dialect),
-		dialect: dialect,
+		db:            db,
+		table:         table,
+		columns:       []string{"*"},
+		joins:         []Join{},
+		where:         NewWhereBuilder(dialect),
+		groupBy:       []string{},
+		having:        NewWhereBuilder(dialect),
+		dialect:       dialect,
+		appliedScopes: []string{}, // 初始化appliedScopes
 	}
 }
 
@@ -778,5 +781,51 @@ func (sb *SelectBuilder) Reset() *SelectBuilder {
 	sb.limit = 0
 	sb.offset = 0
 	sb.lockMode = ""
+	sb.appliedScopes = []string{} // 重置appliedScopes
+	return sb
+}
+
+// Table sets or changes the table name for the query.
+// This is useful for dynamic table routing scenarios.
+func (sb *SelectBuilder) Table(table string) *SelectBuilder {
+	sb.table = table
+	sb.rawTable = false
+	sb.tableArgs = nil
+	return sb
+}
+
+// WithDB sets or changes the database connection for the query.
+// This is useful for multi-database sharding scenarios.
+func (sb *SelectBuilder) WithDB(db DB) *SelectBuilder {
+	sb.db = db
+	return sb
+}
+
+// AddAppliedScope adds a scope name to the applied scopes list.
+// This is useful for tracking which scopes have been applied to the query.
+func (sb *SelectBuilder) AddAppliedScope(scopeName string) *SelectBuilder {
+	sb.appliedScopes = append(sb.appliedScopes, scopeName)
+	return sb
+}
+
+// GetAppliedScopes returns the list of applied scope names.
+// This is useful for debugging and query analysis.
+func (sb *SelectBuilder) GetAppliedScopes() []string {
+	return sb.appliedScopes
+}
+
+// HasAppliedScope checks if a specific scope has been applied.
+func (sb *SelectBuilder) HasAppliedScope(scopeName string) bool {
+	for _, scope := range sb.appliedScopes {
+		if scope == scopeName {
+			return true
+		}
+	}
+	return false
+}
+
+// ClearAppliedScopes clears the applied scopes list.
+func (sb *SelectBuilder) ClearAppliedScopes() *SelectBuilder {
+	sb.appliedScopes = []string{}
 	return sb
 }

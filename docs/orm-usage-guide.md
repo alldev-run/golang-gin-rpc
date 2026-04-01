@@ -1404,4 +1404,409 @@ err := ormInstance.Transaction(ctx, func(txORM *orm.ORM) error {
 
 ---
 
-*本指南涵盖了 ORM 的核心功能和最佳实践，帮助开发者快速上手并正确使用 ORM 进行数据库操作。*
+## Scopes（查询作用域）完整指南 [已更新匹配实际实现]
+
+### 概述
+
+Scopes 是 ORM 中用于构建可重用查询模式的强大功能。它允许你将常用的查询条件封装成函数，然后在查询中链式调用，提高代码的可读性和复用性。
+
+### 核心 Scopes 类型
+
+#### 1. 基础业务 Scopes
+
+```go
+// 状态过滤
+scope := orm.Active("status")           // WHERE status = 'active'
+
+// 软删除过滤  
+scope := orm.NotDeleted()               // WHERE deleted_at IS NULL
+```
+
+#### 2. 查询控制 Scopes
+
+```go
+// 分页
+scope := orm.Paginate(2, 20)            // LIMIT 20 OFFSET 20 (page=2, size=20)
+
+// 排序
+scope := orm.OrderByDesc("created_at")  // ORDER BY created_at DESC
+
+// 日期过滤
+scope := orm.CreatedAfter(time.Now().AddDate(0, 0, -7))  // WHERE created_at >= ?
+```
+
+#### 3. 分片 Scopes
+
+```go
+// Hash 表路由
+scope := orm.HashTable("orders", 12345, 8)   // 路由到 orders_{12345 % 8}
+
+// 用户分片
+scope := orm.ShardByUser(12345)            // WHERE user_id = 12345
+```
+
+#### 4. 元信息 Scopes
+
+```go
+// Trace 用于追踪（不修改查询）
+scope := orm.Trace("query-name")
+```
+
+### 使用方式
+
+#### 1. 基础使用
+
+```go
+// 创建 Builder
+builder := orm.NewBuilder(ctx, "users").
+    Scope(orm.Active("status")).           // 添加状态过滤
+    Scope(orm.NotDeleted()).                // 添加软删除过滤
+    Scope(orm.Paginate(1, 10)).            // 添加分页
+    Scope(orm.OrderByDesc("created_at")).   // 添加排序
+    ApplyScopes()                           // 应用所有 scopes
+
+// 生成 SQL
+sql, args := builder.Build()
+// 输出: SELECT * FROM users WHERE status = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 10 OFFSET 0
+// args: ["active"]
+```
+
+#### 2. Scope 分类注册
+
+```go
+builder := orm.NewBuilder(ctx, "orders")
+
+// 注册 Routing scope（先执行）
+builder.Routing(func(c context.Context, b *orm.Builder) *orm.Builder {
+    return b.Table(fmt.Sprintf("orders_%d", userID % 8))
+})
+
+// 注册普通 Query scope
+builder.Scope(func(c context.Context, b *orm.Builder) *orm.Builder {
+    return b.Where("user_id = ?", userID)
+})
+
+// 注册 Meta scope（后执行，用于追踪）
+builder.Meta(func(c context.Context, b *orm.Builder) *orm.Builder {
+    // 可以在这里记录日志或追踪信息
+    return b
+})
+
+// 应用所有 scopes（按 Routing -> Query -> Meta 顺序执行）
+builder.ApplyScopes()
+```
+
+#### 3. 命名 Scope 追踪
+
+```go
+// 创建命名 scope
+namedScope := orm.Named("UserFilter", orm.ScopeQuery, func(c context.Context, b *orm.Builder) *orm.Builder {
+    return b.Where("user_type = ?", "vip")
+})
+
+builder := orm.NewBuilder(ctx, "users").
+    Add(namedScope).
+    ApplyScopes()
+
+// 查看已应用的 scopes
+applied := builder.AppliedScopes()
+// 输出: ["UserFilter"]
+```
+
+### Helper 函数
+
+#### 1. Compose - 组合多个 Scopes
+
+```go
+// 将多个 scope 组合成一个
+combinedScope := orm.Compose(
+    orm.Active("status"),
+    orm.NotDeleted(),
+    orm.OrderByDesc("created_at"),
+)
+
+builder := orm.NewBuilder(ctx, "users").
+    Scope(combinedScope).
+    ApplyScopes()
+```
+
+#### 2. If - 条件应用 Scope
+
+```go
+// 根据条件决定是否应用 scope
+isActive := true
+scope := orm.If(isActive, orm.Active("status"))
+
+builder := orm.NewBuilder(ctx, "users").
+    Scope(scope).
+    ApplyScopes()
+// 如果 isActive=false，则 Active scope 不会生效
+```
+
+#### 3. IfNotZero - 非零值应用 Scope
+
+```go
+// 当值不为零时应用 scope
+userID := int64(123)
+
+userScope := func(id int64) orm.Scope {
+    return func(c context.Context, b *orm.Builder) *orm.Builder {
+        return b.Where("user_id = ?", id)
+    }
+}
+
+builder := orm.NewBuilder(ctx, "orders").
+    Scope(orm.IfNotZero(userID, userScope)).
+    ApplyScopes()
+
+// 如果 userID=0，则不会添加 WHERE 条件
+```
+
+### 实际应用场景
+
+#### 1. 电商系统订单查询
+
+```go
+func GetUserOrders(ctx context.Context, userID int64, page, pageSize int) (string, []interface{}) {
+    builder := orm.NewBuilder(ctx, "orders").
+        // 路由到用户分片表
+        Scope(orm.HashTable("orders", userID, 8)).
+        // 添加用户过滤
+        Scope(orm.ShardByUser(userID)).
+        // 未删除订单
+        Scope(orm.NotDeleted()).
+        // 分页
+        Scope(orm.Paginate(page, pageSize)).
+        // 排序
+        Scope(orm.OrderByDesc("created_at")).
+        ApplyScopes()
+    
+    return builder.Build()
+}
+```
+
+#### 2. 动态条件查询
+
+```go
+func SearchUsers(ctx context.Context, filters map[string]interface{}) (string, []interface{}) {
+    builder := orm.NewBuilder(ctx, "users")
+    
+    // 基础条件：活跃用户
+    builder.Scope(orm.Active("status"))
+    
+    // 可选条件：根据传入参数动态添加
+    if name, ok := filters["name"].(string); ok && name != "" {
+        builder.Scope(func(c context.Context, b *orm.Builder) *orm.Builder {
+            return b.Where("name LIKE ?", "%"+name+"%")
+        })
+    }
+    
+    if age, ok := filters["age"].(int); ok && age > 0 {
+        builder.Scope(func(c context.Context, b *orm.Builder) *orm.Builder {
+            return b.Where("age = ?", age)
+        })
+    }
+    
+    // 使用 IfNotZero 处理可选的用户类型
+    if userType, ok := filters["user_type"].(int); ok {
+        typeScope := func(t int) orm.Scope {
+            return func(c context.Context, b *orm.Builder) *orm.Builder {
+                return b.Where("user_type = ?", t)
+            }
+        }
+        builder.Scope(orm.IfNotZero(userType, typeScope))
+    }
+    
+    // 分页和排序
+    builder.
+        Scope(orm.Paginate(1, 20)).
+        Scope(orm.OrderByDesc("created_at")).
+        ApplyScopes()
+    
+    return builder.Build()
+}
+```
+
+#### 3. Repository 模式
+
+```go
+type UserRepository struct{}
+
+// 定义可复用的 scope 组合
+func (r *UserRepository) ActiveUsersScope() orm.Scope {
+    return orm.Compose(
+        orm.Active("status"),
+        orm.NotDeleted(),
+    )
+}
+
+func (r *UserRepository) FindActiveUsers(ctx context.Context, page, pageSize int) (*sql.Rows, error) {
+    builder := orm.NewBuilder(ctx, "users").
+        Scope(r.ActiveUsersScope()).
+        Scope(orm.Paginate(page, pageSize)).
+        Scope(orm.OrderByDesc("created_at")).
+        ApplyScopes()
+    
+    sql, args := builder.Build()
+    return db.Query(ctx, sql, args...)
+}
+```
+
+### 性能优化建议
+
+#### 1. Scope 设计原则
+
+```go
+// 好的设计：单一职责
+scope := orm.Active("status")
+
+// 好的设计：可组合
+userScopes := orm.Compose(
+    orm.Active("status"),
+    orm.NotDeleted(),
+)
+
+// 避免：过于复杂的 scope（应该拆分成多个简单 scope）
+badScope := func(c context.Context, b *orm.Builder) *orm.Builder {
+    return b.
+        Where("status = ?", "active").
+        Where("deleted_at IS NULL").
+        Limit(100).
+        OrderBy("created_at DESC")
+}
+```
+
+#### 2. 执行顺序
+
+```go
+// Scopes 执行顺序：Routing -> Query -> Meta
+builder := orm.NewBuilder(ctx, "data").
+    Routing(routingFn).  // 先执行：路由到正确的表
+    Scope(queryFn).      // 再执行：添加查询条件
+    Meta(metaFn).        // 最后执行：追踪记录
+    ApplyScopes()
+```
+
+#### 3. 调试追踪
+
+```go
+builder := orm.NewBuilder(ctx, "users")
+
+// 添加命名 scope 便于追踪
+builder.Add(orm.Named("StatusFilter", orm.ScopeQuery, func(c context.Context, b *orm.Builder) *orm.Builder {
+    return b.Where("status = ?", "active")
+}))
+
+builder.Add(orm.Named("Pagination", orm.ScopeQuery, func(c context.Context, b *orm.Builder) *orm.Builder {
+    return b.Limit(10).Offset(0)
+}))
+
+builder.ApplyScopes()
+
+// 查看哪些 scopes 被应用了
+applied := builder.AppliedScopes()
+fmt.Printf("Applied scopes: %v\n", applied)
+// 输出: ["StatusFilter", "Pagination"]
+```
+
+### 最佳实践
+
+#### 1. 命名规范
+
+```go
+// 清晰的命名
+func ActiveUsersScope() orm.Scope {
+    return orm.Compose(
+        orm.Active("status"),
+        orm.NotDeleted(),
+    )
+}
+
+// 参数化命名
+func UsersByStatusScope(status string) orm.Scope {
+    return func(c context.Context, b *orm.Builder) *orm.Builder {
+        return b.Where("status = ?", status)
+    }
+}
+```
+
+#### 2. 错误处理
+
+```go
+// 验证 scope 参数
+func ValidatedPaginateScope(page, pageSize int) orm.Scope {
+    if page < 1 {
+        page = 1
+    }
+    if pageSize <= 0 || pageSize > 1000 {
+        pageSize = 100
+    }
+    return orm.Paginate(page, pageSize)
+}
+```
+
+#### 3. 测试友好
+
+```go
+// 可测试的 scope 设计
+func TestActiveScope(t *testing.T) {
+    ctx := context.Background()
+    builder := orm.NewBuilder(ctx, "users")
+    
+    builder.Scope(orm.Active("status")).ApplyScopes()
+    
+    sql, args := builder.Build()
+    
+    // 验证生成的 SQL
+    if !strings.Contains(sql, "status = ?") {
+        t.Error("Active scope not properly applied")
+    }
+    if len(args) != 1 || args[0] != "active" {
+        t.Error("Active scope args incorrect")
+    }
+}
+```
+
+### 与 SelectBuilder 的关系
+
+注意：`scopes.go` 中的 `Builder` 与 `select_builder.go` 中的 `SelectBuilder` 是两个独立的类型：
+
+- **`Builder` (scopes.go)**: 轻量级，专注于 scope 链式应用
+- **`SelectBuilder` (select_builder.go)**: 完整 SQL 构建器，带独立的 `appliedScopes` 追踪
+
+两者可以配合使用：
+
+```go
+// 使用 SelectBuilder 构建复杂查询
+query := o.Select("users").
+    Columns("id", "name", "email").
+    Eq("status", "active")
+
+// 使用 Builder 的 scope 概念封装条件
+scope := orm.Compose(
+    orm.Active("status"),
+    orm.NotDeleted(),
+)
+
+// 应用到 Builder 进行简单查询
+builder := orm.NewBuilder(ctx, "users").
+    Scope(scope).
+    ApplyScopes()
+
+sql, args := builder.Build()
+rows, err := db.Query(ctx, sql, args...)
+```
+
+### 总结
+
+- **类型定义**: `Scope` 是 `func(context.Context, *Builder) *Builder`
+- **注册方法**: `Scope()`, `Routing()`, `Meta()`, `Add()`
+- **应用方法**: `ApplyScopes()` 按 Routing -> Query -> Meta 顺序执行
+- **追踪功能**: 使用 `Named()` 和 `AppliedScopes()` 追踪已应用的 scopes
+- **组合工具**: `Compose()`, `If()`, `IfNotZero()` 提供灵活的 scope 组合
+
+通过合理使用 Scopes，可以显著提高查询代码的可读性和复用性。
+
+---
+
+*注意：本文档已根据 `pkg/db/orm/scopes.go` 的实际实现更新，确保所有示例代码均可编译运行。之前版本的文档描述了不存在或名称不符的 API（如 `ActiveScope`、`NotDeletedScope`、`PaginationScope` 等），现已修正为正确的 API（`Active`、`NotDeleted`、`Paginate` 等）。*

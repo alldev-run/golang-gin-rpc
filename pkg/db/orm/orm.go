@@ -44,6 +44,11 @@ func (o *ORM) Select(table string) *SelectBuilder {
 	return NewSelectBuilderWithDialect(o.db, table, o.dialect)
 }
 
+// SelectWithScopes creates a new SELECT query builder with scopes support.
+// func (o *ORM) SelectWithScopes(table string) *ScopedQueryBuilder {
+// 	return NewScopedQueryBuilder(o.Select(table))
+// }
+
 // Insert creates a new INSERT query builder.
 func (o *ORM) Insert(table string) *InsertBuilder {
 	return NewInsertBuilderWithDialect(o.db, table, o.dialect)

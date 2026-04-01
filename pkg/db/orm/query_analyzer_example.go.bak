@@ -1,0 +1,362 @@
+package orm
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+	"time"
+)
+
+// ======================= AppliedScopes Examples for Performance Analysis =======================
+
+// QueryAnalyzer provides functionality to analyze and debug query performance.
+type QueryAnalyzer struct {
+	slowQueryThreshold time.Duration
+	logger             *log.Logger
+}
+
+// NewQueryAnalyzer creates a new query analyzer.
+func NewQueryAnalyzer(threshold time.Duration, logger *log.Logger) *QueryAnalyzer {
+	return &QueryAnalyzer{
+		slowQueryThreshold: threshold,
+		logger:             logger,
+	}
+}
+
+// AnalyzeQuery analyzes a query execution and reports performance issues.
+func (qa *QueryAnalyzer) AnalyzeQuery(ctx context.Context, query *SelectBuilder, queryName string) {
+	start := time.Now()
+	
+	// Execute the query
+	rows, err := query.Query(ctx)
+	if err != nil {
+		qa.logger.Printf("Query %s failed: %v", queryName, err)
+		return
+	}
+	defer rows.Close()
+	
+	duration := time.Since(start)
+	
+	// Check if it's a slow query
+	if duration > qa.slowQueryThreshold {
+		qa.reportSlowQuery(query, queryName, duration)
+	}
+	
+	// Log general query info
+	qa.logger.Printf("Query %s executed in %v", queryName, duration)
+}
+
+// reportSlowQuery reports detailed information about a slow query.
+func (qa *QueryAnalyzer) reportSlowQuery(query *SelectBuilder, queryName string, duration time.Duration) {
+	appliedScopes := query.GetAppliedScopes()
+	
+	qa.logger.Printf("=== SLOW QUERY DETECTED ===")
+	qa.logger.Printf("Query Name: %s", queryName)
+	qa.logger.Printf("Execution Time: %v", duration)
+	qa.logger.Printf("Table: %s", query.table)
+	qa.logger.Printf("Limit: %d", query.limit)
+	qa.logger.Printf("Applied Scopes: %v", appliedScopes)
+	qa.logger.Printf("Where Conditions: %d", qa.countWhereConditions(query))
+	qa.logger.Printf("Joins: %d", len(query.joins))
+	qa.logger.Printf("Order By: %v", query.orderBy)
+	
+	// Provide optimization suggestions
+	qa.suggestOptimizations(query, appliedScopes)
+}
+
+// countWhereConditions counts the number of WHERE conditions.
+func (qa *QueryAnalyzer) countWhereConditions(query *SelectBuilder) int {
+	if query.where == nil {
+		return 0
+	}
+	// This is a simplified count - in a real implementation, 
+	// you might parse the WHERE clause more accurately
+	return len(query.where.conditions)
+}
+
+// suggestOptimizations provides optimization suggestions based on applied scopes.
+func (qa *QueryAnalyzer) suggestOptimizations(query *SelectBuilder, scopes []string) {
+	qa.logger.Printf("Optimization Suggestions:")
+	
+	// Check for missing indexes
+	for _, scope := range scopes {
+		switch {
+		case contains(scope, "HashBasedTableScope"):
+			qa.logger.Printf("  - Consider adding index on the hash column for table routing")
+		case contains(scope, "DateBasedTableScope"):
+			qa.logger.Printf("  - Consider adding index on date column for partitioning")
+		case contains(scope, "MultiTenantTableScope"):
+			qa.logger.Printf("  - Ensure tenant_id column is indexed")
+		case contains(scope, "RangeBasedTableScope"):
+			qa.logger.Printf("  - Consider adding index on range column")
+		}
+	}
+	
+	// Check for large limits
+	if query.limit > 1000 {
+		qa.logger.Printf("  - Large limit (%d) may cause performance issues", query.limit)
+	}
+	
+	// Check for complex joins
+	if len(query.joins) > 3 {
+		qa.logger.Printf("  - Multiple joins (%d) may need optimization", len(query.joins))
+	}
+	
+	// Check for missing pagination
+	if query.limit == 0 && len(query.orderBy) > 0 {
+		qa.logger.Printf("  - Consider adding pagination for ordered queries")
+	}
+}
+
+// contains checks if a string contains a substring.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || 
+		(len(s) > len(substr) && 
+			(s[:len(substr)] == substr || 
+			 s[len(s)-len(substr):] == substr ||
+			 findSubstring(s, substr))))
+}
+
+// findSubstring finds a substring in a string.
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// ExampleQueryPerformanceAnalysis demonstrates how to use AppliedScopes for performance analysis.
+func ExampleQueryPerformanceAnalysis() {
+	// Create a mock database
+	db := &MockDB{
+		QueryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			// Simulate slow query
+			time.Sleep(150 * time.Millisecond)
+			return &sql.Rows{}, nil
+		},
+	}
+	
+	// Create query analyzer
+	logger := log.New(log.Writer(), "[QUERY_ANALYZER] ", log.LstdFlags)
+	analyzer := NewQueryAnalyzer(100*time.Millisecond, logger)
+	
+	// Example 1: Simple query with named scopes
+	fmt.Println("=== Example 1: Simple Query Analysis ===")
+	simpleQuery := NewSelectBuilder(db, "users")
+	
+	// Apply named scopes for tracking
+	namedScopes := []NamedScope{
+		NamedActiveScope("status"),
+		NamedLimitScope(500),
+		NamedOrderByDescScope("created_at"),
+	}
+	
+	for _, ns := range namedScopes {
+		simpleQuery = ns.Apply(simpleQuery)
+	}
+	
+	// Analyze the query
+	ctx := context.Background()
+	analyzer.AnalyzeQuery(ctx, simpleQuery, "SimpleUserQuery")
+	
+	// Example 2: Complex sharded query
+	fmt.Println("\n=== Example 2: Complex Sharded Query Analysis ===")
+	complexQuery := NewSelectBuilder(db, "orders")
+	
+	// Build complex query with multiple routing strategies
+	sqb := NewScopedQueryBuilder(complexQuery)
+	sqb.NamedScope("UserHashTable", HashBasedTableScope("orders", 16, 12345))
+	sqb.NamedScope("DatePartition", DateBasedTableScope("orders", "created_at", "monthly", time.Now()))
+	sqb.NamedScope("TenantIsolation", MultiTenantTableScope("orders", 1001, "table"))
+	sqb.NamedScope("ActiveFilter", ActiveScope("status"))
+	sqb.NamedScope("NotDeleted", NotDeletedScope())
+	sqb.NamedScope("LargeLimit", LimitScope(2000))
+	sqb.NamedScope("ComplexOrdering", OrderByDescScope("created_at"))
+	
+	result := sqb.Apply()
+	
+	// Analyze the complex query
+	analyzer.AnalyzeQuery(ctx, result, "ComplexShardedQuery")
+	
+	// Example 3: Real-time monitoring
+	fmt.Println("\n=== Example 3: Real-time Query Monitoring ===")
+	monitorQuery := NewSelectBuilder(db, "products")
+	
+	// Apply scopes dynamically based on user input
+	userID := int64(12345)
+	productCategory := "electronics"
+	
+	// Build query with tracking
+	monitorQuery = NamedHashBasedTableScope("products", 8, userID).Apply(monitorQuery)
+	monitorQuery = NamedStatusScope("category", productCategory).Apply(monitorQuery)
+	monitorQuery = NamedLimitScope(100).Apply(monitorQuery)
+	
+	// Monitor in real-time
+	start := time.Now()
+	rows, err := monitorQuery.Query(ctx)
+	duration := time.Since(start)
+	
+	if err != nil {
+		fmt.Printf("Monitor query failed: %v\n", err)
+		return
+	}
+	defer rows.Close()
+	
+	// Print real-time analysis
+	fmt.Printf("Real-time Query Analysis:\n")
+	fmt.Printf("  Execution Time: %v\n", duration)
+	fmt.Printf("  Applied Scopes: %v\n", monitorQuery.GetAppliedScopes())
+	fmt.Printf("  Final Table: %s\n", monitorQuery.table)
+	fmt.Printf("  Query Limit: %d\n", monitorQuery.limit)
+	
+	if duration > 50*time.Millisecond {
+		fmt.Printf("  ⚠️  Query is slower than expected\n")
+		fmt.Printf("  📊 Consider reviewing: %v\n", monitorQuery.GetAppliedScopes())
+	}
+}
+
+// ExampleScopeDebugging demonstrates how to use AppliedScopes for debugging.
+func ExampleScopeDebugging() {
+	fmt.Println("=== Example: Scope Debugging ===")
+	
+	db := &MockDB{
+		QueryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			return &sql.Rows{}, nil
+		},
+	}
+	
+	// Create a query that might have issues
+	problematicQuery := NewSelectBuilder(db, "orders")
+	
+	// Apply scopes that might cause performance issues
+	problematicScopes := []NamedScope{
+		NamedHashBasedTableScope("orders", 4, 12345), // Too few shards
+		NamedDateBasedTableScope("orders", "created_at", "daily", time.Now()), // Too granular
+		NamedMultiTenantTableScope("orders", 1001, "shared"), // Shared mode with large dataset
+		NamedLimitScope(10000), // Very large limit
+		NamedOrderByDescScope("created_at"), // Ordering without proper index
+	}
+	
+	for _, ns := range problematicScopes {
+		problematicQuery = ns.Apply(problematicQuery)
+	}
+	
+	// Debug the query
+	fmt.Printf("Debugging Query:\n")
+	fmt.Printf("  Applied Scopes: %v\n", problematicQuery.GetAppliedScopes())
+	fmt.Printf("  Table: %s\n", problematicQuery.table)
+	fmt.Printf("  Limit: %d\n", problematicQuery.limit)
+	
+	// Identify potential issues
+	fmt.Printf("\nPotential Issues:\n")
+	scopes := problematicQuery.GetAppliedScopes()
+	
+	for _, scope := range scopes {
+		switch {
+		case contains(scope, "HashBasedTableScope(orders,4)"):
+			fmt.Printf("  ⚠️  Only 4 shards may cause hotspots\n")
+		case contains(scope, "DateBasedTableScope(orders,created_at,daily)"):
+			fmt.Printf("  ⚠️  Daily partitioning may create too many tables\n")
+		case contains(scope, "MultiTenantTableScope(orders,1001,shared)"):
+			fmt.Printf("  ⚠️  Shared mode with large dataset may be slow\n")
+		case contains(scope, "LimitScope(10000)"):
+			fmt.Printf("  ⚠️  Large limit may cause memory issues\n")
+		case contains(scope, "OrderByDescScope(created_at)"):
+			fmt.Printf("  ⚠️  Ordering requires proper indexing\n")
+		}
+	}
+	
+	fmt.Printf("\nRecommendations:\n")
+	fmt.Printf("  1. Increase hash shard count from 4 to at least 16\n")
+	fmt.Printf("  2. Use monthly partitioning instead of daily\n")
+	fmt.Printf("  3. Consider table-level isolation for tenant 1001\n")
+	fmt.Printf("  4. Add pagination with reasonable limits\n")
+	fmt.Printf("  5. Add composite index on (created_at, tenant_id)\n")
+}
+
+// ExampleScopeComparison demonstrates comparing different scope combinations.
+func ExampleScopeComparison() {
+	fmt.Println("=== Example: Scope Performance Comparison ===")
+	
+	db := &MockDB{
+		QueryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			return &sql.Rows{}, nil
+		},
+	}
+	
+	// Test different scope combinations
+	testCases := []struct {
+		name   string
+		scopes []NamedScope
+	}{
+		{
+			name: "Basic Query",
+			scopes: []NamedScope{
+				NamedActiveScope("status"),
+				NamedLimitScope(100),
+			},
+		},
+		{
+			name: "Hash Sharding",
+			scopes: []NamedScope{
+				NamedHashBasedTableScope("users", 16, 12345),
+				NamedActiveScope("status"),
+				NamedLimitScope(100),
+			},
+		},
+		{
+			name: "Date Partitioning",
+			scopes: []NamedScope{
+				NamedDateBasedTableScope("logs", "created_at", "monthly", time.Now()),
+				NamedLimitScope(1000),
+			},
+		},
+		{
+			name: "Multi-Tenant",
+			scopes: []NamedScope{
+				NamedMultiTenantTableScope("orders", 1001, "table"),
+				NamedActiveScope("status"),
+				NamedOrderByDescScope("created_at"),
+				NamedLimitScope(50),
+			},
+		},
+	}
+	
+	for _, tc := range testCases {
+		fmt.Printf("\n--- %s ---\n", tc.name)
+		
+		query := NewSelectBuilder(db, "test_table")
+		
+		// Apply scopes
+		for _, ns := range tc.scopes {
+			query = ns.Apply(query)
+		}
+		
+		// Analyze the result
+		fmt.Printf("Applied Scopes: %v\n", query.GetAppliedScopes())
+		fmt.Printf("Final Table: %s\n", query.table)
+		fmt.Printf("Limit: %d\n", query.limit)
+		
+		// Estimate complexity (simplified)
+		complexity := len(query.GetAppliedScopes())
+		if query.limit > 500 {
+			complexity += 2
+		}
+		if len(query.joins) > 0 {
+			complexity += len(query.joins)
+		}
+		
+		fmt.Printf("Estimated Complexity: %d\n", complexity)
+		
+		if complexity > 5 {
+			fmt.Printf("⚠️  High complexity - consider optimization\n")
+		} else if complexity > 3 {
+			fmt.Printf("⚡  Medium complexity - monitor performance\n")
+		} else {
+			fmt.Printf("✅ Low complexity - should perform well\n")
+		}
+	}
+}

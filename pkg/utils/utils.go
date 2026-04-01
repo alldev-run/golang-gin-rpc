@@ -50,11 +50,11 @@ func StringJoinNonEmpty(elems []string, sep string) string {
 	if len(elems) == 1 {
 		return elems[0]
 	}
-	
+
 	// Use buffer pool to reduce allocations
 	buf := getBuffer()
 	defer putBuffer(buf)
-	
+
 	first := true
 	for _, s := range elems {
 		if s != "" {
@@ -66,7 +66,8 @@ func StringJoinNonEmpty(elems []string, sep string) string {
 			buf = append(buf, s...)
 		}
 	}
-	return string(buf)
+	res := string(buf)
+	return res
 }
 
 // StringContains checks if slice contains string
@@ -208,7 +209,7 @@ func SafeFromJSON(s string, target any) (err error) {
 	if len(s) > 10*1024*1024 { // 10MB limit
 		return fmt.Errorf("JSON input too large: %d bytes", len(s))
 	}
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("json unmarshal panic: %v", r)
@@ -452,14 +453,14 @@ func RandomString(n int) (string, error) {
 	if n > 1024 { // Reasonable limit for string length
 		return "", fmt.Errorf("length too large: %d", n)
 	}
-	
+
 	// Calculate needed bytes for base64 encoding (4/3 ratio)
 	byteLen := (n*3 + 3) / 4 // Round up
 	b, err := RandomBytes(byteLen)
 	if err != nil {
 		return "", err
 	}
-	
+
 	encoded := base64.URLEncoding.EncodeToString(b)
 	if len(encoded) >= n {
 		return encoded[:n], nil
@@ -478,7 +479,7 @@ func RandomHex(n int) (string, error) {
 	if n > 512 { // Reasonable limit for hex string
 		return "", fmt.Errorf("length too large: %d", n)
 	}
-	
+
 	b, err := RandomBytes(n)
 	if err != nil {
 		return "", err
