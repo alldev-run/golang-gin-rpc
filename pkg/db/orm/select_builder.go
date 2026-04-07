@@ -318,15 +318,36 @@ func (sb *SelectBuilder) Where(condition string, args ...interface{}) *SelectBui
 	return sb
 }
 
+// WhereRaw adds a raw WHERE condition.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) WhereRaw(condition string, args ...interface{}) *SelectBuilder {
+	sb.where.WhereRaw(condition, args...)
+	return sb
+}
+
 // And adds AND conditions.
 func (sb *SelectBuilder) And(condition string, args ...interface{}) *SelectBuilder {
 	sb.where.And(condition, args...)
 	return sb
 }
 
+// AndRaw adds a raw AND condition.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) AndRaw(condition string, args ...interface{}) *SelectBuilder {
+	sb.where.AndRaw(condition, args...)
+	return sb
+}
+
 // Or adds OR conditions.
 func (sb *SelectBuilder) Or(condition string, args ...interface{}) *SelectBuilder {
 	sb.where.Or(condition, args...)
+	return sb
+}
+
+// OrRaw adds a raw OR condition.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) OrRaw(condition string, args ...interface{}) *SelectBuilder {
+	sb.where.OrRaw(condition, args...)
 	return sb
 }
 
@@ -415,6 +436,19 @@ func (sb *SelectBuilder) Between(column string, start, end interface{}) *SelectB
 
 // OrderBy sets the ORDER BY clause.
 func (sb *SelectBuilder) OrderBy(order ...string) *SelectBuilder {
+	for _, item := range order {
+		safeItem, err := BuildSafeOrderByItem(sb.dialect, item)
+		if err != nil {
+			continue
+		}
+		sb.orderBy = append(sb.orderBy, safeItem)
+	}
+	return sb
+}
+
+// OrderByRaw appends raw ORDER BY expressions.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) OrderByRaw(order ...string) *SelectBuilder {
 	sb.orderBy = append(sb.orderBy, order...)
 	return sb
 }
@@ -484,9 +518,29 @@ func (sb *SelectBuilder) Join(table, condition string, args ...interface{}) *Sel
 
 // JoinWithType adds a JOIN clause with specified type.
 func (sb *SelectBuilder) JoinWithType(joinType, table, condition string, args ...interface{}) *SelectBuilder {
+	normalizedJoinType, err := NormalizeJoinType(joinType)
+	if err != nil {
+		return sb
+	}
+	if err := ValidateJoinTableReference(table); err != nil {
+		return sb
+	}
+	sb.joins = append(sb.joins, Join{
+		Type:      normalizedJoinType,
+		Table:     table,
+		Condition: condition,
+		Args:      args,
+	})
+	return sb
+}
+
+// JoinWithTypeRaw adds a JOIN clause with raw join type and raw table expression.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) JoinWithTypeRaw(joinType, table, condition string, args ...interface{}) *SelectBuilder {
 	sb.joins = append(sb.joins, Join{
 		Type:      joinType,
 		Table:     table,
+		RawTable:  true,
 		Condition: condition,
 		Args:      args,
 	})
@@ -523,15 +577,36 @@ func (sb *SelectBuilder) Having(condition string, args ...interface{}) *SelectBu
 	return sb
 }
 
+// HavingRaw adds a raw HAVING condition.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) HavingRaw(condition string, args ...interface{}) *SelectBuilder {
+	sb.having.WhereRaw(condition, args...)
+	return sb
+}
+
 // HavingAnd adds AND conditions to HAVING.
 func (sb *SelectBuilder) HavingAnd(condition string, args ...interface{}) *SelectBuilder {
 	sb.having.And(condition, args...)
 	return sb
 }
 
+// HavingAndRaw adds a raw AND condition to HAVING.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) HavingAndRaw(condition string, args ...interface{}) *SelectBuilder {
+	sb.having.AndRaw(condition, args...)
+	return sb
+}
+
 // HavingOr adds OR conditions to HAVING.
 func (sb *SelectBuilder) HavingOr(condition string, args ...interface{}) *SelectBuilder {
 	sb.having.Or(condition, args...)
+	return sb
+}
+
+// HavingOrRaw adds a raw OR condition to HAVING.
+// Use this only with trusted SQL snippets.
+func (sb *SelectBuilder) HavingOrRaw(condition string, args ...interface{}) *SelectBuilder {
+	sb.having.OrRaw(condition, args...)
 	return sb
 }
 

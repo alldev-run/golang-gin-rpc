@@ -26,13 +26,26 @@ var tableNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 
 // Column name validation pattern - allow alphanumeric, underscore, and some special chars
 var columnNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+var qualifiedIdentifierPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$`)
+var quotedQualifiedIdentifierPattern = regexp.MustCompile("^`[a-zA-Z][a-zA-Z0-9_]*`(?:\\.`[a-zA-Z][a-zA-Z0-9_]*`)*$")
+var jsonPathIdentifierPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)?\s*->>?\s*'[^']+'$`)
+var orderByItemPattern = regexp.MustCompile(`(?i)^\s*([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)?)\s*(ASC|DESC)?\s*$`)
+var unsafeSQLKeywordPattern = regexp.MustCompile(`(?i)\b(union\s+all\s+select|union\s+select|into\s+outfile|load_file\s*\(|sleep\s*\(|benchmark\s*\(|xp_cmdshell|drop\s+table|truncate\s+table)\b`)
+
+var allowedJoinTypes = map[string]struct{}{
+	"INNER":      {},
+	"LEFT":       {},
+	"RIGHT":      {},
+	"FULL OUTER": {},
+	"CROSS":      {},
+}
 
 // IsZero checks if a value is zero or nil.
 func IsZero(v interface{}) bool {
 	if v == nil {
 		return true
 	}
-	
+
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Bool:
@@ -65,16 +78,26 @@ func ToSnakeCase(s string) string {
 	if s == "" {
 		return ""
 	}
-	
-	var result []rune
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			result = append(result, '_')
+
+	runes := []rune(s)
+	result := make([]rune, 0, len(runes)+4)
+
+	for i, r := range runes {
+		if i > 0 && isUpper(r) {
+			prev := runes[i-1]
+			var next rune
+			hasNext := i+1 < len(runes)
+			if hasNext {
+				next = runes[i+1]
+			}
+			if isLower(prev) || isDigit(prev) || (isUpper(prev) && hasNext && isLower(next)) {
+				result = append(result, '_')
+			}
 		}
-		result = append(result, r)
+		result = append(result, toLower(r))
 	}
-	
-	return strings.ToLower(string(result))
+
+	return string(result)
 }
 
 // ToCamelCase converts a string from snake_case to CamelCase.
@@ -203,13 +226,25 @@ func BuildWhereClause(conditions []string, args []interface{}, dialect Dialect) 
 	if len(conditions) == 0 {
 		return "", nil
 	}
-	
-	// Replace placeholders with dialect-specific ones
-	for i := range conditions {
-		conditions[i] = strings.ReplaceAll(conditions[i], "?", dialect.Placeholder(i))
+
+	// Replace placeholders with dialect-specific ones without mutating input.
+	replaced := make([]string, len(conditions))
+	argIndex := 0
+	for i, cond := range conditions {
+		var builder strings.Builder
+		builder.Grow(len(cond) + 16)
+		for _, r := range cond {
+			if r == '?' {
+				builder.WriteString(dialect.Placeholder(argIndex))
+				argIndex++
+				continue
+			}
+			builder.WriteRune(r)
+		}
+		replaced[i] = builder.String()
 	}
-	
-	whereClause := "WHERE " + strings.Join(conditions, " AND ")
+
+	whereClause := "WHERE " + strings.Join(replaced, " AND ")
 	return whereClause, args
 }
 
@@ -225,6 +260,9 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 	
 	// Validate column names
 	for _, column := range columns {
+		if hasUnsafeSQLBoundary(column) {
+			return "", fmt.Errorf("unsafe column expression '%s'", column)
+		}
 		if column != "*" && !strings.Contains(column, "(") && !strings.Contains(column, " ") {
 			// Skip validation for expressions like "COUNT(*)" or "DISTINCT column"
 			if err := ValidateColumnName(column); err != nil {
@@ -247,11 +285,29 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 		dialect.QuoteIdentifier(table))
 	
 	if whereClause != "" {
+		if hasUnsafeSQLBoundary(whereClause) {
+			return "", fmt.Errorf("unsafe where clause")
+		}
+		if !strings.HasPrefix(strings.ToUpper(strings.TrimSpace(whereClause)), "WHERE ") {
+			return "", fmt.Errorf("invalid where clause, must start with WHERE")
+		}
 		query += " " + whereClause
 	}
 	
 	if orderBy != "" {
-		query += " ORDER BY " + orderBy
+		if hasUnsafeSQLBoundary(orderBy) {
+			return "", fmt.Errorf("unsafe order by clause")
+		}
+		items := strings.Split(orderBy, ",")
+		safeItems := make([]string, 0, len(items))
+		for _, item := range items {
+			safe, err := BuildSafeOrderByItem(dialect, item)
+			if err != nil {
+				return "", fmt.Errorf("invalid order by item '%s': %w", strings.TrimSpace(item), err)
+			}
+			safeItems = append(safeItems, safe)
+		}
+		query += " ORDER BY " + strings.Join(safeItems, ", ")
 	}
 	
 	limitOffsetClause := dialect.LimitOffset(limit, offset)
@@ -260,6 +316,54 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 	}
 	
 	return query, nil
+}
+
+// SelectQueryOptions defines structured inputs for safe select query construction.
+type SelectQueryOptions struct {
+	Columns         []string
+	WhereConditions []string
+	WhereArgs       []interface{}
+	OrderByItems    []string
+	Limit           int
+	Offset          int
+	Dialect         Dialect
+}
+
+// BuildSelectQueryWithOptions builds a SELECT query from structured options.
+// This reduces direct raw string concatenation for WHERE/ORDER BY.
+func BuildSelectQueryWithOptions(table string, opts SelectQueryOptions) (string, []interface{}, error) {
+	dialect := opts.Dialect
+	if dialect == nil {
+		dialect = NewDefaultDialect()
+	}
+
+	for _, cond := range opts.WhereConditions {
+		if hasUnsafeSQLBoundary(cond) {
+			return "", nil, fmt.Errorf("unsafe where condition")
+		}
+	}
+
+	whereClause, whereArgs := BuildWhereClause(opts.WhereConditions, opts.WhereArgs, dialect)
+
+	orderBy := ""
+	if len(opts.OrderByItems) > 0 {
+		safeItems := make([]string, 0, len(opts.OrderByItems))
+		for _, item := range opts.OrderByItems {
+			safe, err := BuildSafeOrderByItem(dialect, item)
+			if err != nil {
+				return "", nil, err
+			}
+			safeItems = append(safeItems, safe)
+		}
+		orderBy = strings.Join(safeItems, ", ")
+	}
+
+	query, err := BuildSelectQuery(table, opts.Columns, whereClause, orderBy, opts.Limit, opts.Offset, dialect)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return query, whereArgs, nil
 }
 
 // BuildDeleteQuery builds a DELETE query from table name and conditions with validation.
@@ -356,11 +460,108 @@ func ValidateColumnName(column string) error {
 	if column == "" {
 		return ErrInvalidColumnName
 	}
-	
-	if !columnNamePattern.MatchString(column) {
-		return fmt.Errorf("%w: '%s' (must start with letter and contain only letters, numbers, underscores)", ErrInvalidColumnName, column)
+
+	column = strings.TrimSpace(column)
+
+	if columnNamePattern.MatchString(column) {
+		return nil
 	}
-	
+	if qualifiedIdentifierPattern.MatchString(column) {
+		return nil
+	}
+	if jsonPathIdentifierPattern.MatchString(column) {
+		return nil
+	}
+
+	return fmt.Errorf("%w: '%s'", ErrInvalidColumnName, column)
+}
+
+// ValidateQualifiedIdentifier checks if a dotted identifier is valid (e.g. table.column).
+func ValidateQualifiedIdentifier(identifier string) error {
+	if identifier == "" {
+		return ErrInvalidColumnName
+	}
+
+	if !qualifiedIdentifierPattern.MatchString(identifier) {
+		return fmt.Errorf("%w: '%s' (must be one or more dot-separated identifiers)", ErrInvalidColumnName, identifier)
+	}
+
+	return nil
+}
+
+// BuildSafeOrderByItem validates and quotes a single ORDER BY item.
+// Supported forms: "column", "column ASC", "table.column DESC".
+func BuildSafeOrderByItem(dialect Dialect, item string) (string, error) {
+	_ = dialect
+	matches := orderByItemPattern.FindStringSubmatch(item)
+	if len(matches) < 2 {
+		return "", fmt.Errorf("invalid order by item: %s", item)
+	}
+
+	identifier := matches[1]
+	if err := ValidateQualifiedIdentifier(identifier); err != nil {
+		return "", err
+	}
+
+	direction := strings.ToUpper(strings.TrimSpace(matches[2]))
+	if direction != "" && direction != "ASC" && direction != "DESC" {
+		return "", fmt.Errorf("invalid order direction: %s", direction)
+	}
+
+	if direction == "" {
+		return identifier, nil
+	}
+
+	return identifier + " " + direction, nil
+}
+
+// NormalizeJoinType validates and normalizes join type to a safe allowlist.
+func NormalizeJoinType(joinType string) (string, error) {
+	jt := strings.ToUpper(strings.TrimSpace(joinType))
+	jt = strings.Join(strings.Fields(jt), " ")
+	if _, ok := allowedJoinTypes[jt]; !ok {
+		return "", fmt.Errorf("invalid join type: %s", joinType)
+	}
+	return jt, nil
+}
+
+// ValidateJoinTableReference checks whether join table expression is a safe
+// identifier reference with optional alias, e.g. "users", "users u", "users AS u",
+// "schema.users u", or "`schema`.`users` u".
+func ValidateJoinTableReference(table string) error {
+	table = strings.TrimSpace(table)
+	if table == "" {
+		return ErrInvalidTableName
+	}
+
+	parts := strings.Fields(table)
+	if len(parts) == 0 || len(parts) > 3 {
+		return fmt.Errorf("%w: '%s'", ErrInvalidTableName, table)
+	}
+
+	base := parts[0]
+	if !(qualifiedIdentifierPattern.MatchString(base) || quotedQualifiedIdentifierPattern.MatchString(base)) {
+		return fmt.Errorf("%w: '%s'", ErrInvalidTableName, table)
+	}
+
+	if len(parts) == 1 {
+		return nil
+	}
+
+	if len(parts) == 2 {
+		if err := ValidateColumnName(parts[1]); err != nil {
+			return fmt.Errorf("%w: '%s'", ErrInvalidTableName, table)
+		}
+		return nil
+	}
+
+	if !strings.EqualFold(parts[1], "AS") {
+		return fmt.Errorf("%w: '%s'", ErrInvalidTableName, table)
+	}
+	if err := ValidateColumnName(parts[2]); err != nil {
+		return fmt.Errorf("%w: '%s'", ErrInvalidTableName, table)
+	}
+
 	return nil
 }
 
@@ -390,6 +591,7 @@ func isValidDataType(value interface{}) bool {
 
 // EscapeLike escapes special characters for LIKE queries.
 func EscapeLike(value string) string {
+	value = strings.ReplaceAll(value, "\\", "\\\\")
 	value = strings.ReplaceAll(value, "%", "\\%")
 	value = strings.ReplaceAll(value, "_", "\\_")
 	return value
@@ -397,6 +599,35 @@ func EscapeLike(value string) string {
 
 // BuildLikeCondition builds a LIKE condition with proper escaping.
 func BuildLikeCondition(column, pattern string, dialect Dialect) string {
+	_ = pattern
 	quotedColumn := dialect.QuoteIdentifier(column)
-	return fmt.Sprintf("%s LIKE %s ESCAPE '\\'", quotedColumn, dialect.Placeholder(0))
+	return fmt.Sprintf("%s LIKE ? ESCAPE '\\'", quotedColumn)
+}
+
+func hasUnsafeSQLBoundary(sqlFragment string) bool {
+	trimmed := strings.TrimSpace(sqlFragment)
+	s := strings.ToLower(trimmed)
+	if strings.Contains(s, ";") ||
+		strings.Contains(s, "--") ||
+		strings.Contains(s, "/*") ||
+		strings.Contains(s, "*/") ||
+		strings.ContainsRune(s, '\x00') {
+		return true
+	}
+
+	if unsafeSQLKeywordPattern.MatchString(trimmed) {
+		return true
+	}
+
+	return false
+}
+
+func isUpper(r rune) bool { return r >= 'A' && r <= 'Z' }
+func isLower(r rune) bool { return r >= 'a' && r <= 'z' }
+func isDigit(r rune) bool { return r >= '0' && r <= '9' }
+func toLower(r rune) rune {
+	if isUpper(r) {
+		return r + ('a' - 'A')
+	}
+	return r
 }

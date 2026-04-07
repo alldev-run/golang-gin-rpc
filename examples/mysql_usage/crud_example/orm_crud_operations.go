@@ -229,7 +229,7 @@ func updateExamples(ormInstance *orm.ORM, ctx context.Context) error {
 	fmt.Println("3.2 更新多个字段:")
 	result, err = ormInstance.Update("users").
 		Set("status", "inactive").
-		Set("age", "age + 1").
+		SetExpr("age", "`age` + ?", 1).
 		Eq("email", "lisi@example.com").
 		Exec(ctx)
 	if err != nil {

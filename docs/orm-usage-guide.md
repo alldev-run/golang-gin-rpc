@@ -510,7 +510,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID int64, amount flo
     
     // 3. 在 MySQL 更新用户统计
     _, err = db.Update("users").
-        Set("order_count", "order_count + 1").
+        SetExpr("order_count", "`order_count` + ?", 1).
         Eq("id", userID).
         Exec(ctx)
     
@@ -689,6 +689,11 @@ o.Select("users").
     Where("age > ?", 30).
     Or("department = ?", "IT").
     Or("experience > ?", 5)
+
+// 显式 Raw（仅用于可信 SQL 片段）
+o.Select("users").
+    WhereRaw("JSON_EXTRACT(meta, '$.vip') = ?", true).
+    AndRaw("created_at >= ?", fromTime)
 ```
 
 #### JOIN 操作
@@ -712,6 +717,12 @@ rows, err := o.Select("users u").
     Join("profiles p", "u.id = p.user_id").
     Join("departments d", "u.department_id = d.id").
     Columns("u.name", "p.bio", "d.name as department").
+    Query(ctx)
+
+// 显式 Raw JOIN（仅用于可信 SQL 片段）
+rows, err := o.Select("users u").
+    JoinWithTypeRaw("INNER", "(SELECT user_id, MAX(score) AS score FROM rankings GROUP BY user_id) r", "u.id = r.user_id").
+    Columns("u.name", "r.score").
     Query(ctx)
 ```
 
@@ -772,9 +783,18 @@ sortField := "name"
 sortOrder := "DESC"
 rows, err := o.Select("users").
     Columns("id", "name", "email").
-    OrderBy(fmt.Sprintf("%s %s", sortField, sortOrder)).
+    OrderBy(sortField + " " + sortOrder).
+    Query(ctx)
+
+// 如需复杂表达式排序，使用显式 Raw（仅可信输入）
+rows, err := o.Select("users").
+    Columns("id", "name", "email").
+    OrderByRaw("FIELD(status, 'vip', 'active', 'inactive')", "created_at DESC").
     Query(ctx)
 ```
+
+> 说明：`OrderBy(...)` 现在会校验排序项格式（`column` / `column ASC|DESC` / `table.column ASC|DESC`）。
+> 若需要函数表达式或自定义排序片段，请使用 `OrderByRaw(...)` 并确保输入可信。
 
 ### INSERT 操作
 
@@ -829,7 +849,7 @@ result, err := o.Insert("users").
     Set("age", 25).
     OnDuplicateKeyUpdate("age").
     Set("age", 26).
-    Set("updated_at", "NOW()").
+    SetExpr("updated_at", "NOW()").
     Exec(ctx)
 
 // REPLACE INTO
@@ -847,7 +867,7 @@ result, err := o.Insert("users").
 // 基础更新
 result, err := o.Update("users").
     Set("status", "inactive").
-    Set("updated_at", time.Now()).
+    SetExpr("updated_at", "NOW()").
     Eq("id", 1).
     Exec(ctx)
 
@@ -891,6 +911,47 @@ affected, err := result.RowsAffected()
 fmt.Printf("Deleted %d rows\n", affected)
 ```
 
+### 安全迁移指南（旧写法 -> 新写法）
+
+```go
+// 1) UPDATE 表达式
+// 旧：字符串表达式（不推荐）
+o.Update("users").Set("score", "score + 1")
+
+// 新：显式表达式（推荐）
+o.Update("users").SetExpr("score", "`score` + ?", 1)
+
+// 2) ORDER BY 动态拼接
+// 旧：直接拼接字符串
+o.Select("users").OrderBy(sortField + " " + sortOrder)
+
+// 新：优先用 OrderBy（内置格式校验）
+o.Select("users").OrderBy("created_at DESC")
+
+// 新：复杂函数排序时，显式使用 Raw
+o.Select("users").OrderByRaw("FIELD(status, 'vip', 'active', 'inactive')")
+
+// 3) WHERE/HAVING 原始条件
+// 旧：Where/Having 直接写原始 SQL
+o.Select("users").Where("JSON_EXTRACT(meta, '$.vip') = ?", true)
+o.Select("users").Having("SUM(amount) > ?", 1000)
+
+// 新：显式 Raw API，语义更清晰
+o.Select("users").WhereRaw("JSON_EXTRACT(meta, '$.vip') = ?", true)
+o.Select("users").HavingRaw("SUM(amount) > ?", 1000)
+
+// 4) JOIN 自定义语句
+// 旧：JoinWithType 里放复杂 table 表达式（可能被过滤）
+o.Select("users u").JoinWithType("INNER", "(SELECT ... ) r", "u.id = r.user_id")
+
+// 新：复杂 JOIN 明确走 Raw API
+o.Select("users u").JoinWithTypeRaw("INNER", "(SELECT ... ) r", "u.id = r.user_id")
+```
+
+> 建议：
+> - 默认使用 `Eq/In/Like/Where/OrderBy/JoinWithType` 这类安全 API。
+> - 只有在必须写函数表达式、子查询片段时才使用 `*Raw` 或 `SetExpr`，并确保输入是可信来源。
+
 ## 事务管理
 
 ### 基础事务
@@ -907,7 +968,7 @@ err := o.Transaction(ctx, func(txORM *orm.ORM) error {
     }
 
     _, err = txORM.Update("accounts").
-        Set("balance", "balance - 100").
+        SetExpr("balance", "`balance` - ?", 100).
         Eq("user_id", 1).
         Exec(ctx)
     if err != nil {
@@ -1065,9 +1126,9 @@ result, err = softDelete.CleanSoftDeleted(ctx, o.DB(), "users")
 
 ```go
 // 乐观锁更新
-result, err := o.Update("products").
+result, err := o.Update("users").
     Set("price", 99.99).
-    Set("version", "version + 1").
+    SetExpr("version", "`version` + ?", 1).
     Eq("id", 1).
     Where("version = ?", currentVersion).
     Exec(ctx)

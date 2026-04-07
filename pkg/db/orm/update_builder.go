@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+// SQLExpr represents an explicit SQL expression used in SET clauses.
+// Use this only with trusted SQL snippets.
+type SQLExpr struct {
+	SQL  string
+	Args []interface{}
+}
+
+// Expr creates an explicit SQL expression value for use with SetExpr.
+func Expr(sql string, args ...interface{}) SQLExpr {
+	return SQLExpr{SQL: sql, Args: args}
+}
+
 // UpdateBuilder provides a fluent interface for building UPDATE queries.
 type UpdateBuilder struct {
 	db           DB
@@ -68,13 +80,20 @@ func (ub *UpdateBuilder) SetVersionField(field string) *UpdateBuilder {
 
 // Inc increments a numeric column by the specified amount.
 func (ub *UpdateBuilder) Inc(column string, amount interface{}) *UpdateBuilder {
-	ub.data[column] = fmt.Sprintf("%s + %v", ub.dialect.QuoteIdentifier(column), amount)
-	return ub
+	quotedColumn := ub.dialect.QuoteIdentifier(column)
+	return ub.SetExpr(column, fmt.Sprintf("%s + ?", quotedColumn), amount)
 }
 
 // Dec decrements a numeric column by the specified amount.
 func (ub *UpdateBuilder) Dec(column string, amount interface{}) *UpdateBuilder {
-	ub.data[column] = fmt.Sprintf("%s - %v", ub.dialect.QuoteIdentifier(column), amount)
+	quotedColumn := ub.dialect.QuoteIdentifier(column)
+	return ub.SetExpr(column, fmt.Sprintf("%s - ?", quotedColumn), amount)
+}
+
+// SetExpr sets a column to an explicit SQL expression.
+// Example: SetExpr("count", "`count` + ?", 1)
+func (ub *UpdateBuilder) SetExpr(column string, expr string, args ...interface{}) *UpdateBuilder {
+	ub.data[column] = Expr(expr, args...)
 	return ub
 }
 
@@ -181,6 +200,19 @@ func (ub *UpdateBuilder) Between(column string, start, end interface{}) *UpdateB
 
 // OrderBy sets the ORDER BY clause (supported by some databases).
 func (ub *UpdateBuilder) OrderBy(order ...string) *UpdateBuilder {
+	for _, item := range order {
+		safeItem, err := BuildSafeOrderByItem(ub.dialect, item)
+		if err != nil {
+			continue
+		}
+		ub.orderBy = append(ub.orderBy, safeItem)
+	}
+	return ub
+}
+
+// OrderByRaw appends raw ORDER BY expressions.
+// Use this only with trusted SQL snippets.
+func (ub *UpdateBuilder) OrderByRaw(order ...string) *UpdateBuilder {
 	ub.orderBy = append(ub.orderBy, order...)
 	return ub
 }
@@ -198,9 +230,29 @@ func (ub *UpdateBuilder) Join(table, condition string, args ...interface{}) *Upd
 
 // JoinWithType adds a JOIN clause with specified type for UPDATE with JOIN.
 func (ub *UpdateBuilder) JoinWithType(joinType, table, condition string, args ...interface{}) *UpdateBuilder {
+	normalizedJoinType, err := NormalizeJoinType(joinType)
+	if err != nil {
+		return ub
+	}
+	if err := ValidateJoinTableReference(table); err != nil {
+		return ub
+	}
+	ub.joins = append(ub.joins, Join{
+		Type:      normalizedJoinType,
+		Table:     table,
+		Condition: condition,
+		Args:      args,
+	})
+	return ub
+}
+
+// JoinWithTypeRaw adds a raw JOIN clause for UPDATE queries.
+// Use this only with trusted SQL snippets.
+func (ub *UpdateBuilder) JoinWithTypeRaw(joinType, table, condition string, args ...interface{}) *UpdateBuilder {
 	ub.joins = append(ub.joins, Join{
 		Type:      joinType,
 		Table:     table,
+		RawTable:  true,
 		Condition: condition,
 		Args:      args,
 	})
@@ -231,10 +283,11 @@ func (ub *UpdateBuilder) Build() (string, []interface{}) {
 
 	for _, key := range keys {
 		quotedKey := ub.dialect.QuoteIdentifier(key)
-		
-		// Check if this is an expression (like "column + 1")
-		if str, ok := ub.data[key].(string); ok && strings.Contains(str, ub.dialect.QuoteIdentifier(key)) {
-			setParts = append(setParts, fmt.Sprintf("%s = %s", quotedKey, str))
+
+		if expr, ok := ub.data[key].(SQLExpr); ok {
+			exprSQL := replaceConditionPlaceholders(expr.SQL, ub.dialect, len(args))
+			setParts = append(setParts, fmt.Sprintf("%s = %s", quotedKey, exprSQL))
+			args = append(args, expr.Args...)
 		} else {
 			setParts = append(setParts, fmt.Sprintf("%s = %s", quotedKey, ub.dialect.Placeholder(len(args))))
 			args = append(args, ub.data[key])
@@ -250,10 +303,20 @@ func (ub *UpdateBuilder) Build() (string, []interface{}) {
 
 	// Add JOIN clauses if any
 	for _, join := range ub.joins {
+		tableExpr := ""
+		if join.RawTable {
+			tableExpr = shiftPlaceholdersIfNeeded(join.Table, ub.dialect, len(allArgs))
+			if len(join.TableArgs) > 0 {
+				allArgs = append(allArgs, join.TableArgs...)
+			}
+		} else {
+			tableExpr = ub.dialect.QuoteIdentifier(join.Table)
+		}
+		cond := replaceConditionPlaceholders(join.Condition, ub.dialect, len(allArgs))
 		query += fmt.Sprintf(" %s JOIN %s ON %s", 
 			join.Type, 
-			ub.dialect.QuoteIdentifier(join.Table), 
-			join.Condition)
+			tableExpr, 
+			cond)
 		allArgs = append(allArgs, join.Args...)
 	}
 

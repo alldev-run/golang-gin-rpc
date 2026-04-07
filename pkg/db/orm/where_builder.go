@@ -29,6 +29,12 @@ func (wb *WhereBuilder) Where(condition string, args ...interface{}) *WhereBuild
 	return wb
 }
 
+// WhereRaw adds a raw WHERE condition string.
+// Use this only with trusted SQL snippets.
+func (wb *WhereBuilder) WhereRaw(condition string, args ...interface{}) *WhereBuilder {
+	return wb.Where(condition, args...)
+}
+
 func (wb *WhereBuilder) Group(fn func(*WhereBuilder)) *WhereBuilder {
 	subBuilder := NewWhereBuilder(wb.dialect)
 	fn(subBuilder)
@@ -64,6 +70,12 @@ func (wb *WhereBuilder) And(condition string, args ...interface{}) *WhereBuilder
 	return wb
 }
 
+// AndRaw adds a raw AND condition string.
+// Use this only with trusted SQL snippets.
+func (wb *WhereBuilder) AndRaw(condition string, args ...interface{}) *WhereBuilder {
+	return wb.And(condition, args...)
+}
+
 // Or adds an OR condition.
 func (wb *WhereBuilder) Or(condition string, args ...interface{}) *WhereBuilder {
 	if len(wb.conditions) > 0 {
@@ -73,6 +85,12 @@ func (wb *WhereBuilder) Or(condition string, args ...interface{}) *WhereBuilder 
 	}
 	wb.args = append(wb.args, args...)
 	return wb
+}
+
+// OrRaw adds a raw OR condition string.
+// Use this only with trusted SQL snippets.
+func (wb *WhereBuilder) OrRaw(condition string, args ...interface{}) *WhereBuilder {
+	return wb.Or(condition, args...)
 }
 
 // Eq adds an equality condition (column = value).

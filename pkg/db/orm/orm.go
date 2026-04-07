@@ -134,8 +134,23 @@ func Update(ctx context.Context, db DB, query string, args ...interface{}) (int6
 // SetFieldByID updates a single field on a row identified by an ID column.
 func SetFieldByID(ctx context.Context, db DB, table, idColumn string, id interface{}, field string, value interface{}) (int64, error) {
 	dialect := NewDefaultDialect()
+	if err := ValidateTableName(table); err != nil {
+		return 0, err
+	}
+	if err := ValidateColumnName(idColumn); err != nil {
+		return 0, err
+	}
+	if err := ValidateColumnName(field); err != nil {
+		return 0, err
+	}
+
 	query := fmt.Sprintf("UPDATE %s SET %s = %s WHERE %s = %s",
-		table, field, dialect.Placeholder(0), idColumn, dialect.Placeholder(1))
+		dialect.QuoteIdentifier(table),
+		dialect.QuoteIdentifier(field),
+		dialect.Placeholder(0),
+		dialect.QuoteIdentifier(idColumn),
+		dialect.Placeholder(1),
+	)
 	res, err := db.Exec(ctx, query, value, id)
 	if err != nil {
 		return 0, err

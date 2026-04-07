@@ -142,6 +142,19 @@ func (db *DeleteBuilder) Between(column string, start, end interface{}) *DeleteB
 
 // OrderBy sets the ORDER BY clause (supported by some databases).
 func (db *DeleteBuilder) OrderBy(order ...string) *DeleteBuilder {
+	for _, item := range order {
+		safeItem, err := BuildSafeOrderByItem(db.dialect, item)
+		if err != nil {
+			continue
+		}
+		db.orderBy = append(db.orderBy, safeItem)
+	}
+	return db
+}
+
+// OrderByRaw appends raw ORDER BY expressions.
+// Use this only with trusted SQL snippets.
+func (db *DeleteBuilder) OrderByRaw(order ...string) *DeleteBuilder {
 	db.orderBy = append(db.orderBy, order...)
 	return db
 }
@@ -171,9 +184,29 @@ func (db *DeleteBuilder) Join(table, condition string, args ...interface{}) *Del
 
 // JoinWithType adds a JOIN clause with specified type for DELETE with JOIN.
 func (db *DeleteBuilder) JoinWithType(joinType, table, condition string, args ...interface{}) *DeleteBuilder {
+	normalizedJoinType, err := NormalizeJoinType(joinType)
+	if err != nil {
+		return db
+	}
+	if err := ValidateJoinTableReference(table); err != nil {
+		return db
+	}
+	db.joins = append(db.joins, Join{
+		Type:      normalizedJoinType,
+		Table:     table,
+		Condition: condition,
+		Args:      args,
+	})
+	return db
+}
+
+// JoinWithTypeRaw adds a raw JOIN clause for DELETE queries.
+// Use this only with trusted SQL snippets.
+func (db *DeleteBuilder) JoinWithTypeRaw(joinType, table, condition string, args ...interface{}) *DeleteBuilder {
 	db.joins = append(db.joins, Join{
 		Type:      joinType,
 		Table:     table,
+		RawTable:  true,
 		Condition: condition,
 		Args:      args,
 	})
@@ -193,10 +226,20 @@ func (db *DeleteBuilder) Build() (string, []interface{}) {
 
 	// Add JOIN clauses if any
 	for _, join := range db.joins {
+		tableExpr := ""
+		if join.RawTable {
+			tableExpr = shiftPlaceholdersIfNeeded(join.Table, db.dialect, len(allArgs))
+			if len(join.TableArgs) > 0 {
+				allArgs = append(allArgs, join.TableArgs...)
+			}
+		} else {
+			tableExpr = db.dialect.QuoteIdentifier(join.Table)
+		}
+		cond := replaceConditionPlaceholders(join.Condition, db.dialect, len(allArgs))
 		query += fmt.Sprintf(" %s JOIN %s ON %s", 
 			join.Type, 
-			db.dialect.QuoteIdentifier(join.Table), 
-			join.Condition)
+			tableExpr, 
+			cond)
 		allArgs = append(allArgs, join.Args...)
 	}
 

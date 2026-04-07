@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -49,6 +50,27 @@ type Client struct {
 }
 
 var ErrClientNotInitialized = errors.New("mysql client is nil or uninitialized")
+
+var mysqlIdentifierPartPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+
+func quoteIdentifier(identifier string) (string, error) {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return "", fmt.Errorf("invalid identifier: empty")
+	}
+
+	parts := strings.Split(identifier, ".")
+	quoted := make([]string, len(parts))
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		if !mysqlIdentifierPartPattern.MatchString(part) {
+			return "", fmt.Errorf("invalid identifier: %s", identifier)
+		}
+		quoted[i] = "`" + part + "`"
+	}
+
+	return strings.Join(quoted, "."), nil
+}
 
 func normalizeConfig(config Config) Config {
 	defaults := DefaultConfig()
@@ -195,7 +217,20 @@ func (c *Client) Update(ctx context.Context, query string, args ...any) (int64, 
 
 // SetFieldByID updates a single field on a row identified by an ID column.
 func (c *Client) SetFieldByID(ctx context.Context, table, idColumn string, id interface{}, field string, value interface{}) (int64, error) {
-	query := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?", table, field, idColumn)
+	quotedTable, err := quoteIdentifier(table)
+	if err != nil {
+		return 0, err
+	}
+	quotedField, err := quoteIdentifier(field)
+	if err != nil {
+		return 0, err
+	}
+	quotedIDColumn, err := quoteIdentifier(idColumn)
+	if err != nil {
+		return 0, err
+	}
+
+	query := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?", quotedTable, quotedField, quotedIDColumn)
 	res, err := c.Exec(ctx, query, value, id)
 	if err != nil {
 		return 0, err
@@ -208,10 +243,16 @@ func (c *Client) SetFieldByID(ctx context.Context, table, idColumn string, id in
 // Otherwise, it performs an UPDATE and returns the number of affected rows.
 func (c *Client) Save(ctx context.Context, table, idColumn string, id interface{}, data map[string]interface{}) (int64, error) {
 	if isZero(id) {
-		query, args := c.buildInsertQuery(table, data)
+		query, args, err := c.buildInsertQuery(table, data)
+		if err != nil {
+			return 0, err
+		}
 		return c.InsertGetID(ctx, query, args...)
 	}
-	query, args := c.buildUpdateQuery(table, idColumn, id, data)
+	query, args, err := c.buildUpdateQuery(table, idColumn, id, data)
+	if err != nil {
+		return 0, err
+	}
 	return c.Update(ctx, query, args...)
 }
 
@@ -235,13 +276,18 @@ func isZero(v interface{}) bool {
 	}
 }
 
-func (c *Client) buildInsertQuery(table string, data map[string]interface{}) (string, []interface{}) {
+func (c *Client) buildInsertQuery(table string, data map[string]interface{}) (string, []interface{}, error) {
 	if _, ok := data[c.defaultVersionField]; !ok {
 		data[c.defaultVersionField] = 1
 	}
 
 	if len(data) == 0 {
-		return "", nil
+		return "", nil, nil
+	}
+
+	quotedTable, err := quoteIdentifier(table)
+	if err != nil {
+		return "", nil, err
 	}
 
 	cols := make([]string, 0, len(data))
@@ -252,16 +298,22 @@ func (c *Client) buildInsertQuery(table string, data map[string]interface{}) (st
 
 	placeholders := make([]string, len(cols))
 	args := make([]interface{}, len(cols))
+	quotedCols := make([]string, len(cols))
 	for i, col := range cols {
+		quotedCol, err := quoteIdentifier(col)
+		if err != nil {
+			return "", nil, err
+		}
 		placeholders[i] = "?"
+		quotedCols[i] = quotedCol
 		args[i] = data[col]
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
-	return query, args
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", quotedTable, strings.Join(quotedCols, ", "), strings.Join(placeholders, ", "))
+	return query, args, nil
 }
 
-func (c *Client) buildUpdateQuery(table, idColumn string, id interface{}, data map[string]interface{}) (string, []interface{}) {
+func (c *Client) buildUpdateQuery(table, idColumn string, id interface{}, data map[string]interface{}) (string, []interface{}, error) {
 	hasVersion := false
 	var oldVersion interface{}
 	if v, ok := data[c.defaultVersionField]; ok {
@@ -271,7 +323,20 @@ func (c *Client) buildUpdateQuery(table, idColumn string, id interface{}, data m
 	}
 
 	if len(data) == 0 {
-		return "", nil
+		return "", nil, nil
+	}
+
+	quotedTable, err := quoteIdentifier(table)
+	if err != nil {
+		return "", nil, err
+	}
+	quotedIDColumn, err := quoteIdentifier(idColumn)
+	if err != nil {
+		return "", nil, err
+	}
+	quotedVersionField, err := quoteIdentifier(c.defaultVersionField)
+	if err != nil {
+		return "", nil, err
 	}
 
 	cols := make([]string, 0, len(data))
@@ -286,21 +351,25 @@ func (c *Client) buildUpdateQuery(table, idColumn string, id interface{}, data m
 	setStmts := make([]string, 0, len(cols))
 	args := make([]interface{}, 0, len(cols)+1)
 	for _, col := range cols {
+		quotedCol, err := quoteIdentifier(col)
+		if err != nil {
+			return "", nil, err
+		}
 		if col == c.defaultVersionField {
-			setStmts = append(setStmts, c.defaultVersionField+" = "+c.defaultVersionField+" + 1")
+			setStmts = append(setStmts, quotedVersionField+" = "+quotedVersionField+" + 1")
 		} else {
-			setStmts = append(setStmts, fmt.Sprintf("%s = ?", col))
+			setStmts = append(setStmts, fmt.Sprintf("%s = ?", quotedCol))
 			args = append(args, data[col])
 		}
 	}
 	args = append(args, id)
 
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = ?", table, strings.Join(setStmts, ", "), idColumn)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = ?", quotedTable, strings.Join(setStmts, ", "), quotedIDColumn)
 	if hasVersion {
-		query += " AND " + c.defaultVersionField + " = ?"
+		query += " AND " + quotedVersionField + " = ?"
 		args = append(args, oldVersion)
 	}
-	return query, args
+	return query, args, nil
 }
 
 // Begin starts a new transaction.
