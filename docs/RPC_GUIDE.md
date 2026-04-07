@@ -15,19 +15,24 @@
 
 ```
 pkg/rpc/
+├── README.md              # RPC 包说明文档
+├── auth.go                # 认证相关功能
+├── client.go              # RPC 客户端核心实现
+├── degradation.go         # 服务降级功能
+├── manager.go             # RPC 管理器
+├── observer.go            # 观察者模式实现
 ├── server.go              # RPC 服务器核心
-├── manager.go              # RPC 管理器
-├── service.go              # 基础服务实现
-├── grpc/                   # gRPC 客户端
-│   └── grpc_client.go
-├── jsonrpc/                # JSON-RPC 客户端
-│   └── jsonrpc_client.go
-└── examples/               # 示例服务
-    ├── user_service.go
-    └── calculator_service.go
+├── service.go             # 基础服务实现
+├── grpc/                  # gRPC 相关
+│   └── (gRPC 实现文件)
+├── jsonrpc/               # JSON-RPC 相关
+│   └── (JSON-RPC 实现文件)
+├── clients/               # 客户端实现 (目录预留)
+├── servers/               # 服务器实现 (目录预留)
+├── logs/                  # 日志相关 (目录预留)
+└── examples/              # 示例代码
+    └── (示例文件)
 ```
-
-## 🔧 配置
 
 ### RPC 配置 (configs/config.yaml)
 

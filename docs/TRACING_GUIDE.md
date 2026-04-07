@@ -34,7 +34,15 @@ tracing:
   service_version: "1.0.0"
   environment: "development"
   enabled: true
-  zipkin_url: "http://localhost:9411/api/v2/spans"
+  type: "zipkin"
+  host: "localhost"
+  port: 9411
+  endpoint: "/api/v2/spans"
+  username: ""
+  password: ""
+  options:
+    timeout: "10s"
+    max_attempts: 3
   sample_rate: 1.0  # 开发环境 100% 采样
   batch_timeout: 5s
   max_export_batch_size: 512

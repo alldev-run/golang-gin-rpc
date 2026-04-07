@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -528,4 +529,46 @@ func DerefInt(i *int, defaultVal int) int {
 		return defaultVal
 	}
 	return *i
+}
+
+// StructToMap converts a struct to map[string]interface{} with error handling
+func StructToMap(obj interface{}) map[string]interface{} {
+	if obj == nil {
+		return make(map[string]interface{})
+	}
+
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return make(map[string]interface{})
+		}
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return make(map[string]interface{})
+	}
+
+	result := make(map[string]interface{})
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+
+		// 跳过不可导出的字段
+		if !value.CanInterface() {
+			continue
+		}
+
+		// Get db tag name, fallback to field name
+		dbTag := field.Tag.Get("db")
+		if dbTag == "" || dbTag == "-" {
+			continue
+		}
+
+		result[dbTag] = value.Interface()
+	}
+
+	return result
 }

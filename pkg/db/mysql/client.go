@@ -50,6 +50,32 @@ type Client struct {
 
 var ErrClientNotInitialized = errors.New("mysql client is nil or uninitialized")
 
+func normalizeConfig(config Config) Config {
+	defaults := DefaultConfig()
+
+	if config.Charset == "" {
+		config.Charset = defaults.Charset
+	}
+	if config.MaxOpenConns <= 0 {
+		config.MaxOpenConns = defaults.MaxOpenConns
+	}
+	if config.MaxIdleConns <= 0 {
+		config.MaxIdleConns = defaults.MaxIdleConns
+	}
+	if config.ConnMaxLifetime <= 0 {
+		config.ConnMaxLifetime = defaults.ConnMaxLifetime
+	}
+	if config.ConnMaxIdleTime <= 0 {
+		config.ConnMaxIdleTime = defaults.ConnMaxIdleTime
+	}
+
+	if config.MaxIdleConns > config.MaxOpenConns {
+		config.MaxIdleConns = config.MaxOpenConns
+	}
+
+	return config
+}
+
 func (c *Client) ensureDB() error {
 	if c == nil || c.db == nil {
 		return ErrClientNotInitialized
@@ -59,6 +85,8 @@ func (c *Client) ensureDB() error {
 
 // New creates a new MySQL client from config.
 func New(config Config) (*Client, error) {
+	config = normalizeConfig(config)
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=true&loc=Local",
 		config.Username,
 		config.Password,

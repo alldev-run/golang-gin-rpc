@@ -2,6 +2,7 @@ package utils
 
 import (
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -674,4 +675,163 @@ func TestToStringComplexTypes(t *testing.T) {
 	if result == "" {
 		t.Error("ToString() with struct should not be empty")
 	}
+}
+
+// ==================== StructToMap Tests ====================
+
+func TestStructToMap(t *testing.T) {
+	type User struct {
+		ID     int64  `db:"id"`
+		Name   string `db:"name"`
+		Email  string `db:"email"`
+		Active bool   `db:"active"`
+	}
+
+	user := User{
+		ID:     123,
+		Name:   "Test User",
+		Email:  "test@example.com",
+		Active: true,
+	}
+
+	// 正常情况
+	result := StructToMap(&user)
+	if len(result) != 4 {
+		t.Error("Expected 4 fields")
+	}
+	if result["id"] != int64(123) {
+		t.Error("ID mismatch")
+	}
+	if result["name"] != "Test User" {
+		t.Error("Name mismatch")
+	}
+	if result["email"] != "test@example.com" {
+		t.Error("Email mismatch")
+	}
+	if result["active"] != true {
+		t.Error("Active mismatch")
+	}
+
+	// nil 输入
+	result = StructToMap(nil)
+	if len(result) != 0 {
+		t.Error("Expected empty map for nil input")
+	}
+
+	// nil 指针
+	var userPtr *User
+	result = StructToMap(userPtr)
+	if len(result) != 0 {
+		t.Error("Expected empty map for nil pointer")
+	}
+
+	// 非结构体
+	result = StructToMap("string")
+	if len(result) != 0 {
+		t.Error("Expected empty map for non-struct")
+	}
+
+	// 空标签
+	type UserWithEmptyTags struct {
+		ID   int `db:""`
+		Name string `db:"-"`
+		Age  int `db:"age"`
+	}
+	user2 := UserWithEmptyTags{ID: 1, Name: "John", Age: 30}
+	result = StructToMap(&user2)
+	if len(result) != 1 || result["age"] != 30 {
+		t.Error("Empty tag handling failed")
+	}
+}
+
+func TestStructToMapConcurrency(t *testing.T) {
+	type TestUser struct {
+		ID     int64  `db:"id"`
+		Name   string `db:"name"`
+		Email  string `db:"email"`
+		Active bool   `db:"active"`
+	}
+
+	user := TestUser{
+		ID:     123,
+		Name:   "Test User",
+		Email:  "test@example.com",
+		Active: true,
+	}
+
+	// 并发测试
+	const numGoroutines = 100
+	const numIterations = 100
+
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < numIterations; j++ {
+				result := StructToMap(&user)
+				
+				// 验证结果正确性
+				if result["id"] != int64(123) {
+					t.Errorf("Goroutine %d, iteration %d: id mismatch", id, j)
+				}
+				if result["name"] != "Test User" {
+					t.Errorf("Goroutine %d, iteration %d: name mismatch", id, j)
+				}
+				if result["email"] != "test@example.com" {
+					t.Errorf("Goroutine %d, iteration %d: email mismatch", id, j)
+				}
+				if result["active"] != true {
+					t.Errorf("Goroutine %d, iteration %d: active mismatch", id, j)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+func BenchmarkStructToMap(b *testing.B) {
+	type User struct {
+		ID     int64  `db:"id"`
+		Name   string `db:"name"`
+		Email  string `db:"email"`
+		Active bool   `db:"active"`
+	}
+
+	user := User{
+		ID:     123,
+		Name:   "Test User",
+		Email:  "test@example.com",
+		Active: true,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = StructToMap(&user)
+	}
+}
+
+func BenchmarkStructToMapParallel(b *testing.B) {
+	type User struct {
+		ID     int64  `db:"id"`
+		Name   string `db:"name"`
+		Email  string `db:"email"`
+		Active bool   `db:"active"`
+	}
+
+	user := User{
+		ID:     123,
+		Name:   "Test User",
+		Email:  "test@example.com",
+		Active: true,
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = StructToMap(&user)
+		}
+	})
 }
