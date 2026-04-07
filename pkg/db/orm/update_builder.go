@@ -383,8 +383,7 @@ func (ub *UpdateBuilder) UpdateWithVersion(ctx context.Context, id interface{}, 
 	ub.where.And(versionCondition, currentVersion)
 	
 	// Increment version field
-	incExpr := fmt.Sprintf("%s + 1", ub.dialect.QuoteIdentifier(ub.versionField))
-	ub.data[ub.versionField] = incExpr
+	ub.SetExpr(ub.versionField, fmt.Sprintf("%s + ?", ub.dialect.QuoteIdentifier(ub.versionField)), 1)
 	
 	// Add ID condition
 	ub.where.Eq(idColumn, id)
@@ -402,8 +401,7 @@ func (ub *UpdateBuilder) UpdateWithVersionTx(ctx context.Context, tx *sql.Tx, id
 	ub.where.And(versionCondition, currentVersion)
 	
 	// Increment version field
-	incExpr := fmt.Sprintf("%s + 1", ub.dialect.QuoteIdentifier(ub.versionField))
-	ub.data[ub.versionField] = incExpr
+	ub.SetExpr(ub.versionField, fmt.Sprintf("%s + ?", ub.dialect.QuoteIdentifier(ub.versionField)), 1)
 	
 	// Add ID condition
 	ub.where.Eq(idColumn, id)
