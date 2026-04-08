@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -18,6 +19,7 @@ type Client struct {
 	rdb     *redis.Client        // single instance or sentinel client
 	cluster *redis.ClusterClient // cluster mode client
 	nodes   []*redis.Client      // master-slave nodes
+	mu      sync.RWMutex         // protects nodes and config
 }
 
 // New creates a new Redis client based on config mode.
@@ -199,6 +201,7 @@ func newMultiClient(ctx context.Context, config Config) (*Client, error) {
 }
 
 // getNodeForKey returns the appropriate node index for a given key using sharding strategy.
+// This method is not thread-safe; caller must hold c.mu.RLock.
 func (c *Client) getNodeForKey(key string) int {
 	if c.config.Mode != ModeMulti || len(c.nodes) == 0 {
 		return 0
@@ -213,7 +216,11 @@ func (c *Client) getNodeForKey(key string) int {
 				if nodeIdx >= 0 && nodeIdx < len(c.nodes) {
 					return nodeIdx
 				}
-				return c.config.Multi.DefaultNode
+				// Fall back to default if index out of bounds
+				if defaultIdx := c.config.Multi.DefaultNode; defaultIdx >= 0 && defaultIdx < len(c.nodes) {
+					return defaultIdx
+				}
+				return 0
 			}
 		}
 	}
@@ -229,15 +236,32 @@ func (c *Client) getNodeForKey(key string) int {
 		return hash
 	case "range":
 		// For range-based, use default (should be configured with specific logic)
-		return c.config.Multi.DefaultNode
+		return c.getSafeDefaultNode()
 	default:
 		// Default to configured default node
-		return c.config.Multi.DefaultNode
+		return c.getSafeDefaultNode()
 	}
 }
 
+// getSafeDefaultNode returns the default node index with bounds checking.
+// This method is not thread-safe; caller must hold c.mu.RLock.
+func (c *Client) getSafeDefaultNode() int {
+	if len(c.nodes) == 0 {
+		return 0
+	}
+	defaultIdx := c.config.Multi.DefaultNode
+	if defaultIdx >= 0 && defaultIdx < len(c.nodes) {
+		return defaultIdx
+	}
+	return 0
+}
+
 // getClientForKey returns the appropriate client for a given key.
+// Returns the first available node if no valid client is found for the key.
 func (c *Client) getClientForKey(key string) redis.Cmdable {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	if c.rdb != nil {
 		return c.rdb
 	}
@@ -246,9 +270,30 @@ func (c *Client) getClientForKey(key string) redis.Cmdable {
 	}
 	if len(c.nodes) > 0 {
 		if c.config.Mode == ModeMulti {
-			return c.nodes[c.getNodeForKey(key)]
+			idx := c.getNodeForKey(key)
+			// Bounds check to prevent panic
+			if idx >= 0 && idx < len(c.nodes) && c.nodes[idx] != nil {
+				return c.nodes[idx]
+			}
+			// Fall back to first available node
+			return c.getFirstAvailableNode()
 		}
-		return c.nodes[0]
+		if c.nodes[0] != nil {
+			return c.nodes[0]
+		}
+		return c.getFirstAvailableNode()
+	}
+	// Return nil if no clients available - caller should handle this
+	return nil
+}
+
+// getFirstAvailableNode returns the first non-nil node client.
+// This method is not thread-safe; caller must hold c.mu.RLock.
+func (c *Client) getFirstAvailableNode() redis.Cmdable {
+	for _, node := range c.nodes {
+		if node != nil {
+			return node
+		}
 	}
 	return nil
 }
@@ -493,6 +538,26 @@ func (c *Client) TxPipeline() redis.Pipeliner {
 	return c.getClient(true).TxPipeline()
 }
 
+// Pipelined executes a function within a pipeline and returns results.
+// This is useful for batch operations where you need the results.
+func (c *Client) Pipelined(ctx context.Context, fn func(p redis.Pipeliner) error) ([]redis.Cmder, error) {
+	pipe := c.Pipeline()
+	if err := fn(pipe); err != nil {
+		return nil, err
+	}
+	return pipe.Exec(ctx)
+}
+
+// TxPipelined executes a function within a transactional pipeline and returns results.
+// All commands in the function are executed atomically (MULTI/EXEC).
+func (c *Client) TxPipelined(ctx context.Context, fn func(p redis.Pipeliner) error) ([]redis.Cmder, error) {
+	pipe := c.TxPipeline()
+	if err := fn(pipe); err != nil {
+		return nil, err
+	}
+	return pipe.Exec(ctx)
+}
+
 // ==================== Lua Scripting ====================
 
 // Eval executes a Lua script with keys and arguments.
@@ -529,4 +594,49 @@ func (c *Client) Watch(ctx context.Context, key string, txFunc func(tx *redis.Tx
 		return rdb.Watch(ctx, txFunc, key)
 	}
 	return fmt.Errorf("watch not supported in cluster mode")
+}
+
+// Transaction executes a function within an atomic transaction with automatic retries.
+// It combines Watch + TxPipeline for optimistic locking scenarios.
+// Example: decrementing a counter atomically
+//
+//	err := c.Transaction(ctx, "counter", 3, func(tx *redis.Tx, get func(key string) *redis.StringCmd) error {
+//	    val, _ := get("counter").Int()
+//	    tx.Set(ctx, "counter", val-1, 0)
+//	    return nil
+//	})
+func (c *Client) Transaction(ctx context.Context, key string, maxRetries int, txFunc func(tx *redis.Tx, get func(string) *redis.StringCmd) error) error {
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+
+	watchFunc := func(tx *redis.Tx) error {
+		// Create a getter function for reading current values
+		getFunc := func(k string) *redis.StringCmd {
+			return tx.Get(ctx, k)
+		}
+
+		// Execute user transaction function
+		if err := txFunc(tx, getFunc); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	lastErr := fmt.Errorf("transaction failed after %d retries", maxRetries)
+	for i := 0; i < maxRetries; i++ {
+		err := c.Watch(ctx, key, watchFunc)
+		if err == nil {
+			return nil // Success
+		}
+		// Check if it's a watch error (optimistic lock conflict)
+		if err == redis.TxFailedErr {
+			lastErr = err
+			continue // Retry
+		}
+		return err // Other errors, return immediately
+	}
+
+	return lastErr
 }
