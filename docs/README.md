@@ -1,20 +1,19 @@
-# Database Client Package Documentation
+# Database Module Documentation
 
 ## Overview
 
-The `pkg/db` package provides a comprehensive, production-ready database client solution for Go applications. It supports multiple databases with advanced features including connection pooling, read-write splitting, circuit breaker patterns, slow query logging, and comprehensive metrics collection.
+This document focuses on the `pkg/db` module in `github.com/alldev-run/golang-gin-rpc`.
 
-## Supported Databases
+`pkg/db` provides reusable database access components for Go services, including client factory, connection pooling extensions, read-write split helpers, ORM builder, migration utilities, and related observability helpers.
+
+## Supported Databases (`pkg/db`)
 
 | Database | Package | Type |
 |----------|---------|------|
-| MySQL | `pkg/mysql` | SQL |
-| PostgreSQL | `pkg/postgres` | SQL |
-| Redis | `pkg/redis` | Key-Value |
-| ClickHouse | `pkg/clickhouse` | Column Store |
-| Elasticsearch | `pkg/elasticsearch` | Search Engine |
-| Memcached | `pkg/memcache` | Cache |
-| MongoDB | `pkg/mongodb` | Document Store |
+| MySQL | `pkg/db/mysql` | SQL |
+| PostgreSQL | `pkg/db/postgres` | SQL |
+| ClickHouse | `pkg/db/clickhouse` | Column Store |
+| MongoDB | `pkg/db/mongodb` | Document Store |
 
 ## Architecture
 

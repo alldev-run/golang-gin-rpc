@@ -1,65 +1,60 @@
 # github.com/alldev-run/golang-gin-rpc
  
- `github.com/alldev-run/golang-gin-rpc` 是一个基于 Go 的服务端项目骨架，集成了 HTTP、gRPC / JSON-RPC、数据库、缓存、服务发现、日志、链路追踪、消息队列和网关能力，适合作为微服务或 RPC 服务的基础框架。
+ `github.com/alldev-run/golang-gin-rpc` 是一个基于 Go 的服务端项目骨架，围绕 `internal`（应用编排）和 `pkg`（可复用能力）组织，适合作为 HTTP / RPC 服务的起步框架。
  
- ## 功能概览
- 
- - **HTTP 服务**
-   - 基于 Gin 的 Web 应用与路由注册
- - **RPC 服务**
-   - 支持 `gRPC` 和 `JSON-RPC`
- - **数据库支持**
-   - MySQL、PostgreSQL、MongoDB、ClickHouse、Elasticsearch
- - **缓存支持**
-   - Redis
- - **服务发现**
-   - 支持 `consul`、`etcd`、`zookeeper`、`static`
- - **日志系统**
-   - 基于 Zap 的结构化日志
-   - JSON 输出不会写入 ANSI 颜色码
-   - 自动化 HTTP 请求日志记录
-   - 配置化的日志行为控制
-   - 请求 ID 自动生成和追踪
-   - 网关日志配置入口：`api/http-gateway/config/config.yaml` 下 `logging.http_logging`
- - **链路追踪**
-   - 支持 Zipkin、Jaeger、OTLP
- - **WebSocket 多节点**
-   - 集群事件同步，支持 RabbitMQ / Kafka 消息总线
- - **消息队列**
-   - RabbitMQ、Kafka
- - **网关能力**
-   - 企业级多协议统一网关（HTTP/HTTPS、gRPC、JSON-RPC）
-   - 分布式追踪、负载均衡、服务发现
-   - 路由转发、健康检查、优雅关闭
- - **优雅关闭**
-   - 应用退出时统一执行资源回收与 tracer shutdown
+ ## 功能概览（按 `pkg` 模块）
+
+- **基础能力**
+  - `pkg/config`：统一配置加载与管理
+  - `pkg/logger`：结构化日志
+  - `pkg/errors`、`pkg/panicx`：错误与 panic 处理
+- **服务通信**
+  - `pkg/rpc`：`gRPC` / `JSON-RPC` 服务管理
+  - `pkg/gateway`：网关路由与转发
+  - `pkg/router`、`pkg/middleware`、`pkg/cors`：HTTP 路由与中间件
+  - `pkg/websocket`：WebSocket 服务
+- **数据与状态**
+  - `pkg/db`：数据库客户端、工厂与 `orm`
+  - `pkg/cache`：缓存抽象（含 `redis` / `memcache` 适配）
+  - `pkg/search`：搜索相关能力
+- **治理与可观测**
+  - `pkg/discovery`：服务发现（`consul`、`etcd`、`zookeeper`、`static`）
+  - `pkg/health`、`pkg/metrics`、`pkg/tracing`：健康检查、指标与链路追踪
+  - `pkg/loadbalancer`、`pkg/circuitbreaker`、`pkg/ratelimit`：流量治理能力
+- **安全与业务支撑**
+  - `pkg/auth`、`pkg/rbac`：认证与权限
+  - `pkg/requestid`、`pkg/response`、`pkg/status_code`：请求与响应辅助
+  - `pkg/messaging`、`pkg/audit`、`pkg/alert`：消息、审计与告警支持
+
+说明：以上是根目录 `pkg` 的主要模块分组，完整子目录以仓库实际代码为准。
  
  ## 项目结构
  
  ```text
  github.com/alldev-run/golang-gin-rpc/
- ├── configs/                  # 配置文件
- ├── internal/
- │   ├── app/                  # 应用启动与 HTTP Server 封装
- │   ├── bootstrap/            # 配置加载与模块初始化
- │   └── router/               # 路由注册
- ├── pkg/
- │   ├── auth/                 # 认证
- │   ├── cache/                # 缓存
- │   ├── config/               # 全局配置加载
- │   ├── db/                   # 数据库与客户端工厂
- │   ├── discovery/            # 服务发现
- │   ├── gateway/              # 网关
- │   ├── health/               # 健康检查
- │   ├── logger/               # 结构化日志
- │   ├── messaging/            # 消息队列
- │   ├── metrics/              # 指标
- │   ├── rpc/                  # RPC 服务管理
- │   └── tracing/              # 链路追踪
- ├── main.go                   # 主入口
- ├── start.sh                  # 启动脚本
- └── README.md                 # 项目说明
- ```
+├── configs/                  # 配置文件
+├── internal/
+│   ├── app/                  # 应用启动与 HTTP Server 封装
+│   ├── bootstrap/            # 配置加载与模块初始化
+│   └── router/               # 路由注册
+├── pkg/
+│   ├── auth/                 # 认证
+│   ├── cache/                # 缓存
+│   ├── config/               # 配置
+│   ├── db/                   # 数据库与 ORM
+│   ├── discovery/            # 服务发现
+│   ├── gateway/              # 网关
+│   ├── logger/               # 日志
+│   ├── messaging/            # 消息队列
+│   ├── middleware/           # HTTP 中间件
+│   ├── rpc/                  # RPC
+│   ├── tracing/              # 链路追踪
+│   ├── websocket/            # WebSocket
+│   └── ...                   # 其他通用组件（见 pkg 目录）
+├── main.go                   # 主入口
+├── start.sh                  # 启动脚本
+└── README.md                 # 项目说明
+```
  
  ## 启动流程
  
@@ -577,4 +572,4 @@ Apache License 2.0 - See `LICENSE` file for details.
  
  ## 总结
  
- `github.com/alldev-run/golang-gin-rpc` 现在已经不只是一个数据库示例项目，而是一个包含 HTTP、RPC、缓存、日志、tracing、服务发现和网关能力的 Go 服务端基础框架。
+ `github.com/alldev-run/golang-gin-rpc` 提供了以 `pkg` 为核心的可复用模块集合，可用于快速搭建 Go 的 HTTP / RPC 服务。
