@@ -656,6 +656,30 @@ func onPasswordChanged(userID string, store jwtx.Store) {
 5. **令牌过期**：合理设置访问令牌和刷新令牌的有效期
 6. **存储安全**：使用 Redis 等持久化存储时，确保存储后端的安全配置
 
+## 验证规则汇总
+
+| 校验项 | Access Token | Refresh Token |
+|---|---|---|
+| 加密解密 | 通过 Secret 生成 AES-256-GCM 密钥 | 同上 |
+| Token 类型 | 必须为 `"access"` | 必须为 `"refresh"` |
+| 有效期 | `ExpireAt > now` | `ExpireAt > now` |
+| Store 黑名单 | `blacklist:<token_id>` 不存在 | — |
+| Store Refresh 记录 | — | `refresh:<token_id>` 必须存在，使用后删除 |
+| 用户版本 | `user:version:<user_id>` 与 Claims.Version 一致 | — |
+
+## 错误速查
+
+| 错误信息 | 含义 |
+|---|---|
+| `missing token` | 请求未携带 Authorization Header |
+| `token expired` | Access Token 已超过 ExpireAt |
+| `token revoked` | Token 已被加入黑名单（Logout） |
+| `token invalid` | 用户版本已变更（RevokeUser） |
+| `invalid token type` | 用 Refresh Token 当 Access Token 使用 |
+| `invalid refresh token` | 用 Access Token 当 Refresh Token 使用 |
+| `refresh token expired` | Refresh Token 已超过 ExpireAt |
+| `refresh token invalid` | Refresh Token 不在 Store 中（已被使用或不存在） |
+
 ## 测试
 
 ```go
@@ -713,6 +737,21 @@ func TestTokenFlow(t *testing.T) {
     }
 }
 ```
+
+运行测试：
+```bash
+go test ./pkg/auth/jwtx/... -v
+```
+
+测试覆盖：
+- Token 生成与验证
+- 过期判定
+- 黑名单注销
+- 用户版本失效
+- Refresh Token 轮转
+- 并发安全
+- 多 Manager 隔离
+- 加解密正确性
 
 ## 常见问题
 
