@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -59,18 +60,18 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 	if boot == nil {
 		return fmt.Errorf("bootstrap instance is nil")
 	}
-	
+
 	data, err := os.ReadFile(dbConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to read database config file: %w", err)
 	}
-	
+
 	// Parse raw database config to handle nested structure
 	var rawDBConfigs map[string]interface{}
 	if err := yaml.Unmarshal(data, &rawDBConfigs); err != nil {
 		return fmt.Errorf("failed to parse database config: %w", err)
 	}
-	
+
 	// Convert to framework format
 	dbConfigs := make(map[string]config.DBConfig)
 	for name, rawConfig := range rawDBConfigs {
@@ -78,7 +79,7 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 			dbConfig := config.DBConfig{
 				Enabled: true,
 			}
-			
+
 			// Handle nested mysql structure (project format)
 			if mysqlConfig, exists := configMap["mysql"]; exists {
 				if mysqlMap, ok := mysqlConfig.(map[string]interface{}); ok {
@@ -109,6 +110,18 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 					if charset, ok := mysqlMap["charset"].(string); ok {
 						dbConfig.SSLMode = charset // Use charset as ssl_mode for MySQL
 					}
+					// SQL logging configuration
+					if logEnabled, ok := mysqlMap["log_enabled"].(bool); ok {
+						dbConfig.LogEnabled = logEnabled
+					}
+					if logLevel, ok := mysqlMap["log_level"].(string); ok {
+						dbConfig.LogLevel = logLevel
+					}
+					if slowQueryThresholdStr, ok := mysqlMap["slow_query_threshold"].(string); ok {
+						if duration, err := time.ParseDuration(slowQueryThresholdStr); err == nil {
+							dbConfig.SlowQueryThreshold = int(duration.Milliseconds())
+						}
+					}
 				}
 			} else {
 				// Handle flat format (framework standard)
@@ -137,7 +150,7 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 					dbConfig.Password = password
 				}
 			}
-			
+
 			// Set driver based on name or explicit type
 			if dbType, exists := configMap["type"]; exists {
 				if typeStr, ok := dbType.(string); ok {
@@ -150,11 +163,11 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 					dbConfig.Driver = "postgres"
 				}
 			}
-			
+
 			dbConfigs[name] = dbConfig
 		}
 	}
-	
+
 	// Update bootstrap config with database settings
 	return boot.UpdateDatabaseConfig(dbConfigs)
 }
