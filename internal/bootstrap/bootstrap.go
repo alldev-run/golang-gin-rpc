@@ -192,7 +192,49 @@ func (b *Bootstrap) InitializeDatabases() error {
 
 	// Create database logger if service logging is configured
 	var databaseLogger *zap.Logger
-	if b.config.Logger.ServiceLogging.Enabled {
+
+	// Try logging.service_logging.components first (user's config format)
+	if b.config.Logger.Logging.ServiceLogging.Enabled {
+		if dbConfig, exists := b.config.Logger.Logging.ServiceLogging.Components["database"]; exists {
+			serviceLoggerConfig := logger.ServiceLoggerConfig{
+				ServiceName:         "database",
+				BaseDir:             dbConfig.BaseDir,
+				EnableDateFolder:    b.config.Logger.Logging.ServiceLogging.EnableDateFolders,
+				SeparateByLevel:     dbConfig.SeparateByLevel,
+				InheritGlobalConfig: b.config.Logger.Logging.ServiceLogging.InheritGlobalConfig,
+			}
+
+			// Apply override config
+			if dbConfig.OverrideConfig.Level != "" {
+				serviceLoggerConfig.OverrideConfig.Level = logger.LogLevel(dbConfig.OverrideConfig.Level)
+			}
+			if dbConfig.OverrideConfig.Format != "" {
+				serviceLoggerConfig.OverrideConfig.Format = logger.LogFormat(dbConfig.OverrideConfig.Format)
+			}
+			if dbConfig.OverrideConfig.MaxSize > 0 {
+				serviceLoggerConfig.OverrideConfig.MaxSize = dbConfig.OverrideConfig.MaxSize
+			}
+			if dbConfig.OverrideConfig.MaxBackups > 0 {
+				serviceLoggerConfig.OverrideConfig.MaxBackups = dbConfig.OverrideConfig.MaxBackups
+			}
+			if dbConfig.OverrideConfig.MaxAge > 0 {
+				serviceLoggerConfig.OverrideConfig.MaxAge = dbConfig.OverrideConfig.MaxAge
+			}
+			if dbConfig.OverrideConfig.Compress {
+				serviceLoggerConfig.OverrideConfig.Compress = dbConfig.OverrideConfig.Compress
+			}
+			if dbConfig.OverrideConfig.EnableCaller {
+				serviceLoggerConfig.OverrideConfig.EnableCaller = dbConfig.OverrideConfig.EnableCaller
+			}
+			if dbConfig.OverrideConfig.EnableStacktrace {
+				serviceLoggerConfig.OverrideConfig.EnableStacktrace = dbConfig.OverrideConfig.EnableStacktrace
+			}
+
+			databaseLogger = logger.GetServiceLoggerInstance("database", serviceLoggerConfig)
+			logger.Info("Database component logger created from logging.service_logging", logger.String("base_dir", dbConfig.BaseDir))
+		}
+	} else if b.config.Logger.ServiceLogging.Enabled {
+		// Fallback to logger.service_logging.components (framework config format)
 		if dbConfig, exists := b.config.Logger.ServiceLogging.Components["database"]; exists {
 			serviceLoggerConfig := logger.ServiceLoggerConfig{
 				ServiceName:         "database",
@@ -229,7 +271,7 @@ func (b *Bootstrap) InitializeDatabases() error {
 			}
 
 			databaseLogger = logger.GetServiceLoggerInstance("database", serviceLoggerConfig)
-			logger.Info("Database component logger created", logger.String("base_dir", dbConfig.BaseDir))
+			logger.Info("Database component logger created from logger.service_logging", logger.String("base_dir", dbConfig.BaseDir))
 		}
 	}
 

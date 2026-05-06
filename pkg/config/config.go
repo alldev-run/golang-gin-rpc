@@ -316,6 +316,37 @@ type LoggerConfig struct {
 	Fields              map[string]string    `yaml:"fields" json:"fields"`
 	Sampling            SamplingConfig       `yaml:"sampling" json:"sampling"`
 	ServiceLogging      ServiceLoggingConfig `yaml:"service_logging" json:"service_logging"`
+	Logging             LoggingDetailConfig  `yaml:"logging" json:"logging"`
+}
+
+// LoggingDetailConfig detailed logging configuration (for logging key in YAML)
+type LoggingDetailConfig struct {
+	Level          string               `yaml:"level" json:"level"`
+	Format         string               `yaml:"format" json:"format"`
+	HTTPLogging    HTTPLoggingConfig    `yaml:"http_logging" json:"http_logging"`
+	ServiceLogging ServiceLoggingConfig `yaml:"service_logging" json:"service_logging"`
+}
+
+// HTTPLoggingConfig HTTP request logging configuration
+type HTTPLoggingConfig struct {
+	Enabled              bool               `yaml:"enabled" json:"enabled"`
+	LogRequestBody       bool               `yaml:"log_request_body" json:"log_request_body"`
+	LogResponseBody      bool               `yaml:"log_response_body" json:"log_response_body"`
+	MaxBodySize          int                `yaml:"max_body_size" json:"max_body_size"`
+	LogHeaders           bool               `yaml:"log_headers" json:"log_headers"`
+	SensitiveHeaders     []string           `yaml:"sensitive_headers" json:"sensitive_headers"`
+	SkipPaths            []string           `yaml:"skip_paths" json:"skip_paths"`
+	SlowRequestThreshold string             `yaml:"slow_request_threshold" json:"slow_request_threshold"`
+	EnableRequestID      bool               `yaml:"enable_request_id" json:"enable_request_id"`
+	RequestIDHeader      string             `yaml:"request_id_header" json:"request_id_header"`
+	LogLevelThresholds   LogLevelThresholds `yaml:"log_level_thresholds" json:"log_level_thresholds"`
+}
+
+// LogLevelThresholds log level thresholds configuration
+type LogLevelThresholds struct {
+	ErrorThreshold int `yaml:"error_threshold" json:"error_threshold"`
+	WarnThreshold  int `yaml:"warn_threshold" json:"warn_threshold"`
+	InfoThreshold  int `yaml:"info_threshold" json:"info_threshold"`
 }
 
 // AlertingConfig alerting configuration
