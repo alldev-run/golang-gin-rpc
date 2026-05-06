@@ -5,6 +5,7 @@ This package provides structured logging capabilities with support for service-s
 ## Features
 
 - **Service-Specific Logging**: Each service gets its own isolated log files
+- **Component-Specific Logging**: Framework components (e.g., database) can have their own log configuration
 - **Date-Based Organization**: Logs are automatically organized in date folders (YYYY-MM-DD)
 - **Level Separation**: Optional separate files for different log levels (debug, info, warn, error)
 - **File Rotation**: Built-in log rotation with size limits and retention policies
@@ -27,8 +28,15 @@ logs/
 ├── rpc/
 │   ├── 2026-03-24/
 │   └── 2026-03-25/
-└── websocket/
+├── websocket/
+│   ├── 2026-03-24/
+│   └── 2026-03-25/
+└── database/                         # Component-specific logs
     ├── 2026-03-24/
+    │   ├── database.debug.log
+    │   ├── database.info.log
+    │   ├── database.warn.log
+    │   └── database.error.log
     └── 2026-03-25/
 ```
 
@@ -81,6 +89,35 @@ serviceLogger.With(
 | `SeparateByLevel` | bool | false | Create separate files for log levels |
 | `InheritGlobalConfig` | bool | true | Inherit global logger settings |
 | `OverrideConfig` | Config | DefaultConfig() | Override specific settings |
+
+### Component-Specific Logging
+
+Framework components (like database) can have their own log configuration. This is configured in the `config.yaml` file under `logging.service_logging.components`:
+
+```yaml
+logging:
+  service_logging:
+    enabled: true
+    base_dir: "./logs"
+    enable_date_folders: true
+    separate_by_level: true
+    inherit_global_config: true
+    
+    # Component-specific logging configuration
+    components:
+      database:
+        base_dir: "./logs/database"
+        separate_by_level: true
+        override_config:
+          level: "debug"
+          max_size: 200
+          max_backups: 10
+          max_age: 30
+          enable_caller: true
+          enable_stacktrace: false
+```
+
+When the framework initializes database connections, it will automatically create a logger for the database component using this configuration and set it on the database client. SQL queries will then be logged to the specified directory.
 
 ### Environment-Specific Defaults
 
