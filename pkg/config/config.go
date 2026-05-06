@@ -123,17 +123,17 @@ type DatabaseConfig struct {
 
 // DBConfig single database configuration
 type DBConfig struct {
-	Enabled            bool   `yaml:"enabled" json:"enabled"`
-	Driver             string `yaml:"driver" json:"driver"`
-	Host               string `yaml:"host" json:"host"`
-	Port               int    `yaml:"port" json:"port"`
-	Database           string `yaml:"database" json:"database"`
-	Username           string `yaml:"username" json:"username"`
-	Password           string `yaml:"password" json:"password"`
-	SSLMode            string `yaml:"ssl_mode" json:"ssl_mode"`
-	LogEnabled         bool   `yaml:"log_enabled" json:"log_enabled"`
-	LogLevel           string `yaml:"log_level" json:"log_level"`
-	SlowQueryThreshold int    `yaml:"slow_query_threshold" json:"slow_query_threshold"`
+	Enabled            bool          `yaml:"enabled" json:"enabled"`
+	Driver             string        `yaml:"driver" json:"driver"`
+	Host               string        `yaml:"host" json:"host"`
+	Port               int           `yaml:"port" json:"port"`
+	Database           string        `yaml:"database" json:"database"`
+	Username           string        `yaml:"username" json:"username"`
+	Password           string        `yaml:"password" json:"password"`
+	SSLMode            string        `yaml:"ssl_mode" json:"ssl_mode"`
+	LogEnabled         bool          `yaml:"log_enabled" json:"log_enabled"`
+	LogLevel           string        `yaml:"log_level" json:"log_level"`
+	SlowQueryThreshold time.Duration `yaml:"slow_query_threshold" json:"slow_query_threshold"`
 }
 
 // DBPoolConfig database pool configuration
