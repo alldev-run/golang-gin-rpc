@@ -1007,8 +1007,56 @@ type User struct {
 
 ### 扫描单条记录
 
+#### 方式 1: 使用 QueryRow + StructScanRow（推荐）
+
 ```go
-// 扫描到结构体
+// 使用 QueryRow + StructScanRow 自动映射
+row := o.Select("users").
+    Columns("id", "name", "email", "age", "status", "created_at", "updated_at").
+    Eq("id", 1).
+    QueryRow(ctx)
+
+var user User
+err := orm.StructScanRow(row, &user)
+if err != nil {
+    if err == sql.ErrNoRows {
+        return nil // 未找到记录
+    }
+    return err
+}
+
+fmt.Printf("User: %+v\n", user)
+```
+
+#### 方式 2: 使用 Query + StructScan
+
+```go
+// 使用 Query + StructScan
+rows, err := o.Select("users").
+    Columns("id", "name", "email", "age", "status", "created_at", "updated_at").
+    Eq("id", 1).
+    Query(ctx)
+if err != nil {
+    return err
+}
+defer rows.Close()
+
+var user User
+err = orm.StructScan(rows, &user)
+if err != nil {
+    if err == sql.ErrNoRows {
+        return nil // 未找到记录
+    }
+    return err
+}
+
+fmt.Printf("User: %+v\n", user)
+```
+
+#### 方式 3: 手动 Scan（传统方式）
+
+```go
+// 手动 Scan（需要逐个指定字段）
 row := o.Select("users").
     Columns("id", "name", "email", "age", "status", "created_at", "updated_at").
     Eq("id", 1).
@@ -1022,6 +1070,14 @@ if err != nil {
 
 fmt.Printf("User: %+v\n", user)
 ```
+
+**对比说明**:
+
+| 方式 | 优点 | 缺点 | 适用场景 |
+|------|------|------|----------|
+| `QueryRow` + `StructScanRow` | 自动映射，简洁 | 需要额外函数调用 | 单行查询，推荐使用 |
+| `Query` + `StructScan` | 自动映射，标准 | 需要处理 rows.Close() | 单行或多行查询 |
+| 手动 `Scan` | 完全控制 | 需要逐个指定字段 | 特殊字段映射需求 |
 
 ### 扫描多条记录
 

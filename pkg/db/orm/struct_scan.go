@@ -74,6 +74,43 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 	return scanRowToStruct(columns, values, v)
 }
 
+// StructScanRow scans a single row from *sql.Row into a struct.
+// This is similar to StructScan but works with QueryRow instead of Query.
+func StructScanRow(row *sql.Row, dest interface{}) error {
+	v := reflect.ValueOf(dest)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return errors.New("dest must be a non-nil pointer to a struct")
+	}
+
+	v = v.Elem()
+	if v.Kind() != reflect.Struct {
+		return errors.New("dest must point to a struct")
+	}
+
+	// Get struct metadata to determine expected columns
+	meta := getStructMeta(v.Type())
+
+	// Prepare columns and values based on struct fields
+	columns := make([]string, 0, len(meta.fieldMap))
+	values := make([]interface{}, 0, len(meta.fieldMap))
+	valuePtrs := make([]interface{}, 0, len(meta.fieldMap))
+
+	for col := range meta.fieldMap {
+		columns = append(columns, col)
+		val := new(interface{})
+		values = append(values, val)
+		valuePtrs = append(valuePtrs, val)
+	}
+
+	// Scan the row
+	if err := row.Scan(valuePtrs...); err != nil {
+		return err
+	}
+
+	// Convert scanned values to struct
+	return scanRowToStruct(columns, values, v)
+}
+
 func StructScanAll(rows *sql.Rows, dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr || v.IsNil() {
@@ -162,14 +199,26 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 
 	fieldType := field.Type()
 
-	// 2. 快速路径：类型直接匹配
+	// 2. 处理指针类型字段
+	if field.Kind() == reflect.Ptr {
+		// 创建一个新的指针值
+		ptrValue := reflect.New(fieldType.Elem())
+		// 递归设置指针指向的值
+		if err := setFieldValue(ptrValue.Elem(), val); err != nil {
+			return err
+		}
+		field.Set(ptrValue)
+		return nil
+	}
+
+	// 3. 快速路径：类型直接匹配
 	valV := reflect.ValueOf(val)
 	if valV.Type().AssignableTo(fieldType) {
 		field.Set(valV)
 		return nil
 	}
 
-	// 3. 处理指针解引用（database/sql 有时返回 *interface{}）
+	// 4. 处理指针解引用（database/sql 有时返回 *interface{}）
 	if valV.Kind() == reflect.Ptr {
 		if valV.IsNil() {
 			field.Set(reflect.Zero(fieldType))
@@ -179,7 +228,7 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 		val = valV.Interface()
 	}
 
-	// 4. 根据目标字段类型进行逻辑转换
+	// 5. 根据目标字段类型进行逻辑转换
 	switch field.Kind() {
 	case reflect.String:
 		switch v := val.(type) {
