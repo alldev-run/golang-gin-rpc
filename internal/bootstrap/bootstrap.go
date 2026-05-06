@@ -30,6 +30,7 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
 	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
 	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/pkg/version"
 	"github.com/alldev-run/golang-gin-rpc/pkg/websocket"
 )
 
@@ -123,7 +124,8 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 		}
 	}
 
-	logger.Info("Configuration loaded successfully")
+	logger.Info("Framework version", logger.String("version", version.GetVersion()))
+	// logger.Info("Configuration loaded successfully")
 
 	boot := &Bootstrap{
 		config:           cfg,
