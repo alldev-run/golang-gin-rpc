@@ -177,17 +177,36 @@ func (sl *SQLLogger) LogQuery(query string, args []interface{}, duration time.Du
 	}
 
 	// Log based on level
-	if sl.level >= LogLevelInfo {
+	switch sl.level {
+	case LogLevelError:
+		if sl.logger != nil {
+			sl.logger.Error(logMsg)
+		} else {
+			logger.Errorf(logMsg)
+		}
+	case LogLevelWarn:
+		if sl.logger != nil {
+			sl.logger.Warn(logMsg)
+		} else {
+			logger.Warn(logMsg)
+		}
+	case LogLevelInfo:
 		if sl.logger != nil {
 			sl.logger.Info(logMsg)
 		} else {
 			logger.Info(logMsg)
 		}
-	} else if sl.level >= LogLevelDebug {
+	case LogLevelDebug, LogLevelTrace:
 		if sl.logger != nil {
 			sl.logger.Debug(logMsg)
 		} else {
 			logger.Debug(logMsg)
+		}
+	default:
+		if sl.logger != nil {
+			sl.logger.Info(logMsg)
+		} else {
+			logger.Info(logMsg)
 		}
 	}
 }
