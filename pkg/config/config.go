@@ -48,6 +48,9 @@ type GlobalConfig struct {
 	// Observability
 	Observability ObservabilityConfig `yaml:"observability" json:"observability"`
 
+	// Logger configuration (for service-level logging)
+	Logger LoggerConfig `yaml:"logger" json:"logger"`
+
 	// Security
 	Security SecurityConfig `yaml:"security" json:"security"`
 }
@@ -292,6 +295,27 @@ type CleanupConfig struct {
 	MaxAgeDays        int      `yaml:"max_age_days" json:"max_age_days"`
 	ExcludeComponents []string `yaml:"exclude_components" json:"exclude_components"`
 	CompressOld       bool     `yaml:"compress_old" json:"compress_old"`
+}
+
+// LoggerConfig logger configuration (for service-level logging)
+type LoggerConfig struct {
+	Level               string               `yaml:"level" json:"level"`
+	Env                 string               `yaml:"env" json:"env"`
+	LogPath             string               `yaml:"log_path" json:"log_path"`
+	Output              string               `yaml:"output" json:"output"`
+	Format              string               `yaml:"format" json:"format"`
+	EnableConsoleColors bool                 `yaml:"enable_console_colors" json:"enable_console_colors"`
+	EnableCaller        bool                 `yaml:"enable_caller" json:"enable_caller"`
+	EnableStacktrace    bool                 `yaml:"enable_stacktrace" json:"enable_stacktrace"`
+	TimeFormat          string               `yaml:"time_format" json:"time_format"`
+	MaxSize             int                  `yaml:"max_size" json:"max_size"`
+	MaxBackups          int                  `yaml:"max_backups" json:"max_backups"`
+	MaxAge              int                  `yaml:"max_age" json:"max_age"`
+	Compress            bool                 `yaml:"compress" json:"compress"`
+	LocalTime           bool                 `yaml:"local_time" json:"local_time"`
+	Fields              map[string]string    `yaml:"fields" json:"fields"`
+	Sampling            SamplingConfig       `yaml:"sampling" json:"sampling"`
+	ServiceLogging      ServiceLoggingConfig `yaml:"service_logging" json:"service_logging"`
 }
 
 // AlertingConfig alerting configuration

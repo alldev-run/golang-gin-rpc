@@ -192,14 +192,14 @@ func (b *Bootstrap) InitializeDatabases() error {
 
 	// Create database logger if service logging is configured
 	var databaseLogger *zap.Logger
-	if b.config.Observability.Logging.ServiceLogging.Enabled {
-		if dbConfig, exists := b.config.Observability.Logging.ServiceLogging.Components["database"]; exists {
+	if b.config.Logger.ServiceLogging.Enabled {
+		if dbConfig, exists := b.config.Logger.ServiceLogging.Components["database"]; exists {
 			serviceLoggerConfig := logger.ServiceLoggerConfig{
 				ServiceName:         "database",
 				BaseDir:             dbConfig.BaseDir,
-				EnableDateFolder:    b.config.Observability.Logging.ServiceLogging.EnableDateFolders,
+				EnableDateFolder:    b.config.Logger.ServiceLogging.EnableDateFolders,
 				SeparateByLevel:     dbConfig.SeparateByLevel,
-				InheritGlobalConfig: b.config.Observability.Logging.ServiceLogging.InheritGlobalConfig,
+				InheritGlobalConfig: b.config.Logger.ServiceLogging.InheritGlobalConfig,
 			}
 
 			// Apply override config
