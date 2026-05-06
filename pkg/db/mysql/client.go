@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -27,6 +28,10 @@ type Config struct {
 	MaxIdleConns    int           `yaml:"max_idle_conns" json:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime" json:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `yaml:"conn_max_idle_time" json:"conn_max_idle_time"`
+	// Logging configuration
+	LogEnabled         bool          `yaml:"log_enabled" json:"log_enabled"`
+	LogLevel           string        `yaml:"log_level" json:"log_level"` // error, warn, info, debug, trace
+	SlowQueryThreshold time.Duration `yaml:"slow_query_threshold" json:"slow_query_threshold"`
 }
 
 // DefaultConfig returns default MySQL configuration.
@@ -47,11 +52,113 @@ type Client struct {
 	db                  *sql.DB
 	config              Config
 	defaultVersionField string
+	sqlLogger           *SQLLogger
 }
 
 var ErrClientNotInitialized = errors.New("mysql client is nil or uninitialized")
 
 var mysqlIdentifierPartPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+
+// SQLLogger provides configurable logging for SQL operations.
+type SQLLogger struct {
+	level              LogLevel
+	slowQueryThreshold time.Duration
+}
+
+// LogLevel represents the logging level.
+type LogLevel int
+
+const (
+	LogLevelError LogLevel = iota
+	LogLevelWarn
+	LogLevelInfo
+	LogLevelDebug
+	LogLevelTrace
+)
+
+// String returns the string representation of the log level.
+func (l LogLevel) String() string {
+	switch l {
+	case LogLevelError:
+		return "ERROR"
+	case LogLevelWarn:
+		return "WARN"
+	case LogLevelInfo:
+		return "INFO"
+	case LogLevelDebug:
+		return "DEBUG"
+	case LogLevelTrace:
+		return "TRACE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// parseLogLevel parses log level from string.
+func parseLogLevel(level string) LogLevel {
+	switch strings.ToLower(level) {
+	case "error":
+		return LogLevelError
+	case "warn":
+		return LogLevelWarn
+	case "info":
+		return LogLevelInfo
+	case "debug":
+		return LogLevelDebug
+	case "trace":
+		return LogLevelTrace
+	default:
+		return LogLevelInfo
+	}
+}
+
+// NewSQLLogger creates a new SQL logger with specific level and threshold.
+func NewSQLLogger(level string, threshold time.Duration) *SQLLogger {
+	return &SQLLogger{
+		level:              parseLogLevel(level),
+		slowQueryThreshold: threshold,
+	}
+}
+
+// LogQuery logs a query execution.
+func (sl *SQLLogger) LogQuery(query string, args []interface{}, duration time.Duration, err error) {
+	if sl.level < LogLevelInfo {
+		return
+	}
+
+	msg := "SQL query executed"
+	if err != nil {
+		msg = "SQL query failed"
+	} else if duration > sl.slowQueryThreshold {
+		msg = "Slow SQL query detected"
+	}
+
+	// Build log message with key details
+	logMsg := msg +
+		" | query: " + query +
+		" | duration: " + duration.String()
+
+	if len(args) > 0 {
+		logMsg += " | args: " + fmt.Sprintf("%v", args)
+	}
+
+	if err != nil {
+		logMsg += " | error: " + err.Error()
+		logger.Errorf(logMsg)
+		return
+	}
+
+	// Check for slow queries
+	if duration > sl.slowQueryThreshold {
+		logMsg += " | threshold: " + sl.slowQueryThreshold.String()
+		logger.Warn(logMsg)
+		return
+	}
+
+	if sl.level >= LogLevelInfo {
+		logger.Info(logMsg)
+	}
+}
 
 func quoteIdentifier(identifier string) (string, error) {
 	identifier = strings.TrimSpace(identifier)
@@ -137,11 +244,18 @@ func New(config Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to ping mysql: %w", err)
 	}
 
-	return &Client{
+	client := &Client{
 		db:                  db,
 		config:              config,
 		defaultVersionField: "version",
-	}, nil
+	}
+
+	// Initialize SQL logger if enabled
+	if config.LogEnabled {
+		client.sqlLogger = NewSQLLogger(config.LogLevel, config.SlowQueryThreshold)
+	}
+
+	return client, nil
 }
 
 // DB returns the underlying sql.DB instance.
@@ -178,7 +292,15 @@ func (c *Client) Query(ctx context.Context, query string, args ...any) (*sql.Row
 	if err := c.ensureDB(); err != nil {
 		return nil, err
 	}
-	return c.db.QueryContext(ctx, query, args...)
+	start := time.Now()
+	rows, err := c.db.QueryContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	if c.sqlLogger != nil {
+		c.sqlLogger.LogQuery(query, args, duration, err)
+	}
+
+	return rows, err
 }
 
 // QueryRow executes a query that returns a single row.
@@ -186,7 +308,15 @@ func (c *Client) QueryRow(ctx context.Context, query string, args ...any) *sql.R
 	if err := c.ensureDB(); err != nil {
 		return &sql.Row{}
 	}
-	return c.db.QueryRowContext(ctx, query, args...)
+	start := time.Now()
+	row := c.db.QueryRowContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	if c.sqlLogger != nil {
+		c.sqlLogger.LogQuery(query, args, duration, nil)
+	}
+
+	return row
 }
 
 // Exec executes a query without returning rows (INSERT, UPDATE, DELETE).
@@ -194,7 +324,15 @@ func (c *Client) Exec(ctx context.Context, query string, args ...any) (sql.Resul
 	if err := c.ensureDB(); err != nil {
 		return nil, err
 	}
-	return c.db.ExecContext(ctx, query, args...)
+	start := time.Now()
+	result, err := c.db.ExecContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	if c.sqlLogger != nil {
+		c.sqlLogger.LogQuery(query, args, duration, err)
+	}
+
+	return result, err
 }
 
 // InsertGetID executes an INSERT statement and returns the last inserted ID.

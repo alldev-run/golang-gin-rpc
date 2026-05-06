@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -69,6 +70,29 @@ func TestConfigStruct(t *testing.T) {
 	}
 }
 
+func TestConfigWithLogging(t *testing.T) {
+	cfg := Config{
+		Host:               "localhost",
+		Port:               3306,
+		Database:           "testdb",
+		Username:           "testuser",
+		Password:           "testpass",
+		LogEnabled:         true,
+		LogLevel:           "debug",
+		SlowQueryThreshold: 200 * time.Millisecond,
+	}
+
+	if !cfg.LogEnabled {
+		t.Error("LogEnabled should be true")
+	}
+	if cfg.LogLevel != "debug" {
+		t.Errorf("LogLevel = %v, want debug", cfg.LogLevel)
+	}
+	if cfg.SlowQueryThreshold != 200*time.Millisecond {
+		t.Errorf("SlowQueryThreshold = %v, want 200ms", cfg.SlowQueryThreshold)
+	}
+}
+
 // TestNewWithInvalidDSN tests connection with invalid parameters
 // This should fail but validates our error handling
 func TestNewWithInvalidHost(t *testing.T) {
@@ -106,6 +130,87 @@ func TestClientMethods(t *testing.T) {
 	var _ func(context.Context, string, string, interface{}, string, interface{}) (int64, error) = client.SetFieldByID
 
 	t.Log("Client methods compile successfully")
+}
+
+func TestParseLogLevel(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected LogLevel
+	}{
+		{"error", LogLevelError},
+		{"ERROR", LogLevelError},
+		{"Error", LogLevelError},
+		{"warn", LogLevelWarn},
+		{"WARN", LogLevelWarn},
+		{"info", LogLevelInfo},
+		{"INFO", LogLevelInfo},
+		{"debug", LogLevelDebug},
+		{"DEBUG", LogLevelDebug},
+		{"trace", LogLevelTrace},
+		{"TRACE", LogLevelTrace},
+		{"invalid", LogLevelInfo}, // default
+		{"", LogLevelInfo},        // default
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := parseLogLevel(tt.input)
+			if result != tt.expected {
+				t.Errorf("parseLogLevel(%q) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLogLevelString(t *testing.T) {
+	tests := []struct {
+		level    LogLevel
+		expected string
+	}{
+		{LogLevelError, "ERROR"},
+		{LogLevelWarn, "WARN"},
+		{LogLevelInfo, "INFO"},
+		{LogLevelDebug, "DEBUG"},
+		{LogLevelTrace, "TRACE"},
+		{LogLevel(99), "UNKNOWN"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := tt.level.String()
+			if result != tt.expected {
+				t.Errorf("LogLevel(%v).String() = %q, want %q", tt.level, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNewSQLLogger(t *testing.T) {
+	logger := NewSQLLogger("info", 100*time.Millisecond)
+	if logger == nil {
+		t.Fatal("NewSQLLogger returned nil")
+	}
+	if logger.level != LogLevelInfo {
+		t.Errorf("logger.level = %v, want LogLevelInfo", logger.level)
+	}
+	if logger.slowQueryThreshold != 100*time.Millisecond {
+		t.Errorf("logger.slowQueryThreshold = %v, want 100ms", logger.slowQueryThreshold)
+	}
+}
+
+func TestSQLLoggerLogQuery(t *testing.T) {
+	// Test with info level (should log)
+	logger := NewSQLLogger("info", 100*time.Millisecond)
+
+	// This test verifies the logger doesn't panic
+	// Actual log output is handled by the logger package
+	logger.LogQuery("SELECT * FROM users", []interface{}{1, 2}, 50*time.Millisecond, nil)
+	logger.LogQuery("SELECT * FROM users", []interface{}{1, 2}, 150*time.Millisecond, nil) // slow query
+	logger.LogQuery("SELECT * FROM users", []interface{}{1, 2}, 50*time.Millisecond, errors.New("test error"))
+
+	// Test with error level (should not log info queries)
+	errorLogger := NewSQLLogger("error", 100*time.Millisecond)
+	errorLogger.LogQuery("SELECT * FROM users", []interface{}{1, 2}, 50*time.Millisecond, nil)
 }
 
 func TestWhereBuilder(t *testing.T) {
