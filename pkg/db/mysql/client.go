@@ -122,10 +122,6 @@ func NewSQLLogger(level string, threshold time.Duration) *SQLLogger {
 
 // LogQuery logs a query execution.
 func (sl *SQLLogger) LogQuery(query string, args []interface{}, duration time.Duration, err error) {
-	if sl.level < LogLevelInfo {
-		return
-	}
-
 	msg := "SQL query executed"
 	if err != nil {
 		msg = "SQL query failed"
@@ -155,8 +151,11 @@ func (sl *SQLLogger) LogQuery(query string, args []interface{}, duration time.Du
 		return
 	}
 
+	// Log based on level
 	if sl.level >= LogLevelInfo {
 		logger.Info(logMsg)
+	} else if sl.level >= LogLevelDebug {
+		logger.Debug(logMsg)
 	}
 }
 
