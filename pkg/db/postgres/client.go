@@ -186,6 +186,9 @@ func New(config Config) (*Client, error) {
 	// Initialize SQL logger if enabled
 	if config.LogEnabled {
 		client.sqlLogger = NewSQLLogger(config.LogLevel, config.SlowQueryThreshold)
+		logger.Info("SQL logger initialized",
+			logger.String("level", config.LogLevel),
+			logger.String("threshold", config.SlowQueryThreshold.String()))
 	}
 
 	return client, nil
