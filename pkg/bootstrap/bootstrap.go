@@ -120,7 +120,7 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 					}
 					if slowQueryThresholdStr, ok := mysqlMap["slow_query_threshold"].(string); ok {
 						if duration, err := time.ParseDuration(slowQueryThresholdStr); err == nil {
-							dbConfig.SlowQueryThreshold = int(duration.Milliseconds())
+							dbConfig.SlowQueryThreshold = duration
 						}
 					}
 					// Debug log to verify config parsing
@@ -128,7 +128,7 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 						logger.String("name", name),
 						logger.Bool("log_enabled", dbConfig.LogEnabled),
 						logger.String("log_level", dbConfig.LogLevel),
-						logger.Int("slow_query_threshold", dbConfig.SlowQueryThreshold))
+						logger.String("slow_query_threshold", dbConfig.SlowQueryThreshold.String()))
 				}
 			} else {
 				// Handle flat format (framework standard)
