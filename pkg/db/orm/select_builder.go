@@ -10,8 +10,8 @@ import (
 )
 
 type cteClause struct {
-	name  string
-	query *SelectBuilder
+	name      string
+	query     *SelectBuilder
 	recursive bool
 }
 
@@ -155,15 +155,67 @@ type SelectBuilder struct {
 func NewSelectBuilder(db DB, table string) *SelectBuilder {
 	dialect := NewDefaultDialect()
 	return &SelectBuilder{
-		db:            db,
-		table:         table,
-		columns:       []string{"*"},
-		joins:         []Join{},
-		where:         NewWhereBuilder(dialect),
-		groupBy:       []string{},
-		having:        NewWhereBuilder(dialect),
-		dialect:       dialect,
-		appliedScopes: []string{}, // 初始化appliedScopes
+		db:      db,
+		table:   table,
+		columns: []string{"*"},
+		joins:   []Join{},
+		where:   NewWhereBuilder(dialect),
+		groupBy: []string{},
+		having:  NewWhereBuilder(dialect),
+		dialect: dialect,
+	}
+}
+
+// Clone creates a deep copy of the SelectBuilder.
+func (sb *SelectBuilder) Clone() *SelectBuilder {
+	copiedColumns := make([]string, len(sb.columns))
+	copy(copiedColumns, sb.columns)
+
+	copiedJoins := make([]Join, len(sb.joins))
+	copy(copiedJoins, sb.joins)
+
+	copiedTableArgs := make([]interface{}, len(sb.tableArgs))
+	copy(copiedTableArgs, sb.tableArgs)
+
+	copiedGroupBy := make([]string, len(sb.groupBy))
+	copy(copiedGroupBy, sb.groupBy)
+
+	copiedOrderBy := make([]string, len(sb.orderBy))
+	copy(copiedOrderBy, sb.orderBy)
+
+	copiedCtes := make([]cteClause, len(sb.ctes))
+	for i, cte := range sb.ctes {
+		copiedCtes[i] = cteClause{
+			name:      cte.name,
+			query:     cte.query.Clone(),
+			recursive: cte.recursive,
+		}
+	}
+
+	copiedUnions := make([]unionClause, len(sb.unions))
+	copy(copiedUnions, sb.unions)
+
+	copiedAppliedScopes := make([]string, len(sb.appliedScopes))
+	copy(copiedAppliedScopes, sb.appliedScopes)
+
+	return &SelectBuilder{
+		db:            sb.db,
+		table:         sb.table,
+		rawTable:      sb.rawTable,
+		tableArgs:     copiedTableArgs,
+		columns:       copiedColumns,
+		joins:         copiedJoins,
+		where:         sb.where.Clone(),
+		groupBy:       copiedGroupBy,
+		having:        sb.having.Clone(),
+		orderBy:       copiedOrderBy,
+		limit:         sb.limit,
+		offset:        sb.offset,
+		lockMode:      sb.lockMode,
+		dialect:       sb.dialect,
+		ctes:          copiedCtes,
+		unions:        copiedUnions,
+		appliedScopes: copiedAppliedScopes,
 	}
 }
 
@@ -689,9 +741,9 @@ func (sb *SelectBuilder) buildSelectCore() (string, []interface{}) {
 			tableExpr = sb.dialect.QuoteIdentifier(join.Table)
 		}
 		cond := replaceConditionPlaceholders(join.Condition, sb.dialect, len(allArgs))
-		query += fmt.Sprintf(" %s JOIN %s ON %s", 
-			join.Type, 
-			tableExpr, 
+		query += fmt.Sprintf(" %s JOIN %s ON %s",
+			join.Type,
+			tableExpr,
 			cond)
 		allArgs = append(allArgs, join.Args...)
 	}
@@ -780,69 +832,49 @@ func (sb *SelectBuilder) QueryRowTx(ctx context.Context, tx *sql.Tx) *sql.Row {
 
 // Count builds a COUNT query.
 func (sb *SelectBuilder) Count() *SelectBuilder {
-	sb.columns = []string{"COUNT(*)"}
-	return sb
+	cloned := sb.Clone()
+	cloned.columns = []string{"COUNT(*)"}
+	return cloned
 }
 
 // CountColumn builds a COUNT(column) query.
 func (sb *SelectBuilder) CountColumn(column string) *SelectBuilder {
-	quotedColumn := sb.dialect.QuoteIdentifier(column)
-	sb.columns = []string{fmt.Sprintf("COUNT(%s)", quotedColumn)}
-	return sb
+	cloned := sb.Clone()
+	quotedColumn := cloned.dialect.QuoteIdentifier(column)
+	cloned.columns = []string{fmt.Sprintf("COUNT(%s)", quotedColumn)}
+	return cloned
 }
 
 // Sum builds a SUM(column) query.
 func (sb *SelectBuilder) Sum(column string) *SelectBuilder {
-	quotedColumn := sb.dialect.QuoteIdentifier(column)
-	sb.columns = []string{fmt.Sprintf("SUM(%s)", quotedColumn)}
-	return sb
+	cloned := sb.Clone()
+	quotedColumn := cloned.dialect.QuoteIdentifier(column)
+	cloned.columns = []string{fmt.Sprintf("SUM(%s)", quotedColumn)}
+	return cloned
 }
 
 // Avg builds an AVG(column) query.
 func (sb *SelectBuilder) Avg(column string) *SelectBuilder {
-	quotedColumn := sb.dialect.QuoteIdentifier(column)
-	sb.columns = []string{fmt.Sprintf("AVG(%s)", quotedColumn)}
-	return sb
+	cloned := sb.Clone()
+	quotedColumn := cloned.dialect.QuoteIdentifier(column)
+	cloned.columns = []string{fmt.Sprintf("AVG(%s)", quotedColumn)}
+	return cloned
 }
 
 // Max builds a MAX(column) query.
 func (sb *SelectBuilder) Max(column string) *SelectBuilder {
-	quotedColumn := sb.dialect.QuoteIdentifier(column)
-	sb.columns = []string{fmt.Sprintf("MAX(%s)", quotedColumn)}
-	return sb
+	cloned := sb.Clone()
+	quotedColumn := cloned.dialect.QuoteIdentifier(column)
+	cloned.columns = []string{fmt.Sprintf("MAX(%s)", quotedColumn)}
+	return cloned
 }
 
 // Min builds a MIN(column) query.
 func (sb *SelectBuilder) Min(column string) *SelectBuilder {
-	quotedColumn := sb.dialect.QuoteIdentifier(column)
-	sb.columns = []string{fmt.Sprintf("MIN(%s)", quotedColumn)}
-	return sb
-}
-
-// Clone creates a copy of the SelectBuilder.
-func (sb *SelectBuilder) Clone() *SelectBuilder {
-	clone := &SelectBuilder{
-		db:      sb.db,
-		table:   sb.table,
-		columns: make([]string, len(sb.columns)),
-		joins:   make([]Join, len(sb.joins)),
-		groupBy: make([]string, len(sb.groupBy)),
-		orderBy: make([]string, len(sb.orderBy)),
-		limit:   sb.limit,
-		offset:  sb.offset,
-		lockMode: sb.lockMode,
-		dialect: sb.dialect,
-	}
-	
-	copy(clone.columns, sb.columns)
-	copy(clone.joins, sb.joins)
-	copy(clone.groupBy, sb.groupBy)
-	copy(clone.orderBy, sb.orderBy)
-	
-	clone.where = sb.where.Clone()
-	clone.having = sb.having.Clone()
-	
-	return clone
+	cloned := sb.Clone()
+	quotedColumn := cloned.dialect.QuoteIdentifier(column)
+	cloned.columns = []string{fmt.Sprintf("MIN(%s)", quotedColumn)}
+	return cloned
 }
 
 // Reset clears all query conditions except table and dialect.
