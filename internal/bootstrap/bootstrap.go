@@ -247,9 +247,12 @@ func (b *Bootstrap) initializeServiceDatabases(factory *db.Factory) error {
 
 	// Check for service database config file in order of preference
 	serviceDBConfigPaths := []string{
-		"database.yml",         // Simplified config (MySQL only)
-		"configs/database.yml", // Full service config
-		"database.service.yml", // Explicit service config
+		"database.yml",          // Simplified config (MySQL only)
+		"database.yaml",         // Simplified config (MySQL only) - .yaml extension
+		"configs/database.yml",  // Full service config
+		"configs/database.yaml", // Full service config - .yaml extension
+		"database.service.yml",  // Explicit service config
+		"database.service.yaml", // Explicit service config - .yaml extension
 	}
 
 	var serviceDBData []byte

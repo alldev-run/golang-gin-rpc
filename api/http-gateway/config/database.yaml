@@ -14,6 +14,9 @@ mysql_primary:
     max_open_conns: 25
     max_idle_conns: 10
     conn_max_lifetime: "1h"
+    log_enabled: true
+    log_level: debug
+    slow_query_threshold: 0.1ms
 
 # Redis Configuration - Single Instance Mode (Default)
 redis_cache:
