@@ -70,6 +70,8 @@ type Bootstrap struct {
 
 	depMu        sync.RWMutex
 	dependencies map[string]interface{}
+
+	serviceDBConfigLoaded bool
 }
 
 // NewBootstrap creates a new bootstrap instance
@@ -186,9 +188,8 @@ func (b *Bootstrap) InitializeDatabases() error {
 	factory := db.NewFactory()
 
 	// Check if database configuration has been loaded via LoadDatabaseConfig
-	// If Primary config has logging enabled, it means it was loaded from service config
-	if b.config.Database.Primary.LogEnabled || b.config.Database.Replica.LogEnabled {
-		logger.Info("Using pre-loaded database configuration with SQL logging enabled")
+	if b.serviceDBConfigLoaded {
+		logger.Info("Using pre-loaded database configuration")
 		configs := map[string]config.DBConfig{
 			"primary": b.config.Database.Primary,
 			"replica": b.config.Database.Replica,
@@ -1240,6 +1241,9 @@ func (b *Bootstrap) UpdateDatabaseConfig(dbConfigs map[string]config.DBConfig) e
 	if replicaConfig, exists := dbConfigs["mysql_replica"]; exists {
 		b.config.Database.Replica = replicaConfig
 	}
+
+	// Mark that service database config has been loaded
+	b.serviceDBConfigLoaded = true
 
 	logger.Info("Database configuration updated")
 	return nil
