@@ -10,14 +10,18 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	
+
 	"github.com/alldev-run/golang-gin-rpc/pkg/auth"
+	"github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
 	"github.com/alldev-run/golang-gin-rpc/pkg/cache"
 	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
+	cacheredis "github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
+	mysqlpkg "github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
+	pg "github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
 	"github.com/alldev-run/golang-gin-rpc/pkg/discovery"
 	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 	"github.com/alldev-run/golang-gin-rpc/pkg/health"
@@ -26,26 +30,22 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
 	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 	"github.com/alldev-run/golang-gin-rpc/pkg/websocket"
-	"github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
-	cacheredis "github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
-	pg "github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
-	mysqlpkg "github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
 )
 
 // LoadConfig loads configuration from file using pkg/config
 func LoadConfig(configPath string) (*config.GlobalConfig, error) {
 	loader := config.NewLoader()
-	
+
 	// Set defaults first
 	loader.Set(config.DefaultConfig())
-	
+
 	// Load from file if exists
 	if configPath != "" {
 		if err := loader.Load(configPath); err != nil {
 			return nil, fmt.Errorf("failed to load config: %w", err)
 		}
 	}
-	
+
 	return loader.Get(), nil
 }
 
@@ -63,7 +63,7 @@ type Bootstrap struct {
 	tracer           *tracing.Tracer
 	gateway          *gateway.Gateway
 
-	serviceMu       sync.RWMutex
+	serviceMu        sync.RWMutex
 	serviceFactories map[string]ServiceFactory
 	managedServices  map[string]ManagedService
 	serviceOrder     []string
@@ -82,7 +82,7 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 
 	// Initialize logger
 	loggerConfig := logger.DefaultConfig()
-	
+
 	// Override with config file values
 	if cfg.Observability.Logging.Level != "" {
 		loggerConfig.Level = logger.LogLevel(cfg.Observability.Logging.Level)
@@ -96,10 +96,10 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 	if cfg.Observability.Logging.FilePath != "" {
 		loggerConfig.LogPath = cfg.Observability.Logging.FilePath
 	}
-	
+
 	// Boolean flags
 	loggerConfig.Compress = cfg.Observability.Logging.MaxBackups > 0
-	
+
 	// Numeric values
 	if cfg.Observability.Logging.MaxSize > 0 {
 		loggerConfig.MaxSize = cfg.Observability.Logging.MaxSize
@@ -110,7 +110,7 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 	if cfg.Observability.Logging.MaxAge > 0 {
 		loggerConfig.MaxAge = cfg.Observability.Logging.MaxAge
 	}
-	
+
 	logger.Init(loggerConfig)
 
 	// Ensure log directory exists
@@ -184,17 +184,17 @@ func (b *Bootstrap) InitializeAll() error {
 // InitializeDatabases initializes all database connections
 func (b *Bootstrap) InitializeDatabases() error {
 	factory := db.NewFactory()
-	
+
 	// First, try to load service-level database configurations
 	if err := b.initializeServiceDatabases(factory); err != nil {
 		logger.Warn("Failed to initialize service-level databases, falling back to framework config", logger.Error(err))
-		
+
 		// Fallback to framework database configuration
 		if !b.config.Database.Primary.Enabled && !b.config.Database.Replica.Enabled {
 			logger.Info("No database configuration found, skipping database initialization")
 			return nil
 		}
-		
+
 		configs := map[string]config.DBConfig{
 			"primary": b.config.Database.Primary,
 			"replica": b.config.Database.Replica,
@@ -244,17 +244,17 @@ func (b *Bootstrap) InitializeDatabases() error {
 func (b *Bootstrap) initializeServiceDatabases(factory *db.Factory) error {
 	// Try to read service-level database configuration from a separate file
 	// This supports the format used by external projects
-	
+
 	// Check for service database config file in order of preference
 	serviceDBConfigPaths := []string{
-		"database.yml",           // Simplified config (MySQL only)
-		"configs/database.yml",   // Full service config
-		"database.service.yml",  // Explicit service config
+		"database.yml",         // Simplified config (MySQL only)
+		"configs/database.yml", // Full service config
+		"database.service.yml", // Explicit service config
 	}
-	
+
 	var serviceDBData []byte
 	var serviceDBConfigPath string
-	
+
 	for _, path := range serviceDBConfigPaths {
 		if _, err := os.Stat(path); err == nil {
 			serviceDBConfigPath = path
@@ -266,28 +266,28 @@ func (b *Bootstrap) initializeServiceDatabases(factory *db.Factory) error {
 			break
 		}
 	}
-	
+
 	if serviceDBData == nil {
 		return fmt.Errorf("no service database configuration file found")
 	}
-	
+
 	var serviceDBConfigs map[string]interface{}
 	if err := yaml.Unmarshal(serviceDBData, &serviceDBConfigs); err != nil {
 		return fmt.Errorf("failed to parse service database config from %s: %w", serviceDBConfigPath, err)
 	}
-	
+
 	logger.Info("Service database configs found", logger.Int("count", len(serviceDBConfigs)))
 	for key := range serviceDBConfigs {
 		logger.Info("Processing service config", logger.String("key", key))
 	}
-	
+
 	// Process each service database configuration
 	for key, config := range serviceDBConfigs {
 		if err := b.processServiceDatabaseConfig(key, config, factory); err != nil {
 			return fmt.Errorf("failed to process service database config %s: %w", key, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -298,33 +298,33 @@ func (b *Bootstrap) processServiceDatabaseConfig(key string, config interface{},
 	if len(parts) < 2 {
 		return fmt.Errorf("invalid database config key format: %s", key)
 	}
-	
+
 	dbType := parts[0]
 	role := parts[1]
-	
+
 	// Special handling for Redis with role like "cache"
 	if dbType == "redis" && role == "cache" {
 		role = "primary" // Treat redis_cache as primary Redis instance
 	}
-	
+
 	// Convert config to map
 	configMap, ok := config.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("invalid database config format for %s", key)
 	}
-	
+
 	// Check if this is the expected database type
 	typeField, ok := configMap["type"].(string)
 	if !ok || typeField != dbType {
 		return fmt.Errorf("database type mismatch for %s: expected %s", key, dbType)
 	}
-	
+
 	// Extract database-specific configuration
 	dbSpecificConfig, ok := configMap[dbType].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("missing %s configuration in %s", dbType, key)
 	}
-	
+
 	// Create database client based on type
 	switch dbType {
 	case "mysql":
@@ -341,7 +341,7 @@ func (b *Bootstrap) processServiceDatabaseConfig(key string, config interface{},
 // createMySQLFromServiceConfig creates MySQL client from service configuration
 func (b *Bootstrap) createMySQLFromServiceConfig(role string, config map[string]interface{}, factory *db.Factory) error {
 	mysqlConfig := mysqlpkg.DefaultConfig()
-	
+
 	// Map configuration fields
 	if host, ok := config["host"].(string); ok {
 		mysqlConfig.Host = host
@@ -363,43 +363,56 @@ func (b *Bootstrap) createMySQLFromServiceConfig(role string, config map[string]
 	if charset, ok := config["charset"].(string); ok {
 		mysqlConfig.Charset = charset
 	}
-	
+
 	// Pool configuration
 	if maxOpenConns, ok := config["max_open_conns"].(int); ok {
 		mysqlConfig.MaxOpenConns = maxOpenConns
 	} else if maxOpenConnsFloat, ok := config["max_open_conns"].(float64); ok {
 		mysqlConfig.MaxOpenConns = int(maxOpenConnsFloat)
 	}
-	
+
 	if maxIdleConns, ok := config["max_idle_conns"].(int); ok {
 		mysqlConfig.MaxIdleConns = maxIdleConns
 	} else if maxIdleConnsFloat, ok := config["max_idle_conns"].(float64); ok {
 		mysqlConfig.MaxIdleConns = int(maxIdleConnsFloat)
 	}
-	
+
 	if connMaxLifetimeStr, ok := config["conn_max_lifetime"].(string); ok {
 		if duration, err := time.ParseDuration(connMaxLifetimeStr); err == nil {
 			mysqlConfig.ConnMaxLifetime = duration
 		}
 	}
-	
+
 	if connMaxIdleTimeStr, ok := config["conn_max_idle_time"].(string); ok {
 		if duration, err := time.ParseDuration(connMaxIdleTimeStr); err == nil {
 			mysqlConfig.ConnMaxIdleTime = duration
 		}
 	}
-	
+
+	// SQL logging configuration
+	if logEnabled, ok := config["log_enabled"].(bool); ok {
+		mysqlConfig.LogEnabled = logEnabled
+	}
+	if logLevel, ok := config["log_level"].(string); ok {
+		mysqlConfig.LogLevel = logLevel
+	}
+	if slowQueryThresholdStr, ok := config["slow_query_threshold"].(string); ok {
+		if duration, err := time.ParseDuration(slowQueryThresholdStr); err == nil {
+			mysqlConfig.SlowQueryThreshold = duration
+		}
+	}
+
 	// Create database client
 	dbConfig := db.Config{
-		Type:   db.TypeMySQL,
-		MySQL:  mysqlConfig,
+		Type:  db.TypeMySQL,
+		MySQL: mysqlConfig,
 	}
-	
+
 	client, err := factory.Create(dbConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create MySQL client for role %s: %w", role, err)
 	}
-	
+
 	// Test connection
 	ctx := context.Background()
 	if err := client.Ping(ctx); err != nil {
@@ -407,14 +420,14 @@ func (b *Bootstrap) createMySQLFromServiceConfig(role string, config map[string]
 	} else {
 		logger.Info("MySQL connected successfully", logger.String("role", role))
 	}
-	
+
 	return nil
 }
 
 // createPostgresFromServiceConfig creates PostgreSQL client from service configuration
 func (b *Bootstrap) createPostgresFromServiceConfig(role string, config map[string]interface{}, factory *db.Factory) error {
 	postgresConfig := pg.DefaultConfig()
-	
+
 	// Map configuration fields
 	if host, ok := config["host"].(string); ok {
 		postgresConfig.Host = host
@@ -436,44 +449,57 @@ func (b *Bootstrap) createPostgresFromServiceConfig(role string, config map[stri
 	if sslMode, ok := config["ssl_mode"].(string); ok {
 		postgresConfig.SSLMode = sslMode
 	}
-	
+
 	// Pool configuration
 	if maxOpenConns, ok := config["max_open_conns"].(int); ok {
 		postgresConfig.MaxOpenConns = maxOpenConns
 	} else if maxOpenConnsFloat, ok := config["max_open_conns"].(float64); ok {
 		postgresConfig.MaxOpenConns = int(maxOpenConnsFloat)
 	}
-	
+
 	if maxIdleConns, ok := config["max_idle_conns"].(int); ok {
 		postgresConfig.MaxIdleConns = maxIdleConns
 	} else if maxIdleConnsFloat, ok := config["max_idle_conns"].(float64); ok {
 		postgresConfig.MaxIdleConns = int(maxIdleConnsFloat)
 	}
-	
+
 	if connMaxLifetimeStr, ok := config["conn_max_lifetime"].(string); ok {
 		if duration, err := time.ParseDuration(connMaxLifetimeStr); err == nil {
 			postgresConfig.ConnMaxLifetime = duration
 		}
 	}
-	
+
 	if connMaxIdleTimeStr, ok := config["conn_max_idle_time"].(string); ok {
 		if duration, err := time.ParseDuration(connMaxIdleTimeStr); err == nil {
 			// PostgreSQL config doesn't have ConnMaxIdleTime field, skip for now
 			_ = duration
 		}
 	}
-	
+
+	// SQL logging configuration
+	if logEnabled, ok := config["log_enabled"].(bool); ok {
+		postgresConfig.LogEnabled = logEnabled
+	}
+	if logLevel, ok := config["log_level"].(string); ok {
+		postgresConfig.LogLevel = logLevel
+	}
+	if slowQueryThresholdStr, ok := config["slow_query_threshold"].(string); ok {
+		if duration, err := time.ParseDuration(slowQueryThresholdStr); err == nil {
+			postgresConfig.SlowQueryThreshold = duration
+		}
+	}
+
 	// Create database client
 	dbConfig := db.Config{
 		Type: db.TypePostgres,
 		PG:   postgresConfig,
 	}
-	
+
 	client, err := factory.Create(dbConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL client for role %s: %w", role, err)
 	}
-	
+
 	// Test connection
 	ctx := context.Background()
 	if err := client.Ping(ctx); err != nil {
@@ -481,14 +507,14 @@ func (b *Bootstrap) createPostgresFromServiceConfig(role string, config map[stri
 	} else {
 		logger.Info("PostgreSQL connected successfully", logger.String("role", role))
 	}
-	
+
 	return nil
 }
 
 // createRedisFromServiceConfig creates Redis client from service configuration
 func (b *Bootstrap) createRedisFromServiceConfig(role string, config map[string]interface{}, factory *db.Factory) error {
 	redisConfig := cacheredis.DefaultConfig()
-	
+
 	// Map configuration fields
 	if host, ok := config["host"].(string); ok {
 		redisConfig.Host = host
@@ -509,60 +535,60 @@ func (b *Bootstrap) createRedisFromServiceConfig(role string, config map[string]
 	if mode, ok := config["mode"].(string); ok {
 		redisConfig.Mode = redis.Mode(mode)
 	}
-	
+
 	if poolSize, ok := config["pool_size"].(int); ok {
 		redisConfig.PoolSize = poolSize
 	} else if poolSizeFloat, ok := config["pool_size"].(float64); ok {
 		redisConfig.PoolSize = int(poolSizeFloat)
 	}
-	
+
 	if minIdleConns, ok := config["min_idle_conns"].(int); ok {
 		redisConfig.MinIdleConns = minIdleConns
 	} else if minIdleConnsFloat, ok := config["min_idle_conns"].(float64); ok {
 		redisConfig.MinIdleConns = int(minIdleConnsFloat)
 	}
-	
+
 	if maxRetries, ok := config["max_retries"].(int); ok {
 		redisConfig.MaxRetries = maxRetries
 	} else if maxRetriesFloat, ok := config["max_retries"].(float64); ok {
 		redisConfig.MaxRetries = int(maxRetriesFloat)
 	}
-	
+
 	if dialTimeoutStr, ok := config["dial_timeout"].(string); ok {
 		if duration, err := time.ParseDuration(dialTimeoutStr); err == nil {
 			redisConfig.DialTimeout = duration
 		}
 	}
-	
+
 	if readTimeoutStr, ok := config["read_timeout"].(string); ok {
 		if duration, err := time.ParseDuration(readTimeoutStr); err == nil {
 			redisConfig.ReadTimeout = duration
 		}
 	}
-	
+
 	if writeTimeoutStr, ok := config["write_timeout"].(string); ok {
 		if duration, err := time.ParseDuration(writeTimeoutStr); err == nil {
 			redisConfig.WriteTimeout = duration
 		}
 	}
-	
+
 	if poolTimeoutStr, ok := config["pool_timeout"].(string); ok {
 		if duration, err := time.ParseDuration(poolTimeoutStr); err == nil {
 			redisConfig.PoolTimeout = duration
 		}
 	}
-	
+
 	// Create database client
 	dbConfig := db.Config{
 		Type:  db.TypeRedis,
 		Redis: redisConfig,
 	}
-	
+
 	client, err := factory.Create(dbConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create Redis client for role %s: %w", role, err)
 	}
-	
+
 	// Test connection
 	ctx := context.Background()
 	if err := client.Ping(ctx); err != nil {
@@ -570,7 +596,7 @@ func (b *Bootstrap) createRedisFromServiceConfig(role string, config map[string]
 	} else {
 		logger.Info("Redis connected successfully", logger.String("role", role))
 	}
-	
+
 	return nil
 }
 
@@ -820,8 +846,8 @@ func (b *Bootstrap) InitializeAuth() error {
 	authManager := auth.NewAuthManager(auth.AuthConfig{
 		Enabled: b.config.Security.JWT.Enabled,
 		JWT: jwtx.Config{
-			Secret:         b.config.Security.JWT.Secret,
-			AccessTokenTTL: b.config.Security.JWT.Expiration,
+			Secret:          b.config.Security.JWT.Secret,
+			AccessTokenTTL:  b.config.Security.JWT.Expiration,
 			RefreshTokenTTL: b.config.Security.JWT.Expiration * 7,
 		},
 	})
@@ -922,6 +948,16 @@ func buildDBConfig(dbConfig config.DBConfig, poolCfg config.DBPoolConfig) (db.Co
 		if poolCfg.ConnMaxIdleTime > 0 {
 			cfg.ConnMaxIdleTime = poolCfg.ConnMaxIdleTime
 		}
+		// Set SQL logging configuration
+		if dbConfig.LogEnabled {
+			cfg.LogEnabled = true
+			if dbConfig.LogLevel != "" {
+				cfg.LogLevel = dbConfig.LogLevel
+			}
+			if dbConfig.SlowQueryThreshold > 0 {
+				cfg.SlowQueryThreshold = time.Duration(dbConfig.SlowQueryThreshold)
+			}
+		}
 		return db.Config{Type: db.TypeMySQL, MySQL: cfg}, nil
 	case "postgres", "postgresql":
 		cfg := pg.DefaultConfig()
@@ -939,6 +975,16 @@ func buildDBConfig(dbConfig config.DBConfig, poolCfg config.DBPoolConfig) (db.Co
 		}
 		if poolCfg.ConnMaxLifetime > 0 {
 			cfg.ConnMaxLifetime = poolCfg.ConnMaxLifetime
+		}
+		// Set SQL logging configuration
+		if dbConfig.LogEnabled {
+			cfg.LogEnabled = true
+			if dbConfig.LogLevel != "" {
+				cfg.LogLevel = dbConfig.LogLevel
+			}
+			if dbConfig.SlowQueryThreshold > 0 {
+				cfg.SlowQueryThreshold = time.Duration(dbConfig.SlowQueryThreshold)
+			}
 		}
 		return db.Config{Type: db.TypePostgres, PG: cfg}, nil
 	default:
@@ -1140,17 +1186,17 @@ func (b *Bootstrap) UpdateDatabaseConfig(dbConfigs map[string]config.DBConfig) e
 	if b.config == nil {
 		return fmt.Errorf("bootstrap config is nil")
 	}
-	
+
 	// Update primary database config
 	if primaryConfig, exists := dbConfigs["mysql_primary"]; exists {
 		b.config.Database.Primary = primaryConfig
 	}
-	
+
 	// Update replica database config if exists
 	if replicaConfig, exists := dbConfigs["mysql_replica"]; exists {
 		b.config.Database.Replica = replicaConfig
 	}
-	
+
 	logger.Info("Database configuration updated")
 	return nil
 }

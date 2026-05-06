@@ -26,28 +26,28 @@ type GlobalConfig struct {
 
 	// Framework runtime config
 	Framework FrameworkConfig `yaml:"framework" json:"framework"`
-	
+
 	// Server configs
 	Server ServerConfig `yaml:"server" json:"server"`
-	
+
 	// Database configs
 	Database DatabaseConfig `yaml:"database" json:"database"`
-	
-	// Redis cache configs  
+
+	// Redis cache configs
 	Redis RedisConfig `yaml:"redis" json:"redis"`
-	
+
 	// RPC configs
 	RPC RPCConfig `yaml:"rpc" json:"rpc"`
-	
+
 	// Service discovery
 	Discovery DiscoveryConfig `yaml:"discovery" json:"discovery"`
-	
+
 	// Message queue
 	Messaging MessagingConfig `yaml:"messaging" json:"messaging"`
-	
+
 	// Observability
 	Observability ObservabilityConfig `yaml:"observability" json:"observability"`
-	
+
 	// Security
 	Security SecurityConfig `yaml:"security" json:"security"`
 }
@@ -63,16 +63,16 @@ type AppConfig struct {
 
 // FrameworkConfig controls bootstrap-managed dependency and service composition.
 type FrameworkConfig struct {
-	InitDatabases             bool     `yaml:"init_databases" json:"init_databases"`
-	InitCache                 bool     `yaml:"init_cache" json:"init_cache"`
-	InitDiscovery             bool     `yaml:"init_discovery" json:"init_discovery"`
-	InitTracing               bool     `yaml:"init_tracing" json:"init_tracing"`
-	InitAuth                  bool     `yaml:"init_auth" json:"init_auth"`
-	InitMetrics               bool     `yaml:"init_metrics" json:"init_metrics"`
-	InitHealth                bool     `yaml:"init_health" json:"init_health"`
-	InitErrors                bool     `yaml:"init_errors" json:"init_errors"`
-	ValidateDependencyCoverage bool    `yaml:"validate_dependency_coverage" json:"validate_dependency_coverage"`
-	Services                  []string `yaml:"services" json:"services"`
+	InitDatabases              bool     `yaml:"init_databases" json:"init_databases"`
+	InitCache                  bool     `yaml:"init_cache" json:"init_cache"`
+	InitDiscovery              bool     `yaml:"init_discovery" json:"init_discovery"`
+	InitTracing                bool     `yaml:"init_tracing" json:"init_tracing"`
+	InitAuth                   bool     `yaml:"init_auth" json:"init_auth"`
+	InitMetrics                bool     `yaml:"init_metrics" json:"init_metrics"`
+	InitHealth                 bool     `yaml:"init_health" json:"init_health"`
+	InitErrors                 bool     `yaml:"init_errors" json:"init_errors"`
+	ValidateDependencyCoverage bool     `yaml:"validate_dependency_coverage" json:"validate_dependency_coverage"`
+	Services                   []string `yaml:"services" json:"services"`
 }
 
 // ServerConfig server configuration
@@ -83,22 +83,22 @@ type ServerConfig struct {
 
 // HTTPConfig HTTP server configuration
 type HTTPConfig struct {
-	Enabled         bool          `yaml:"enabled" json:"enabled"`
-	Host            string        `yaml:"host" json:"host"`
-	Port            int           `yaml:"port" json:"port"`
-	ReadTimeout     time.Duration `yaml:"read_timeout" json:"read_timeout"`
-	WriteTimeout    time.Duration `yaml:"write_timeout" json:"write_timeout"`
-	IdleTimeout     time.Duration `yaml:"idle_timeout" json:"idle_timeout"`
-	MaxHeaderBytes  int           `yaml:"max_header_bytes" json:"max_header_bytes"`
+	Enabled        bool          `yaml:"enabled" json:"enabled"`
+	Host           string        `yaml:"host" json:"host"`
+	Port           int           `yaml:"port" json:"port"`
+	ReadTimeout    time.Duration `yaml:"read_timeout" json:"read_timeout"`
+	WriteTimeout   time.Duration `yaml:"write_timeout" json:"write_timeout"`
+	IdleTimeout    time.Duration `yaml:"idle_timeout" json:"idle_timeout"`
+	MaxHeaderBytes int           `yaml:"max_header_bytes" json:"max_header_bytes"`
 }
 
 // GRPCConfig gRPC server configuration
 type GRPCConfig struct {
-	Enabled     bool          `yaml:"enabled" json:"enabled"`
-	Host        string        `yaml:"host" json:"host"`
-	Port        int           `yaml:"port" json:"port"`
-	MaxConnAge  time.Duration `yaml:"max_conn_age" json:"max_conn_age"`
-	Keepalive   KeepaliveConfig `yaml:"keepalive" json:"keepalive"`
+	Enabled    bool            `yaml:"enabled" json:"enabled"`
+	Host       string          `yaml:"host" json:"host"`
+	Port       int             `yaml:"port" json:"port"`
+	MaxConnAge time.Duration   `yaml:"max_conn_age" json:"max_conn_age"`
+	Keepalive  KeepaliveConfig `yaml:"keepalive" json:"keepalive"`
 }
 
 // KeepaliveConfig keepalive settings
@@ -113,21 +113,24 @@ type KeepaliveConfig struct {
 
 // DatabaseConfig database configuration
 type DatabaseConfig struct {
-	Primary DBConfig            `yaml:"primary" json:"primary"`
-	Replica DBConfig            `yaml:"replica" json:"replica"`
-	Pool    DBPoolConfig        `yaml:"pool" json:"pool"`
+	Primary DBConfig     `yaml:"primary" json:"primary"`
+	Replica DBConfig     `yaml:"replica" json:"replica"`
+	Pool    DBPoolConfig `yaml:"pool" json:"pool"`
 }
 
 // DBConfig single database configuration
 type DBConfig struct {
-	Enabled  bool   `yaml:"enabled" json:"enabled"`
-	Driver   string `yaml:"driver" json:"driver"`
-	Host     string `yaml:"host" json:"host"`
-	Port     int    `yaml:"port" json:"port"`
-	Database string `yaml:"database" json:"database"`
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
-	SSLMode  string `yaml:"ssl_mode" json:"ssl_mode"`
+	Enabled            bool   `yaml:"enabled" json:"enabled"`
+	Driver             string `yaml:"driver" json:"driver"`
+	Host               string `yaml:"host" json:"host"`
+	Port               int    `yaml:"port" json:"port"`
+	Database           string `yaml:"database" json:"database"`
+	Username           string `yaml:"username" json:"username"`
+	Password           string `yaml:"password" json:"password"`
+	SSLMode            string `yaml:"ssl_mode" json:"ssl_mode"`
+	LogEnabled         bool   `yaml:"log_enabled" json:"log_enabled"`
+	LogLevel           string `yaml:"log_level" json:"log_level"`
+	SlowQueryThreshold int    `yaml:"slow_query_threshold" json:"slow_query_threshold"`
 }
 
 // DBPoolConfig database pool configuration
@@ -140,14 +143,14 @@ type DBPoolConfig struct {
 
 // RedisConfig Redis configuration
 type RedisConfig struct {
-	Mode           string           `yaml:"mode" json:"mode"`
-	Host           string           `yaml:"host" json:"host"`
-	Port           int              `yaml:"port" json:"port"`
-	Password       string           `yaml:"password" json:"password"`
-	Database       int              `yaml:"database" json:"database"`
-	PoolSize       int              `yaml:"pool_size" json:"pool_size"`
-	MinIdleConns   int              `yaml:"min_idle_conns" json:"min_idle_conns"`
-	Nodes          []RedisNode      `yaml:"nodes" json:"nodes"`
+	Mode         string      `yaml:"mode" json:"mode"`
+	Host         string      `yaml:"host" json:"host"`
+	Port         int         `yaml:"port" json:"port"`
+	Password     string      `yaml:"password" json:"password"`
+	Database     int         `yaml:"database" json:"database"`
+	PoolSize     int         `yaml:"pool_size" json:"pool_size"`
+	MinIdleConns int         `yaml:"min_idle_conns" json:"min_idle_conns"`
+	Nodes        []RedisNode `yaml:"nodes" json:"nodes"`
 }
 
 // RedisNode Redis cluster/sentinel node
@@ -161,37 +164,37 @@ type RedisNode struct {
 
 // RPCConfig RPC configuration
 type RPCConfig struct {
-	Enabled     bool            `yaml:"enabled" json:"enabled"`
-	Protocol    string          `yaml:"protocol" json:"protocol"`
-	Degradation DegradationCfg  `yaml:"degradation" json:"degradation"`
+	Enabled     bool           `yaml:"enabled" json:"enabled"`
+	Protocol    string         `yaml:"protocol" json:"protocol"`
+	Degradation DegradationCfg `yaml:"degradation" json:"degradation"`
 }
 
 // DegradationCfg RPC degradation configuration
 type DegradationCfg struct {
-	Enabled             bool          `yaml:"enabled" json:"enabled"`
-	Level               string        `yaml:"level" json:"level"`
-	AutoDetect          bool          `yaml:"auto_detect" json:"auto_detect"`
-	CPUThreshold        float64       `yaml:"cpu_threshold" json:"cpu_threshold"`
-	MemoryThreshold     float64       `yaml:"memory_threshold" json:"memory_threshold"`
-	ErrorRateThreshold  float64       `yaml:"error_rate_threshold" json:"error_rate_threshold"`
-	LatencyThreshold    time.Duration `yaml:"latency_threshold" json:"latency_threshold"`
-	EnableCircuitBreaker bool       `yaml:"enable_circuit_breaker" json:"enable_circuit_breaker"`
+	Enabled              bool          `yaml:"enabled" json:"enabled"`
+	Level                string        `yaml:"level" json:"level"`
+	AutoDetect           bool          `yaml:"auto_detect" json:"auto_detect"`
+	CPUThreshold         float64       `yaml:"cpu_threshold" json:"cpu_threshold"`
+	MemoryThreshold      float64       `yaml:"memory_threshold" json:"memory_threshold"`
+	ErrorRateThreshold   float64       `yaml:"error_rate_threshold" json:"error_rate_threshold"`
+	LatencyThreshold     time.Duration `yaml:"latency_threshold" json:"latency_threshold"`
+	EnableCircuitBreaker bool          `yaml:"enable_circuit_breaker" json:"enable_circuit_breaker"`
 }
 
 // DiscoveryConfig service discovery configuration
 type DiscoveryConfig struct {
-	Enabled  bool              `yaml:"enabled" json:"enabled"`
-	Type     string            `yaml:"type" json:"type"`
-	Address  string            `yaml:"address" json:"address"`
-	Timeout  time.Duration     `yaml:"timeout" json:"timeout"`
-	Config   map[string]string `yaml:"config" json:"config"`
+	Enabled bool              `yaml:"enabled" json:"enabled"`
+	Type    string            `yaml:"type" json:"type"`
+	Address string            `yaml:"address" json:"address"`
+	Timeout time.Duration     `yaml:"timeout" json:"timeout"`
+	Config  map[string]string `yaml:"config" json:"config"`
 }
 
 // MessagingConfig message queue configuration
 type MessagingConfig struct {
-	Enabled bool       `yaml:"enabled" json:"enabled"`
-	Type    string     `yaml:"type" json:"type"`
-	Broker BrokerConfig `yaml:"broker" json:"broker"`
+	Enabled bool         `yaml:"enabled" json:"enabled"`
+	Type    string       `yaml:"type" json:"type"`
+	Broker  BrokerConfig `yaml:"broker" json:"broker"`
 }
 
 // BrokerConfig message broker configuration
@@ -212,19 +215,19 @@ type ObservabilityConfig struct {
 
 // MetricsConfig metrics configuration
 type MetricsConfig struct {
-	Enabled    bool   `yaml:"enabled" json:"enabled"`
-	Type       string `yaml:"type" json:"type"`
-	Endpoint   string `yaml:"endpoint" json:"endpoint"`
-	Namespace  string `yaml:"namespace" json:"namespace"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Type      string `yaml:"type" json:"type"`
+	Endpoint  string `yaml:"endpoint" json:"endpoint"`
+	Namespace string `yaml:"namespace" json:"namespace"`
 }
 
 // TracingConfig tracing configuration
 type TracingConfig struct {
-	Enabled     bool          `yaml:"enabled" json:"enabled"`
-	Type        string        `yaml:"type" json:"type"`
-	Endpoint    string        `yaml:"endpoint" json:"endpoint"`
-	SampleRate  float64       `yaml:"sample_rate" json:"sample_rate"`
-	BatchSize   int           `yaml:"batch_size" json:"batch_size"`
+	Enabled       bool          `yaml:"enabled" json:"enabled"`
+	Type          string        `yaml:"type" json:"type"`
+	Endpoint      string        `yaml:"endpoint" json:"endpoint"`
+	SampleRate    float64       `yaml:"sample_rate" json:"sample_rate"`
+	BatchSize     int           `yaml:"batch_size" json:"batch_size"`
 	FlushInterval time.Duration `yaml:"flush_interval" json:"flush_interval"`
 }
 
@@ -241,8 +244,8 @@ type LoggingConfig struct {
 
 // AlertingConfig alerting configuration
 type AlertingConfig struct {
-	Enabled  bool            `yaml:"enabled" json:"enabled"`
-	Channels []AlertChannel  `yaml:"channels" json:"channels"`
+	Enabled  bool           `yaml:"enabled" json:"enabled"`
+	Channels []AlertChannel `yaml:"channels" json:"channels"`
 }
 
 // AlertChannel alert channel configuration
@@ -254,9 +257,9 @@ type AlertChannel struct {
 
 // SecurityConfig security configuration
 type SecurityConfig struct {
-	JWT      JWTConfig      `yaml:"jwt" json:"jwt"`
-	APIKey   APIKeyConfig   `yaml:"api_key" json:"api_key"`
-	CORS     CORSConfig     `yaml:"cors" json:"cors"`
+	JWT       JWTConfig       `yaml:"jwt" json:"jwt"`
+	APIKey    APIKeyConfig    `yaml:"api_key" json:"api_key"`
+	CORS      CORSConfig      `yaml:"cors" json:"cors"`
 	RateLimit RateLimitConfig `yaml:"rate_limit" json:"rate_limit"`
 }
 
@@ -360,26 +363,26 @@ func (l *Loader) applyEnvOverrides(config interface{}) {
 	if v.Kind() != reflect.Ptr || v.IsNil() {
 		return
 	}
-	
+
 	v = v.Elem()
 	t := v.Type()
-	
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldType := t.Field(i)
-		
+
 		// Skip unexported fields
 		if !field.CanSet() {
 			continue
 		}
-		
+
 		envTag := fieldType.Tag.Get("env")
 		if envTag != "" {
 			if value := os.Getenv(envTag); value != "" {
 				l.setFieldValue(field, value)
 			}
 		}
-		
+
 		// Recursively process nested structs
 		if field.Kind() == reflect.Struct {
 			l.applyEnvOverrides(field.Addr().Interface())
@@ -419,24 +422,24 @@ func (l *Loader) setFieldValue(field reflect.Value, value string) {
 // validate validates the configuration
 func (l *Loader) validate() error {
 	config := l.config
-	
+
 	// Validate app config
 	if config.App.Name == "" {
 		return fmt.Errorf("app name is required")
 	}
-	
+
 	// Validate server config
 	if config.Server.HTTP.Enabled && config.Server.HTTP.Port == 0 {
 		return fmt.Errorf("http port is required when enabled")
 	}
-	
+
 	// Validate database config
 	if config.Database.Primary.Enabled {
 		if config.Database.Primary.Host == "" {
 			return fmt.Errorf("database host is required")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -451,16 +454,16 @@ func DefaultConfig() *GlobalConfig {
 			Labels:      map[string]string{},
 		},
 		Framework: FrameworkConfig{
-			InitDatabases:             true,
-			InitCache:                 true,
-			InitDiscovery:             true,
-			InitTracing:               true,
-			InitAuth:                  true,
-			InitMetrics:               true,
-			InitHealth:                true,
-			InitErrors:                true,
+			InitDatabases:              true,
+			InitCache:                  true,
+			InitDiscovery:              true,
+			InitTracing:                true,
+			InitAuth:                   true,
+			InitMetrics:                true,
+			InitHealth:                 true,
+			InitErrors:                 true,
 			ValidateDependencyCoverage: true,
-			Services:                  []string{"rpc"},
+			Services:                   []string{"rpc"},
 		},
 		Server: ServerConfig{
 			HTTP: HTTPConfig{
