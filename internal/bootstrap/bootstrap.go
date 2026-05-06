@@ -185,16 +185,10 @@ func (b *Bootstrap) InitializeAll() error {
 func (b *Bootstrap) InitializeDatabases() error {
 	factory := db.NewFactory()
 
-	// First, try to load service-level database configurations
-	if err := b.initializeServiceDatabases(factory); err != nil {
-		logger.Warn("Failed to initialize service-level databases, falling back to framework config", logger.Error(err))
-
-		// Fallback to framework database configuration
-		if !b.config.Database.Primary.Enabled && !b.config.Database.Replica.Enabled {
-			logger.Info("No database configuration found, skipping database initialization")
-			return nil
-		}
-
+	// Check if database configuration has been loaded via LoadDatabaseConfig
+	// If Primary config has logging enabled, it means it was loaded from service config
+	if b.config.Database.Primary.LogEnabled || b.config.Database.Replica.LogEnabled {
+		logger.Info("Using pre-loaded database configuration with SQL logging enabled")
 		configs := map[string]config.DBConfig{
 			"primary": b.config.Database.Primary,
 			"replica": b.config.Database.Replica,
@@ -228,6 +222,53 @@ func (b *Bootstrap) InitializeDatabases() error {
 				logger.Errorf("Database connection failed", logger.String("name", name), logger.Error(err))
 			} else {
 				logger.Info("Database connected successfully", logger.String("name", name))
+			}
+		}
+	} else {
+		// First, try to load service-level database configurations
+		if err := b.initializeServiceDatabases(factory); err != nil {
+			logger.Warn("Failed to initialize service-level databases, falling back to framework config", logger.Error(err))
+
+			// Fallback to framework database configuration
+			if !b.config.Database.Primary.Enabled && !b.config.Database.Replica.Enabled {
+				logger.Info("No database configuration found, skipping database initialization")
+				return nil
+			}
+
+			configs := map[string]config.DBConfig{
+				"primary": b.config.Database.Primary,
+				"replica": b.config.Database.Replica,
+			}
+
+			for name, dbConfig := range configs {
+				if !dbConfig.Enabled {
+					continue
+				}
+
+				clientConfig, err := buildDBConfig(dbConfig, b.config.Database.Pool)
+				if err != nil {
+					logger.Errorf("Database configuration build failed",
+						logger.String("name", name),
+						logger.Error(err),
+					)
+					return fmt.Errorf("failed to build database config %s: %w", name, err)
+				}
+
+				client, err := factory.Create(clientConfig)
+				if err != nil {
+					logger.Errorf("Database client creation failed",
+						logger.String("name", name),
+						logger.Error(err),
+					)
+					return fmt.Errorf("failed to create database client %s: %w", name, err)
+				}
+
+				ctx := context.Background()
+				if err := client.Ping(ctx); err != nil {
+					logger.Errorf("Database connection failed", logger.String("name", name), logger.Error(err))
+				} else {
+					logger.Info("Database connected successfully", logger.String("name", name))
+				}
 			}
 		}
 	}
