@@ -233,13 +233,65 @@ type TracingConfig struct {
 
 // LoggingConfig logging configuration
 type LoggingConfig struct {
-	Level      string `yaml:"level" json:"level"`
-	Format     string `yaml:"format" json:"format"`
-	Output     string `yaml:"output" json:"output"`
-	FilePath   string `yaml:"file_path" json:"file_path"`
-	MaxSize    int    `yaml:"max_size" json:"max_size"`
-	MaxBackups int    `yaml:"max_backups" json:"max_backups"`
-	MaxAge     int    `yaml:"max_age" json:"max_age"`
+	Level          string               `yaml:"level" json:"level"`
+	Format         string               `yaml:"format" json:"format"`
+	Output         string               `yaml:"output" json:"output"`
+	FilePath       string               `yaml:"file_path" json:"file_path"`
+	MaxSize        int                  `yaml:"max_size" json:"max_size"`
+	MaxBackups     int                  `yaml:"max_backups" json:"max_backups"`
+	MaxAge         int                  `yaml:"max_age" json:"max_age"`
+	ServiceLogging ServiceLoggingConfig `yaml:"service_logging" json:"service_logging"`
+}
+
+// ServiceLoggingConfig service logging configuration
+type ServiceLoggingConfig struct {
+	Enabled             bool                       `yaml:"enabled" json:"enabled"`
+	BaseDir             string                     `yaml:"base_dir" json:"base_dir"`
+	EnableDateFolders   bool                       `yaml:"enable_date_folders" json:"enable_date_folders"`
+	SeparateByLevel     bool                       `yaml:"separate_by_level" json:"separate_by_level"`
+	InheritGlobalConfig bool                       `yaml:"inherit_global_config" json:"inherit_global_config"`
+	OverrideConfig      LoggerOverrideConfig       `yaml:"override_config" json:"override_config"`
+	Components          map[string]ComponentConfig `yaml:"components" json:"components"`
+	Cleanup             CleanupConfig              `yaml:"cleanup" json:"cleanup"`
+}
+
+// LoggerOverrideConfig logger override configuration
+type LoggerOverrideConfig struct {
+	Level            string         `yaml:"level" json:"level"`
+	Format           string         `yaml:"format" json:"format"`
+	MaxSize          int            `yaml:"max_size" json:"max_size"`
+	MaxBackups       int            `yaml:"max_backups" json:"max_backups"`
+	MaxAge           int            `yaml:"max_age" json:"max_age"`
+	Compress         bool           `yaml:"compress" json:"compress"`
+	EnableCaller     bool           `yaml:"enable_caller" json:"enable_caller"`
+	EnableStacktrace bool           `yaml:"enable_stacktrace" json:"enable_stacktrace"`
+	TimeFormat       string         `yaml:"time_format" json:"time_format"`
+	Sampling         SamplingConfig `yaml:"sampling" json:"sampling"`
+}
+
+// SamplingConfig sampling configuration
+type SamplingConfig struct {
+	Enabled    bool    `yaml:"enabled" json:"enabled"`
+	Rate       float64 `yaml:"rate" json:"rate"`
+	Tick       string  `yaml:"tick" json:"tick"`
+	Initial    int     `yaml:"initial" json:"initial"`
+	Thereafter int     `yaml:"thereafter" json:"thereafter"`
+}
+
+// ComponentConfig component-specific logging configuration
+type ComponentConfig struct {
+	BaseDir         string               `yaml:"base_dir" json:"base_dir"`
+	SeparateByLevel bool                 `yaml:"separate_by_level" json:"separate_by_level"`
+	OverrideConfig  LoggerOverrideConfig `yaml:"override_config" json:"override_config"`
+}
+
+// CleanupConfig log cleanup configuration
+type CleanupConfig struct {
+	Enabled           bool     `yaml:"enabled" json:"enabled"`
+	Schedule          string   `yaml:"schedule" json:"schedule"`
+	MaxAgeDays        int      `yaml:"max_age_days" json:"max_age_days"`
+	ExcludeComponents []string `yaml:"exclude_components" json:"exclude_components"`
+	CompressOld       bool     `yaml:"compress_old" json:"compress_old"`
 }
 
 // AlertingConfig alerting configuration

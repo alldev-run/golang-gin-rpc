@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/auth"
@@ -187,6 +188,49 @@ func (b *Bootstrap) InitializeAll() error {
 func (b *Bootstrap) InitializeDatabases() error {
 	factory := db.NewFactory()
 
+	// Create database logger if service logging is configured
+	var databaseLogger *zap.Logger
+	if b.config.Observability.Logging.ServiceLogging.Enabled {
+		if dbConfig, exists := b.config.Observability.Logging.ServiceLogging.Components["database"]; exists {
+			serviceLoggerConfig := logger.ServiceLoggerConfig{
+				ServiceName:         "database",
+				BaseDir:             dbConfig.BaseDir,
+				EnableDateFolder:    b.config.Observability.Logging.ServiceLogging.EnableDateFolders,
+				SeparateByLevel:     dbConfig.SeparateByLevel,
+				InheritGlobalConfig: b.config.Observability.Logging.ServiceLogging.InheritGlobalConfig,
+			}
+
+			// Apply override config
+			if dbConfig.OverrideConfig.Level != "" {
+				serviceLoggerConfig.OverrideConfig.Level = logger.LogLevel(dbConfig.OverrideConfig.Level)
+			}
+			if dbConfig.OverrideConfig.Format != "" {
+				serviceLoggerConfig.OverrideConfig.Format = logger.LogFormat(dbConfig.OverrideConfig.Format)
+			}
+			if dbConfig.OverrideConfig.MaxSize > 0 {
+				serviceLoggerConfig.OverrideConfig.MaxSize = dbConfig.OverrideConfig.MaxSize
+			}
+			if dbConfig.OverrideConfig.MaxBackups > 0 {
+				serviceLoggerConfig.OverrideConfig.MaxBackups = dbConfig.OverrideConfig.MaxBackups
+			}
+			if dbConfig.OverrideConfig.MaxAge > 0 {
+				serviceLoggerConfig.OverrideConfig.MaxAge = dbConfig.OverrideConfig.MaxAge
+			}
+			if dbConfig.OverrideConfig.Compress {
+				serviceLoggerConfig.OverrideConfig.Compress = dbConfig.OverrideConfig.Compress
+			}
+			if dbConfig.OverrideConfig.EnableCaller {
+				serviceLoggerConfig.OverrideConfig.EnableCaller = dbConfig.OverrideConfig.EnableCaller
+			}
+			if dbConfig.OverrideConfig.EnableStacktrace {
+				serviceLoggerConfig.OverrideConfig.EnableStacktrace = dbConfig.OverrideConfig.EnableStacktrace
+			}
+
+			databaseLogger = logger.GetServiceLoggerInstance("database", serviceLoggerConfig)
+			logger.Info("Database component logger created", logger.String("base_dir", dbConfig.BaseDir))
+		}
+	}
+
 	// Check if database configuration has been loaded via LoadDatabaseConfig
 	if b.serviceDBConfigLoaded {
 		logger.Info("Using pre-loaded database configuration")
@@ -216,6 +260,15 @@ func (b *Bootstrap) InitializeDatabases() error {
 					logger.Error(err),
 				)
 				return fmt.Errorf("failed to create database client %s: %w", name, err)
+			}
+
+			// Set database logger if configured
+			if databaseLogger != nil {
+				if mysqlClient, ok := client.(*mysql.Client); ok {
+					mysqlClient.SetSQLLogger(databaseLogger)
+				} else if postgresClient, ok := client.(*postgres.Client); ok {
+					postgresClient.SetSQLLogger(databaseLogger)
+				}
 			}
 
 			ctx := context.Background()
@@ -270,6 +323,15 @@ func (b *Bootstrap) InitializeDatabases() error {
 					logger.Error(err),
 				)
 				return fmt.Errorf("failed to create database client %s: %w", name, err)
+			}
+
+			// Set database logger if configured
+			if databaseLogger != nil {
+				if mysqlClient, ok := client.(*mysql.Client); ok {
+					mysqlClient.SetSQLLogger(databaseLogger)
+				} else if postgresClient, ok := client.(*postgres.Client); ok {
+					postgresClient.SetSQLLogger(databaseLogger)
+				}
 			}
 
 			ctx := context.Background()
