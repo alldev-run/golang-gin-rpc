@@ -16,6 +16,7 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/db"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 type Bootstrap = internalbootstrap.Bootstrap
@@ -122,6 +123,12 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 							dbConfig.SlowQueryThreshold = int(duration.Milliseconds())
 						}
 					}
+					// Debug log to verify config parsing
+					logger.Debug("Parsed MySQL config",
+						logger.String("name", name),
+						logger.Bool("log_enabled", dbConfig.LogEnabled),
+						logger.String("log_level", dbConfig.LogLevel),
+						logger.Int("slow_query_threshold", dbConfig.SlowQueryThreshold))
 				}
 			} else {
 				// Handle flat format (framework standard)
@@ -169,7 +176,11 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 	}
 
 	// Update bootstrap config with database settings
-	return boot.UpdateDatabaseConfig(dbConfigs)
+	if err := boot.UpdateDatabaseConfig(dbConfigs); err != nil {
+		return err
+	}
+	logger.Info("Service database config loaded via LoadDatabaseConfig")
+	return nil
 }
 
 // GetDatabaseFactory returns the database factory instance
