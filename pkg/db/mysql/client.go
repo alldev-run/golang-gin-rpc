@@ -14,6 +14,7 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	_ "github.com/go-sql-driver/mysql"
+	"go.uber.org/zap"
 )
 
 // Config holds MySQL connection configuration.
@@ -63,6 +64,7 @@ var mysqlIdentifierPartPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 type SQLLogger struct {
 	level              LogLevel
 	slowQueryThreshold time.Duration
+	logger             *zap.Logger
 }
 
 // LogLevel represents the logging level.
@@ -117,7 +119,22 @@ func NewSQLLogger(level string, threshold time.Duration) *SQLLogger {
 	return &SQLLogger{
 		level:              parseLogLevel(level),
 		slowQueryThreshold: threshold,
+		logger:             logger.L(),
 	}
+}
+
+// NewSQLLoggerWithLogger creates a new SQL logger with a custom logger.
+func NewSQLLoggerWithLogger(level string, threshold time.Duration, customLogger *zap.Logger) *SQLLogger {
+	return &SQLLogger{
+		level:              parseLogLevel(level),
+		slowQueryThreshold: threshold,
+		logger:             customLogger,
+	}
+}
+
+// SetLogger sets a custom logger for the SQL logger.
+func (sl *SQLLogger) SetLogger(customLogger *zap.Logger) {
+	sl.logger = customLogger
 }
 
 // LogQuery logs a query execution.
@@ -140,22 +157,38 @@ func (sl *SQLLogger) LogQuery(query string, args []interface{}, duration time.Du
 
 	if err != nil {
 		logMsg += " | error: " + err.Error()
-		logger.Errorf(logMsg)
+		if sl.logger != nil {
+			sl.logger.Error(logMsg)
+		} else {
+			logger.Errorf(logMsg)
+		}
 		return
 	}
 
 	// Check for slow queries
 	if duration > sl.slowQueryThreshold {
 		logMsg += " | threshold: " + sl.slowQueryThreshold.String()
-		logger.Warn(logMsg)
+		if sl.logger != nil {
+			sl.logger.Warn(logMsg)
+		} else {
+			logger.Warn(logMsg)
+		}
 		return
 	}
 
 	// Log based on level
 	if sl.level >= LogLevelInfo {
-		logger.Info(logMsg)
+		if sl.logger != nil {
+			sl.logger.Info(logMsg)
+		} else {
+			logger.Info(logMsg)
+		}
 	} else if sl.level >= LogLevelDebug {
-		logger.Debug(logMsg)
+		if sl.logger != nil {
+			sl.logger.Debug(logMsg)
+		} else {
+			logger.Debug(logMsg)
+		}
 	}
 }
 
@@ -279,6 +312,13 @@ func (c *Client) Ping(ctx context.Context) error {
 		return err
 	}
 	return c.db.PingContext(ctx)
+}
+
+// SetSQLLogger sets a custom SQL logger for the client.
+func (c *Client) SetSQLLogger(customLogger *zap.Logger) {
+	if c.sqlLogger != nil {
+		c.sqlLogger.SetLogger(customLogger)
+	}
 }
 
 // Stats returns database connection statistics.
