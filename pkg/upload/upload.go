@@ -1,15 +1,29 @@
 package upload
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
+
+// FileInfo represents information about an uploaded file
+type FileInfo struct {
+	Filename    string    `json:"filename"`
+	FilePath    string    `json:"file_path"`
+	FileSize    int64     `json:"file_size"`
+	ModTime     time.Time `json:"mod_time"`
+	IsDirectory bool      `json:"is_directory"`
+}
 
 // UploadResult represents the result of a file upload
 type UploadResult struct {
@@ -68,7 +82,11 @@ func (u *Uploader) Upload(fileHeader *multipart.FileHeader) *UploadResult {
 	}
 
 	// Build full file path
-	filePath := filepath.Join(u.config.UploadDir, newFilename)
+	filePath, err := u.resolveSafeFilePath(newFilename)
+	if err != nil {
+		result.Error = err
+		return result
+	}
 
 	// Check if file exists and overwrite is disabled
 	if !u.config.EnableOverwrite {
@@ -87,7 +105,12 @@ func (u *Uploader) Upload(fileHeader *multipart.FileHeader) *UploadResult {
 	defer src.Close()
 
 	// Create destination file
-	dst, err := os.Create(filePath)
+	openFlags := os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+	if !u.config.EnableOverwrite {
+		openFlags = os.O_CREATE | os.O_WRONLY | os.O_EXCL
+	}
+
+	dst, err := os.OpenFile(filePath, openFlags, 0o600)
 	if err != nil {
 		result.Error = fmt.Errorf("failed to create destination file: %w", err)
 		return result
@@ -158,6 +181,16 @@ func (u *Uploader) UploadFromBytes(filename string, data []byte) *UploadResult {
 		return result
 	}
 
+	// Validate MIME type inferred from content
+	mimeType := http.DetectContentType(data)
+	if !u.validator.IsAllowedMimeType(mimeType) {
+		result.Error = &ValidationError{
+			Field:   "file_mime_type",
+			Message: fmt.Sprintf("file MIME type %s is not allowed", mimeType),
+		}
+		return result
+	}
+
 	// Generate new filename
 	newFilename := u.namer.Generate(filename)
 
@@ -170,7 +203,11 @@ func (u *Uploader) UploadFromBytes(filename string, data []byte) *UploadResult {
 	}
 
 	// Build full file path
-	filePath := filepath.Join(u.config.UploadDir, newFilename)
+	filePath, err := u.resolveSafeFilePath(newFilename)
+	if err != nil {
+		result.Error = err
+		return result
+	}
 
 	// Check if file exists and overwrite is disabled
 	if !u.config.EnableOverwrite {
@@ -181,13 +218,14 @@ func (u *Uploader) UploadFromBytes(filename string, data []byte) *UploadResult {
 	}
 
 	// Write file
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		result.Error = fmt.Errorf("failed to write file: %w", err)
 		return result
 	}
 
 	result.SavedFilename = newFilename
 	result.FilePath = filePath
+	result.MimeType = mimeType
 	result.Success = true
 
 	logger.Info("File uploaded from bytes successfully",
@@ -200,15 +238,136 @@ func (u *Uploader) UploadFromBytes(filename string, data []byte) *UploadResult {
 
 // Delete deletes a file
 func (u *Uploader) Delete(filename string) error {
-	filePath := filepath.Join(u.config.UploadDir, filename)
+	filePath, err := u.resolveSafeFilePath(filename)
+	if err != nil {
+		return err
+	}
 	return os.Remove(filePath)
 }
 
 // Exists checks if a file exists
 func (u *Uploader) Exists(filename string) bool {
-	filePath := filepath.Join(u.config.UploadDir, filename)
-	_, err := os.Stat(filePath)
+	filePath, err := u.resolveSafeFilePath(filename)
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(filePath)
 	return err == nil
+}
+
+// ListFiles lists all files in the upload directory
+func (u *Uploader) ListFiles() ([]*FileInfo, error) {
+	entries, err := os.ReadDir(u.config.UploadDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read upload directory: %w", err)
+	}
+
+	var files []*FileInfo
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		files = append(files, &FileInfo{
+			Filename:    entry.Name(),
+			FilePath:    entry.Name(),
+			FileSize:    info.Size(),
+			ModTime:     info.ModTime(),
+			IsDirectory: false,
+		})
+	}
+
+	return files, nil
+}
+
+// ServeFile serves a file for download
+func (u *Uploader) ServeFile(filename string, w http.ResponseWriter) error {
+	filePath, err := u.resolveSafeFilePath(filename)
+	if err != nil {
+		return err
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("file not found: %s", filename)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+	n, _ := file.Read(buffer)
+	contentType := http.DetectContentType(buffer[:n])
+	if contentType == "application/octet-stream" {
+		if extType := mime.TypeByExtension(filepath.Ext(filename)); extType != "" {
+			contentType = extType
+		}
+	}
+
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek file: %w", err)
+	}
+
+	// Set headers
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", path.Base(filename)))
+
+	if _, err := io.Copy(w, file); err != nil {
+		return fmt.Errorf("failed to stream file: %w", err)
+	}
+
+	logger.Info("File served", logger.String("filename", filename))
+	return nil
+}
+
+func (u *Uploader) resolveSafeFilePath(filename string) (string, error) {
+	clean := strings.TrimSpace(filename)
+	if clean == "" {
+		return "", errors.New("filename is required")
+	}
+
+	if strings.Contains(clean, "\\") {
+		return "", fmt.Errorf("invalid filename: %s", filename)
+	}
+
+	normalized := filepath.Clean(clean)
+	if normalized == "." || normalized == ".." {
+		return "", fmt.Errorf("invalid filename: %s", filename)
+	}
+
+	if strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") {
+		return "", fmt.Errorf("invalid filename: %s", filename)
+	}
+
+	baseDir, err := filepath.Abs(u.config.UploadDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve upload directory: %w", err)
+	}
+
+	fullPath := filepath.Join(baseDir, normalized)
+	fullPathAbs, err := filepath.Abs(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve file path: %w", err)
+	}
+
+	rel, err := filepath.Rel(baseDir, fullPathAbs)
+	if err != nil {
+		return "", fmt.Errorf("failed to validate file path: %w", err)
+	}
+
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("invalid filename: %s", filename)
+	}
+
+	return fullPathAbs, nil
 }
 
 // GetConfig returns the current configuration

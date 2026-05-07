@@ -1,6 +1,7 @@
 package gin
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 
@@ -21,10 +22,61 @@ func NewMiddleware(config *upload.Config) *Middleware {
 	}
 }
 
+func secureEquals(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+func (m *Middleware) checkEnabled() bool {
+	return m.handler.GetUploader().GetConfig().Enabled
+}
+
+// checkAuth checks if the request is authenticated
+func (m *Middleware) checkAuth(c *gin.Context) bool {
+	config := m.handler.GetUploader().GetConfig()
+	if !config.EnableAuth {
+		return true
+	}
+
+	if config.AuthUsername == "" || config.AuthPassword == "" {
+		return false
+	}
+
+	username, password, ok := c.Request.BasicAuth()
+	if !ok {
+		return false
+	}
+
+	return secureEquals(username, config.AuthUsername) && secureEquals(password, config.AuthPassword)
+}
+
+// sendAuthRequired sends an authentication required response
+func (m *Middleware) sendAuthRequired(c *gin.Context) {
+	c.Header("WWW-Authenticate", `Basic realm="Upload Server"`)
+	c.JSON(http.StatusUnauthorized, gin.H{
+		"success": false,
+		"message": "Authentication required",
+	})
+	c.Abort()
+}
+
 // UploadHandler handles file upload in Gin
 func (m *Middleware) UploadHandler(c *gin.Context) {
 	// Set CORS headers
 	m.setCORSHeaders(c)
+
+	if !m.checkEnabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Upload service is disabled"})
+		return
+	}
+
+	// Check authentication
+	if !m.checkAuth(c) {
+		m.sendAuthRequired(c)
+		return
+	}
 
 	// Get files from form
 	form, err := c.MultipartForm()
@@ -86,6 +138,17 @@ func (m *Middleware) SingleUploadHandler(c *gin.Context) {
 	// Set CORS headers
 	m.setCORSHeaders(c)
 
+	if !m.checkEnabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Upload service is disabled"})
+		return
+	}
+
+	// Check authentication
+	if !m.checkAuth(c) {
+		m.sendAuthRequired(c)
+		return
+	}
+
 	// Get file from form
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -124,6 +187,17 @@ func (m *Middleware) DeleteHandler(c *gin.Context) {
 	// Set CORS headers
 	m.setCORSHeaders(c)
 
+	if !m.checkEnabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Upload service is disabled"})
+		return
+	}
+
+	// Check authentication
+	if !m.checkAuth(c) {
+		m.sendAuthRequired(c)
+		return
+	}
+
 	// Get filename from query parameter
 	filename := c.Query("filename")
 	if filename == "" {
@@ -149,6 +223,59 @@ func (m *Middleware) DeleteHandler(c *gin.Context) {
 	})
 
 	logger.Info("File deleted via Gin", logger.String("filename", filename))
+}
+
+// ListHandler handles file listing in Gin
+func (m *Middleware) ListHandler(c *gin.Context) {
+	// Set CORS headers
+	m.setCORSHeaders(c)
+
+	if !m.checkEnabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Upload service is disabled"})
+		return
+	}
+
+	// Check authentication
+	if !m.checkAuth(c) {
+		m.sendAuthRequired(c)
+		return
+	}
+
+	// List files
+	files, err := m.handler.GetUploader().ListFiles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("Failed to list files: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Files listed successfully",
+		"data":    files,
+	})
+
+	logger.Info("Files listed via Gin", logger.Int("count", len(files)))
+}
+
+// DownloadHandler handles file download in Gin
+func (m *Middleware) DownloadHandler(c *gin.Context) {
+	m.handler.DownloadHandler(c.Writer, c.Request)
+	c.Abort()
+}
+
+// UploadStreamHandler handles raw binary stream upload in Gin
+func (m *Middleware) UploadStreamHandler(c *gin.Context) {
+	m.handler.UploadStreamHandler(c.Writer, c.Request)
+	c.Abort()
+}
+
+// IssueTokenHandler issues short-lived token in Gin
+func (m *Middleware) IssueTokenHandler(c *gin.Context) {
+	m.handler.IssueTokenHandler(c.Writer, c.Request)
+	c.Abort()
 }
 
 // setCORSHeaders sets CORS headers for Gin
@@ -238,5 +365,9 @@ func (m *Middleware) RegisterRoutes(router *gin.RouterGroup) {
 	router.Use(m.CORSMiddleware())
 	router.POST("/upload", m.UploadHandler)
 	router.POST("/upload/single", m.SingleUploadHandler)
+	router.POST("/upload/stream", m.UploadStreamHandler)
+	router.GET("/list", m.ListHandler)
+	router.GET("/token", m.IssueTokenHandler)
+	router.GET("/download", m.DownloadHandler)
 	router.DELETE("/delete", m.DeleteHandler)
 }

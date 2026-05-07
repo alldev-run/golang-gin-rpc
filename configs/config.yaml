@@ -412,3 +412,8 @@ upload:
   enable_server: false  # Enable standalone upload server
   auto_create_dir: true
   enable_overwrite: false
+  enable_auth: false  # Enable authentication
+  auth_username: "admin"  # Authentication username
+  auth_password: "password"  # Authentication password
+  token_secret: ""  # Optional signing secret for short-lived download tokens (fallback: auth_password)
+  token_ttl_seconds: 300  # Signed token validity in seconds

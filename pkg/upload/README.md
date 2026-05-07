@@ -21,8 +21,12 @@ pkg/upload/
 - **File Validation**: Validate file types by extension and MIME type, and file size limits
 - **Naming Strategies**: Multiple naming strategies including UUID, timestamp, original name, and custom templates
 - **CORS Support**: Configurable CORS settings for cross-origin requests
+- **Authentication**: Basic HTTP authentication support with username/password
+- **Short-Lived Download Token**: Signed token issuance with framework `jwtx` component
 - **Gin Integration**: Built-in middleware for seamless integration with Gin framework
 - **net/http Integration**: Native HTTP handlers for standard Go HTTP servers
+- **File Browsing**: List and browse uploaded files
+- **File Download**: Download files with proper MIME type detection
 - **Standalone Server**: Option to run as a standalone upload server
 - **Auto Directory Creation**: Automatically creates upload directories
 - **File Overwrite Control**: Configurable file overwrite behavior
@@ -191,6 +195,10 @@ api := r.Group("/api")
 api.Use(middleware.CORSMiddleware())
 api.POST("/upload", middleware.UploadHandler)
 api.POST("/upload/single", middleware.SingleUploadHandler)
+api.POST("/upload/stream", middleware.UploadStreamHandler)
+api.GET("/list", middleware.ListHandler)
+api.GET("/token", middleware.IssueTokenHandler)
+api.GET("/download", middleware.DownloadHandler)
 api.DELETE("/delete", middleware.DeleteHandler)
 ```
 
@@ -212,6 +220,10 @@ func main() {
     
     http.HandleFunc("/upload", handler.UploadHandler)
     http.HandleFunc("/upload/single", handler.SingleUploadHandler)
+    http.HandleFunc("/upload/stream", handler.UploadStreamHandler)
+    http.HandleFunc("/list", handler.ListHandler)
+    http.HandleFunc("/token", handler.IssueTokenHandler)
+    http.HandleFunc("/download", handler.DownloadHandler)
     http.HandleFunc("/delete", handler.DeleteHandler)
     
     http.ListenAndServe(":8080", nil)
@@ -227,6 +239,61 @@ config.Port = 8081
 
 handler := upload.NewHandler(config)
 go handler.StartServer(":8081")
+```
+
+## Authentication
+
+The upload package supports Basic HTTP authentication for protecting upload endpoints.
+
+### Enable Authentication
+
+```go
+config := upload.DefaultConfig()
+config.EnableAuth = true
+config.AuthUsername = "admin"
+config.AuthPassword = "securepassword"
+
+handler := upload.NewHandler(config)
+```
+
+### Public Token Methods (for external frameworks)
+
+You can generate and verify short-lived download tokens directly in code (without HTTP `/token` endpoint). The implementation reuses framework `pkg/auth/jwtx`:
+
+```go
+handler := upload.NewHandler(config)
+
+token, expiresAt, err := handler.GenerateDownloadToken("test.jpg")
+if err != nil {
+    // handle error
+}
+
+ok := handler.VerifyDownloadToken("test.jpg", expiresAt, token)
+if !ok {
+    // handle invalid token
+}
+```
+
+### Using Authentication with cURL
+
+```bash
+# Upload with authentication
+curl -X POST -u admin:securepassword -F "files=@test.jpg" http://localhost:8081/upload
+
+# List files with authentication
+curl -u admin:securepassword http://localhost:8081/list
+
+# Download file with authentication
+curl -u admin:securepassword "http://localhost:8081/download?filename=test.jpg" -o test.jpg
+
+# Issue short-lived token (requires authentication)
+curl -u admin:securepassword "http://localhost:8081/token?filename=test.jpg"
+
+# Download file with token (recommended: Authorization Bearer)
+curl -H "Authorization: Bearer <TOKEN>" "http://localhost:8081/download?filename=test.jpg" -o test.jpg
+
+# Backward-compatible query token usage
+curl "http://localhost:8081/download?filename=test.jpg&token=<TOKEN>" -o test.jpg
 ```
 
 ## Configuration in YAML
@@ -270,6 +337,11 @@ upload:
   enable_server: false
   auto_create_dir: true
   enable_overwrite: false
+  enable_auth: true
+  auth_username: "admin"
+  auth_password: "securepassword"
+  token_secret: ""        # Optional. Falls back to auth_password when empty
+  token_ttl_seconds: 300   # Token validity in seconds
 ```
 
 ## API Endpoints
@@ -326,6 +398,26 @@ Upload a single file.
 }
 ```
 
+### POST /api/upload/stream?filename={filename}
+
+Upload a single file using raw binary stream.
+
+**Request:**
+- Method: POST
+- Content-Type: `application/octet-stream`
+- Query parameter: `filename` (or header `X-Filename`)
+- Body: raw binary bytes
+
+**cURL example:**
+```bash
+curl -X POST \
+  -H "Content-Type: application/octet-stream" \
+  -H "X-Filename: demo.txt" \
+  --data-binary @demo.txt \
+  -u admin:securepassword \
+  http://localhost:8081/upload/stream
+```
+
 ### DELETE /api/delete?filename={filename}
 
 Delete a file.
@@ -339,6 +431,70 @@ Delete a file.
 {
   "success": true,
   "message": "File deleted successfully"
+}
+```
+
+### GET /api/list
+
+List all uploaded files.
+
+**Request:**
+- Method: GET
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Files listed successfully",
+  "data": [
+    {
+      "filename": "550e8400-e29b-41d4-a716-446655440000.jpg",
+      "file_path": "550e8400-e29b-41d4-a716-446655440000.jpg",
+      "file_size": 1024000,
+      "mod_time": "2024-05-06T14:30:25Z",
+      "is_directory": false
+    }
+  ]
+}
+```
+
+### GET /api/download?filename={filename}
+
+Download a file.
+
+**Request:**
+- Method: GET
+- Query parameter: `filename`
+- Auth options:
+  - `Authorization: Bearer <token>`
+  - or Basic Auth (`-u username:password`)
+  - or query token `token=<TOKEN>` (compatibility)
+
+**Response:**
+- Content-Type: Detected MIME type (e.g., image/jpeg)
+- Content-Disposition: attachment; filename={filename}
+- File content in response body
+
+### GET /api/token?filename={filename}
+
+Issue short-lived download token.
+
+**Request:**
+- Method: GET
+- Requires Basic Auth
+- Query parameter: `filename`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Token issued successfully",
+  "data": {
+    "filename": "test.jpg",
+    "token": "<SIGNED_TOKEN>",
+    "expires": 1715000000,
+    "ttl": 300
+  }
 }
 ```
 

@@ -14,6 +14,36 @@ type TokenPair struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// SignAccessClaims signs custom access-token claims.
+// Missing fields are populated with sane defaults.
+func (m *Manager) SignAccessClaims(claims Claims) (string, error) {
+	cfg := m.Config()
+	now := time.Now()
+
+	if claims.Type == "" {
+		claims.Type = TokenTypeAccess
+	}
+	if claims.Type != TokenTypeAccess {
+		return "", errors.New("claims type must be access")
+	}
+	if claims.TokenID == "" {
+		claims.TokenID = uuid.NewString()
+	}
+	if claims.IssuedAt.IsZero() {
+		claims.IssuedAt = now
+	}
+	if claims.ExpireAt.IsZero() {
+		claims.ExpireAt = claims.IssuedAt.Add(cfg.AccessTokenTTL)
+	}
+
+	return m.encodeClaims(claims)
+}
+
+// ParseClaims decodes token claims without enforcing token type.
+func (m *Manager) ParseClaims(token string) (*Claims, error) {
+	return m.decodeClaims(token)
+}
+
 // GenerateTokenPair generates a new pair of access and refresh tokens for a user.
 func (m *Manager) GenerateTokenPair(userID, username, deviceID string) (*TokenPair, error) {
 	cfg := m.Config()
