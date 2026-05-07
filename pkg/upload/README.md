@@ -1,6 +1,20 @@
 # Upload Package
 
-The upload package provides a comprehensive file upload functionality for the golang-gin-rpc framework. It supports configurable file validation, naming strategies, CORS, and integration with both standard HTTP and Gin framework.
+The upload package provides a comprehensive file upload functionality for the golang-gin-rpc framework. It supports configurable file validation, naming strategies, CORS, and integration with both standard HTTP (net/http) and Gin framework.
+
+## Package Structure
+
+```
+pkg/upload/
+├── config.go           # Configuration structures
+├── namer.go            # File naming strategies
+├── validator.go        # File validation
+├── upload.go           # Core upload functionality
+├── handler.go          # HTTP handlers (net/http compatible)
+├── example_test.go     # Core package tests
+└── gin/                # Gin framework integration
+    └── gin.go         # Gin middleware and handlers
+```
 
 ## Features
 
@@ -8,6 +22,7 @@ The upload package provides a comprehensive file upload functionality for the go
 - **Naming Strategies**: Multiple naming strategies including UUID, timestamp, original name, and custom templates
 - **CORS Support**: Configurable CORS settings for cross-origin requests
 - **Gin Integration**: Built-in middleware for seamless integration with Gin framework
+- **net/http Integration**: Native HTTP handlers for standard Go HTTP servers
 - **Standalone Server**: Option to run as a standalone upload server
 - **Auto Directory Creation**: Automatically creates upload directories
 - **File Overwrite Control**: Configurable file overwrite behavior
@@ -150,13 +165,14 @@ package main
 import (
     "github.com/gin-gonic/gin"
     "github.com/alldev-run/golang-gin-rpc/pkg/upload"
+    "github.com/alldev-run/golang-gin-rpc/pkg/upload/gin"
 )
 
 func main() {
     r := gin.Default()
     
     config := upload.DefaultConfig()
-    middleware := upload.NewGinMiddleware(config)
+    middleware := gin.NewMiddleware(config)
     
     // Register upload routes
     api := r.Group("/api")
@@ -169,7 +185,7 @@ func main() {
 ### Manual Route Registration
 
 ```go
-middleware := upload.NewGinMiddleware(config)
+middleware := gin.NewMiddleware(config)
 
 api := r.Group("/api")
 api.Use(middleware.CORSMiddleware())
@@ -178,7 +194,31 @@ api.POST("/upload/single", middleware.SingleUploadHandler)
 api.DELETE("/delete", middleware.DeleteHandler)
 ```
 
-## Standalone Server
+## net/http Integration
+
+### Basic Setup
+
+```go
+package main
+
+import (
+    "net/http"
+    "github.com/alldev-run/golang-gin-rpc/pkg/upload"
+)
+
+func main() {
+    config := upload.DefaultConfig()
+    handler := upload.NewHandler(config)
+    
+    http.HandleFunc("/upload", handler.UploadHandler)
+    http.HandleFunc("/upload/single", handler.SingleUploadHandler)
+    http.HandleFunc("/delete", handler.DeleteHandler)
+    
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+### Standalone Server
 
 ```go
 config := upload.DefaultConfig()

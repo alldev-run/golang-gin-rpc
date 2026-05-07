@@ -187,9 +187,24 @@ func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Info("File deleted", logger.String("filename", filename))
 }
 
+// GetConfig returns the current configuration
+func (h *Handler) GetConfig() *Config {
+	return h.uploader.GetConfig()
+}
+
+// GetUploader returns the uploader instance
+func (h *Handler) GetUploader() *Uploader {
+	return h.uploader
+}
+
+// UpdateConfig updates the configuration
+func (h *Handler) UpdateConfig(config *Config) {
+	h.uploader.UpdateConfig(config)
+}
+
 // setCORSHeaders sets CORS headers based on configuration
 func (h *Handler) setCORSHeaders(w http.ResponseWriter) {
-	config := h.uploader.GetConfig()
+	config := h.GetConfig()
 	if !config.EnableCORS {
 		return
 	}

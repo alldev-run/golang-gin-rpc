@@ -1,6 +1,6 @@
 # File Upload Guide
 
-The golang-gin-rpc framework provides a comprehensive file upload functionality with configurable validation, naming strategies, CORS support, and seamless integration with both standard HTTP and Gin framework.
+The golang-gin-rpc framework provides a comprehensive file upload functionality with configurable validation, naming strategies, CORS support, and seamless integration with both standard HTTP (net/http) and Gin framework.
 
 ## Table of Contents
 
@@ -8,7 +8,8 @@ The golang-gin-rpc framework provides a comprehensive file upload functionality 
 - [Features](#features)
 - [Configuration](#configuration)
 - [Quick Start](#quick-start)
-- [Integration with Gin](#integration-with-gin)
+- [Gin Framework Integration](#gin-framework-integration)
+- [net/http Integration](#nethttp-integration)
 - [Naming Strategies](#naming-strategies)
 - [File Validation](#file-validation)
 - [CORS Configuration](#cors-configuration)
@@ -25,8 +26,22 @@ The upload package (`pkg/upload`) provides a flexible and secure file upload sol
 - Multiple naming strategies (UUID, timestamp, custom)
 - CORS support for cross-origin requests
 - Gin framework middleware integration
-- Standalone server mode
+- Native net/http handler support
 - Comprehensive error handling
+
+## Package Structure
+
+```
+pkg/upload/
+├── config.go           # Configuration structures
+├── namer.go            # File naming strategies
+├── validator.go        # File validation
+├── upload.go           # Core upload functionality
+├── handler.go          # HTTP handlers (net/http compatible)
+├── example_test.go     # Core package tests
+└── gin/                # Gin framework integration
+    └── gin.go         # Gin middleware and handlers
+```
 
 ## Features
 
@@ -158,7 +173,7 @@ for _, result := range results {
 }
 ```
 
-## Integration with Gin
+## Gin Framework Integration
 
 ### Basic Setup
 
@@ -168,14 +183,14 @@ package main
 import (
     "github.com/gin-gonic/gin"
     "github.com/alldev-run/golang-gin-rpc/pkg/upload"
+    "github.com/alldev-run/golang-gin-rpc/pkg/upload/gin"
 )
 
 func main() {
     r := gin.Default()
     
-    // Create upload middleware
     config := upload.DefaultConfig()
-    middleware := upload.NewGinMiddleware(config)
+    middleware := gin.NewMiddleware(config)
     
     // Register upload routes
     api := r.Group("/api")
@@ -188,7 +203,7 @@ func main() {
 ### Manual Route Registration
 
 ```go
-middleware := upload.NewGinMiddleware(config)
+middleware := gin.NewMiddleware(config)
 
 api := r.Group("/api")
 api.Use(middleware.CORSMiddleware())
@@ -197,10 +212,45 @@ api.POST("/upload/single", middleware.SingleUploadHandler)
 api.DELETE("/delete", middleware.DeleteHandler)
 ```
 
+## net/http Integration
+
+### Basic Setup
+
+```go
+package main
+
+import (
+    "net/http"
+    "github.com/alldev-run/golang-gin-rpc/pkg/upload"
+)
+
+func main() {
+    config := upload.DefaultConfig()
+    handler := upload.NewHandler(config)
+    
+    http.HandleFunc("/upload", handler.UploadHandler)
+    http.HandleFunc("/upload/single", handler.SingleUploadHandler)
+    http.HandleFunc("/delete", handler.DeleteHandler)
+    
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+### Standalone Server
+
+```go
+config := upload.DefaultConfig()
+config.EnableServer = true
+config.Port = 8081
+
+handler := upload.NewHandler(config)
+go handler.StartServer(":8081")
+```
+
 ### Custom Route Prefix
 
 ```go
-middleware := upload.NewGinMiddleware(config)
+middleware := gin.NewMiddleware(config)
 
 files := r.Group("/files")
 middleware.RegisterRoutes(files)

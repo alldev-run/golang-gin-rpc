@@ -1,27 +1,28 @@
-package upload
+package gin
 
 import (
 	"fmt"
 	"net/http"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/upload"
 	"github.com/gin-gonic/gin"
 )
 
-// GinMiddleware provides Gin middleware for file upload
-type GinMiddleware struct {
-	handler *Handler
+// Middleware provides Gin middleware for file upload
+type Middleware struct {
+	handler *upload.Handler
 }
 
-// NewGinMiddleware creates a new Gin middleware
-func NewGinMiddleware(config *Config) *GinMiddleware {
-	return &GinMiddleware{
-		handler: NewHandler(config),
+// NewMiddleware creates a new Gin middleware
+func NewMiddleware(config *upload.Config) *Middleware {
+	return &Middleware{
+		handler: upload.NewHandler(config),
 	}
 }
 
 // UploadHandler handles file upload in Gin
-func (m *GinMiddleware) UploadHandler(c *gin.Context) {
+func (m *Middleware) UploadHandler(c *gin.Context) {
 	// Set CORS headers
 	m.setCORSHeaders(c)
 
@@ -45,7 +46,7 @@ func (m *GinMiddleware) UploadHandler(c *gin.Context) {
 	}
 
 	// Upload files
-	results := m.handler.uploader.UploadMultiple(files)
+	results := m.handler.GetUploader().UploadMultiple(files)
 
 	// Check for errors
 	var errors []string
@@ -81,7 +82,7 @@ func (m *GinMiddleware) UploadHandler(c *gin.Context) {
 }
 
 // SingleUploadHandler handles single file upload in Gin
-func (m *GinMiddleware) SingleUploadHandler(c *gin.Context) {
+func (m *Middleware) SingleUploadHandler(c *gin.Context) {
 	// Set CORS headers
 	m.setCORSHeaders(c)
 
@@ -96,7 +97,7 @@ func (m *GinMiddleware) SingleUploadHandler(c *gin.Context) {
 	}
 
 	// Upload file
-	result := m.handler.uploader.Upload(file)
+	result := m.handler.GetUploader().Upload(file)
 
 	// Send response
 	if !result.Success {
@@ -119,7 +120,7 @@ func (m *GinMiddleware) SingleUploadHandler(c *gin.Context) {
 }
 
 // DeleteHandler handles file deletion in Gin
-func (m *GinMiddleware) DeleteHandler(c *gin.Context) {
+func (m *Middleware) DeleteHandler(c *gin.Context) {
 	// Set CORS headers
 	m.setCORSHeaders(c)
 
@@ -134,7 +135,7 @@ func (m *GinMiddleware) DeleteHandler(c *gin.Context) {
 	}
 
 	// Delete file
-	if err := m.handler.uploader.Delete(filename); err != nil {
+	if err := m.handler.GetUploader().Delete(filename); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": fmt.Sprintf("Failed to delete file: %v", err),
@@ -151,8 +152,8 @@ func (m *GinMiddleware) DeleteHandler(c *gin.Context) {
 }
 
 // setCORSHeaders sets CORS headers for Gin
-func (m *GinMiddleware) setCORSHeaders(c *gin.Context) {
-	config := m.handler.uploader.GetConfig()
+func (m *Middleware) setCORSHeaders(c *gin.Context) {
+	config := m.handler.GetUploader().GetConfig()
 	if !config.EnableCORS {
 		return
 	}
@@ -218,7 +219,7 @@ func (m *GinMiddleware) setCORSHeaders(c *gin.Context) {
 }
 
 // CORSMiddleware returns a CORS middleware for Gin
-func (m *GinMiddleware) CORSMiddleware() gin.HandlerFunc {
+func (m *Middleware) CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		m.setCORSHeaders(c)
 
@@ -233,7 +234,7 @@ func (m *GinMiddleware) CORSMiddleware() gin.HandlerFunc {
 }
 
 // RegisterRoutes registers upload routes in Gin
-func (m *GinMiddleware) RegisterRoutes(router *gin.RouterGroup) {
+func (m *Middleware) RegisterRoutes(router *gin.RouterGroup) {
 	router.Use(m.CORSMiddleware())
 	router.POST("/upload", m.UploadHandler)
 	router.POST("/upload/single", m.SingleUploadHandler)
