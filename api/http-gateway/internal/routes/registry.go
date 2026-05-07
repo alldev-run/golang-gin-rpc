@@ -19,7 +19,7 @@ func NewServices() *Services {
 func RegisterAll(registry *router.RouteRegistry, services *Services) {
 	// 注册各个模块路由
 	RegisterUserRoutes(registry, services)
-	
+
 	// 可以继续添加其他模块
 	// RegisterOrderRoutes(registry)
 	// RegisterPaymentRoutes(registry)

@@ -1,6 +1,6 @@
 # File Upload Guide
 
-The golang-gin-rpc framework provides a comprehensive file upload functionality with configurable validation, naming strategies, CORS support, and seamless integration with both standard HTTP (net/http) and Gin framework.
+The golang-gin-rpc framework provides a core file upload component with configurable validation and naming strategies. HTTP interface layer (handlers, CORS, authentication) is handled by the API Gateway layer.
 
 ## Table of Contents
 
@@ -8,26 +8,23 @@ The golang-gin-rpc framework provides a comprehensive file upload functionality 
 - [Features](#features)
 - [Configuration](#configuration)
 - [Quick Start](#quick-start)
-- [Gin Framework Integration](#gin-framework-integration)
-- [net/http Integration](#nethttp-integration)
+- [Bootstrap Integration](#bootstrap-integration)
 - [Naming Strategies](#naming-strategies)
 - [File Validation](#file-validation)
-- [CORS Configuration](#cors-configuration)
-- [API Endpoints](#api-endpoints)
 - [Security Considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-The upload package (`pkg/upload`) provides a flexible and secure file upload solution for the golang-gin-rpc framework. It supports:
+The upload package (`pkg/upload`) provides a flexible and secure file upload core component for the golang-gin-rpc framework. It handles:
 
-- Multiple file upload methods (multipart form, bytes)
-- Configurable file type and size validation
+- File validation by extension and MIME type
+- Configurable file size limits
 - Multiple naming strategies (UUID, timestamp, custom)
-- CORS support for cross-origin requests
-- Gin framework middleware integration
-- Native net/http handler support
-- Comprehensive error handling
+- Path traversal protection
+- Auto directory creation
+
+HTTP handlers, CORS, authentication, and other interface concerns are implemented in the API Gateway layer.
 
 ## Package Structure
 
@@ -37,10 +34,7 @@ pkg/upload/
 ├── namer.go            # File naming strategies
 ├── validator.go        # File validation
 ├── upload.go           # Core upload functionality
-├── handler.go          # HTTP handlers (net/http compatible)
-├── example_test.go     # Core package tests
-└── gin/                # Gin framework integration
-    └── gin.go         # Gin middleware and handlers
+└── example_test.go     # Core package tests
 ```
 
 ## Features
@@ -50,13 +44,7 @@ pkg/upload/
 - **File Validation**: Validate files by extension and MIME type
 - **Size Limits**: Configure maximum file size to prevent DoS attacks
 - **Naming Strategies**: Multiple options for auto-naming uploaded files
-- **CORS Support**: Full CORS configuration for cross-origin requests
-- **Authentication**: Basic HTTP authentication support with username/password
-- **Gin Integration**: Built-in middleware for seamless Gin integration
-- **net/http Integration**: Native HTTP handlers for standard Go HTTP servers
-- **File Browsing**: List and browse uploaded files
-- **File Download**: Download files with proper MIME type detection
-- **Standalone Server**: Option to run as a standalone upload server
+- **Path Traversal Protection**: Prevents directory traversal attacks
 - **Auto Directory Creation**: Automatically creates upload directories
 - **File Overwrite Control**: Configurable file overwrite behavior
 
@@ -85,123 +73,24 @@ upload:
   naming_strategy: "uuid"  # uuid, timestamp, original, custom
   custom_name_template: "{date}_{original}_{random}"
   preserve_extension: true
-  enable_cors: true
-  cors:
-    allowed_origins:
-      - "*"
-    allowed_methods:
-      - "GET"
-      - "POST"
-      - "OPTIONS"
-      - "DELETE"
-    allowed_headers:
-      - "Origin"
-      - "Content-Type"
-      - "Accept"
-      - "Authorization"
-    allow_credentials: false
-    max_age: 86400
-  port: 8081
-  enable_server: false
   auto_create_dir: true
   enable_overwrite: false
-  enable_auth: false
-  auth_username: "admin"
-  auth_password: "password"
-  token_secret: ""
-  token_ttl_seconds: 300
 ```
 
 ### Configuration Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `enabled` | bool | `false` | Enable/disable file upload functionality |
+| `enabled` | bool | `false` | Enable/disable upload functionality |
 | `upload_dir` | string | `"./uploads"` | Directory to store uploaded files |
-| `max_file_size` | int64 | `10485760` | Maximum file size in bytes (10MB default) |
+| `max_file_size` | int64 | `10485760` | Maximum file size in bytes (10MB) |
 | `allowed_extensions` | []string | See default | Allowed file extensions |
 | `allowed_mime_types` | []string | See default | Allowed MIME types |
 | `naming_strategy` | string | `"uuid"` | File naming strategy |
-| `custom_name_template` | string | `""` | Custom naming template |
+| `custom_name_template` | string | `"{date}_{original}_{random}"` | Custom naming template |
 | `preserve_extension` | bool | `true` | Preserve original file extension |
-| `enable_cors` | bool | `true` | Enable CORS support |
-| `port` | int | `8081` | Port for standalone server |
-| `enable_server` | bool | `false` | Enable standalone upload server |
-| `auto_create_dir` | bool | `true` | Automatically create upload directory |
-| `enable_overwrite` | bool | `false` | Allow overwriting existing files |
-| `enable_auth` | bool | `false` | Enable authentication |
-| `auth_username` | string | `""` | Authentication username |
-| `auth_password` | string | `""` | Authentication password |
-| `token_secret` | string | `""` | Token signing secret (fallback to `auth_password`) |
-| `token_ttl_seconds` | int64 | `300` | Short-lived token validity in seconds |
-
-## Authentication
-
-The upload package supports Basic HTTP authentication to protect upload endpoints.
-Download token generation and verification reuse framework `pkg/auth/jwtx`.
-
-### Enabling Authentication
-
-```yaml
-upload:
-  enable_auth: true
-  auth_username: "admin"
-  auth_password: "secure_password"
-```
-
-### Using Authentication
-
-When authentication is enabled, upload/list/delete endpoints require Basic HTTP authentication. Download can use either Basic Auth or a valid short-lived Bearer token.
-
-#### Using cURL
-
-```bash
-# Upload with authentication
-curl -X POST -u admin:secure_password -F "files=@test.jpg" http://localhost:8081/upload
-
-# List files with authentication
-curl -u admin:secure_password http://localhost:8081/list
-
-# Download file with authentication
-curl -u admin:secure_password "http://localhost:8081/download?filename=test.jpg" -o test.jpg
-
-# Issue short-lived token (requires authentication)
-curl -u admin:secure_password "http://localhost:8081/token?filename=test.jpg"
-
-# Download with bearer token (recommended)
-curl -H "Authorization: Bearer <TOKEN>" "http://localhost:8081/download?filename=test.jpg" -o test.jpg
-
-# Delete file with authentication
-curl -X DELETE -u admin:secure_password "http://localhost:8081/delete?filename=test.jpg"
-```
-
-#### Using in Code
-
-```go
-config := upload.DefaultConfig()
-config.EnableAuth = true
-config.AuthUsername = "admin"
-config.AuthPassword = "secure_password"
-
-handler := upload.NewHandler(config)
-// All handlers will now require authentication
-```
-
-### Public Token Methods (for external frameworks)
-
-```go
-handler := upload.NewHandler(config)
-
-token, expiresAt, err := handler.GenerateDownloadToken("test.jpg")
-if err != nil {
-    // handle error
-}
-
-ok := handler.VerifyDownloadToken("test.jpg", expiresAt, token)
-if !ok {
-    // handle invalid token
-}
-```
+| `auto_create_dir` | bool | `true` | Auto-create upload directory |
+| `enable_overwrite` | bool | `false` | Allow file overwrites |
 
 ## Quick Start
 
@@ -255,96 +144,68 @@ for _, result := range results {
 }
 ```
 
-## Gin Framework Integration
+## Bootstrap Integration
 
-### Basic Setup
+The upload package integrates with the framework's bootstrap system for automatic initialization.
+
+### Enable in Configuration
+
+```yaml
+upload:
+  enabled: true
+  upload_dir: "./uploads"
+  # ... other config
+```
+
+### Get Uploader from Bootstrap
 
 ```go
-package main
+import (
+    "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+)
 
+// Initialize bootstrap
+boot := bootstrap.New()
+err := boot.InitializeAll()
+if err != nil {
+    log.Fatal(err)
+}
+
+// Get uploader
+uploader, err := pkgbootstrap.GetUploader(boot)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Create HTTP Handlers in API Gateway Layer
+
+```go
 import (
     "github.com/gin-gonic/gin"
     "github.com/alldev-run/golang-gin-rpc/pkg/upload"
-    "github.com/alldev-run/golang-gin-rpc/pkg/upload/gin"
 )
 
-func main() {
-    r := gin.Default()
+func uploadHandler(c *gin.Context, uploader *upload.Uploader) {
+    file, err := c.FormFile("file")
+    if err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
     
-    config := upload.DefaultConfig()
-    middleware := gin.NewMiddleware(config)
+    result := uploader.Upload(file)
+    if !result.Success {
+        c.JSON(400, gin.H{"error": result.Error.Error()})
+        return
+    }
     
-    // Register upload routes
-    api := r.Group("/api")
-    middleware.RegisterRoutes(api)
-    
-    r.Run(":8080")
+    c.JSON(200, gin.H{
+        "filename": result.SavedFilename,
+        "path": result.FilePath,
+        "size": result.FileSize,
+    })
 }
-```
-
-### Manual Route Registration
-
-```go
-middleware := gin.NewMiddleware(config)
-
-api := r.Group("/api")
-api.Use(middleware.CORSMiddleware())
-api.POST("/upload", middleware.UploadHandler)
-api.POST("/upload/single", middleware.SingleUploadHandler)
-api.POST("/upload/stream", middleware.UploadStreamHandler)
-api.GET("/list", middleware.ListHandler)
-api.GET("/token", middleware.IssueTokenHandler)
-api.GET("/download", middleware.DownloadHandler)
-api.DELETE("/delete", middleware.DeleteHandler)
-```
-
-## net/http Integration
-
-### Basic Setup
-
-```go
-package main
-
-import (
-    "net/http"
-    "github.com/alldev-run/golang-gin-rpc/pkg/upload"
-)
-
-func main() {
-    config := upload.DefaultConfig()
-    handler := upload.NewHandler(config)
-    
-    http.HandleFunc("/upload", handler.UploadHandler)
-    http.HandleFunc("/upload/single", handler.SingleUploadHandler)
-    http.HandleFunc("/upload/stream", handler.UploadStreamHandler)
-    http.HandleFunc("/list", handler.ListHandler)
-    http.HandleFunc("/token", handler.IssueTokenHandler)
-    http.HandleFunc("/download", handler.DownloadHandler)
-    http.HandleFunc("/delete", handler.DeleteHandler)
-    
-    http.ListenAndServe(":8080", nil)
-}
-```
-
-### Standalone Server
-
-```go
-config := upload.DefaultConfig()
-config.EnableServer = true
-config.Port = 8081
-
-handler := upload.NewHandler(config)
-go handler.StartServer(":8081")
-```
-
-### Custom Route Prefix
-
-```go
-middleware := gin.NewMiddleware(config)
-
-files := r.Group("/files")
-middleware.RegisterRoutes(files)
-// Routes: /files/upload, /files/upload/single, /files/upload/stream, /files/list, /files/token, /files/download, /files/delete
 ```
 
 ## Naming Strategies
@@ -423,210 +284,6 @@ if !result.Success {
 }
 ```
 
-## CORS Configuration
-
-### Basic CORS Setup
-
-```go
-config := upload.DefaultConfig()
-config.EnableCORS = true
-config.CORS = upload.CORSConfig{
-    AllowedOrigins:   []string{"https://example.com"},
-    AllowedMethods:   []string{"POST", "OPTIONS"},
-    AllowedHeaders:   []string{"Content-Type", "Authorization"},
-    AllowCredentials: true,
-    MaxAge:           86400,
-}
-```
-
-### CORS for Local Development
-
-```go
-config.CORS = upload.CORSConfig{
-    AllowedOrigins:   []string{"*"},
-    AllowedMethods:   []string{"GET", "POST", "OPTIONS", "DELETE"},
-    AllowedHeaders:   []string{"*"},
-    AllowCredentials: false,
-    MaxAge:           86400,
-}
-```
-
-### CORS for Production
-
-```go
-config.CORS = upload.CORSConfig{
-    AllowedOrigins:   []string{"https://yourdomain.com", "https://api.yourdomain.com"},
-    AllowedMethods:   []string{"POST", "OPTIONS", "DELETE"},
-    AllowedHeaders:   []string{"Content-Type", "Authorization"},
-    AllowCredentials: true,
-    MaxAge:           3600,
-}
-```
-
-## API Endpoints
-
-### POST /api/upload
-
-Upload multiple files.
-
-**Request:**
-- Method: POST
-- Content-Type: multipart/form-data
-- Form field: `files` (array)
-
-**Response (Success):**
-```json
-{
-  "success": true,
-  "message": "2 files uploaded successfully",
-  "data": [
-    {
-      "original_filename": "example.jpg",
-      "saved_filename": "550e8400-e29b-41d4-a716-446655440000.jpg",
-      "file_path": "./uploads/550e8400-e29b-41d4-a716-446655440000.jpg",
-      "file_size": 1024000,
-      "mime_type": "image/jpeg",
-      "success": true
-    }
-  ]
-}
-```
-
-**Response (Partial Success):**
-```json
-{
-  "success": false,
-  "message": "1 files uploaded successfully, 1 files failed",
-  "data": [...],
-  "errors": ["file_extension: file extension .exe is not allowed"]
-}
-```
-
-### POST /api/upload/single
-
-Upload a single file.
-
-**Request:**
-- Method: POST
-- Content-Type: multipart/form-data
-- Form field: `file`
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "File uploaded successfully",
-  "data": {
-    "original_filename": "example.jpg",
-    "saved_filename": "550e8400-e29b-41d4-a716-446655440000.jpg",
-    "file_path": "./uploads/550e8400-e29b-41d4-a716-446655440000.jpg",
-    "file_size": 1024000,
-    "mime_type": "image/jpeg",
-    "success": true
-  }
-}
-```
-
-### POST /api/upload/stream?filename={filename}
-
-Upload a single file using raw binary stream.
-
-**Request:**
-- Method: POST
-- Content-Type: `application/octet-stream`
-- Query parameter: `filename` (or header `X-Filename`)
-- Body: raw binary bytes
-
-**cURL example:**
-```bash
-curl -X POST \
-  -H "Content-Type: application/octet-stream" \
-  -H "X-Filename: demo.txt" \
-  --data-binary @demo.txt \
-  -u admin:secure_password \
-  http://localhost:8081/upload/stream
-```
-
-### GET /api/list
-
-List all uploaded files.
-
-**Request:**
-- Method: GET
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Files listed successfully",
-  "data": [
-    {
-      "filename": "550e8400-e29b-41d4-a716-446655440000.jpg",
-      "file_path": "550e8400-e29b-41d4-a716-446655440000.jpg",
-      "file_size": 1024000,
-      "mod_time": "2024-05-06T14:30:25Z",
-      "is_directory": false
-    }
-  ]
-}
-```
-
-### GET /api/download?filename={filename}
-
-Download a file.
-
-**Request:**
-- Method: GET
-- Query parameter: `filename`
-- Auth options:
-  - `Authorization: Bearer <token>`
-  - or Basic Auth (`-u username:password`)
-  - or query token `token=<TOKEN>` (compatibility)
-
-**Response:**
-- Content-Type: Detected MIME type (e.g., image/jpeg)
-- Content-Disposition: attachment; filename={filename}
-- File content in response body
-
-### GET /api/token?filename={filename}
-
-Issue short-lived download token.
-
-**Request:**
-- Method: GET
-- Requires Basic Auth
-- Query parameter: `filename`
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Token issued successfully",
-  "data": {
-    "filename": "test.jpg",
-    "token": "<SIGNED_TOKEN>",
-    "expires": 1715000000,
-    "ttl": 300
-  }
-}
-```
-
-### DELETE /api/delete?filename={filename}
-
-Delete a file.
-
-**Request:**
-- Method: DELETE
-- Query parameter: `filename`
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "File deleted successfully"
-}
-```
-
 ## Security Considerations
 
 ### File Size Limits
@@ -661,19 +318,6 @@ upload:
 - Consider storing uploads outside the web root
 - Implement access control for file downloads
 
-### CORS Configuration
-
-Configure CORS carefully for production:
-
-```yaml
-upload:
-  enable_cors: true
-  cors:
-    allowed_origins:
-      - "https://yourdomain.com"  # Specific origins only
-    allow_credentials: true      # Only if needed
-```
-
 ### File Naming
 
 Use UUID or timestamp naming to prevent:
@@ -694,6 +338,10 @@ For sensitive applications, implement additional validation:
 - Validate file content matches declared MIME type
 - Process files in a sandboxed environment
 
+### HTTP Interface Security
+
+HTTP handlers, CORS, authentication, and other interface concerns should be implemented in the API Gateway layer with appropriate security measures.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -705,10 +353,6 @@ For sensitive applications, implement additional validation:
 #### File Upload Fails with "File size exceeds maximum"
 
 **Solution:** Increase `max_file_size` in configuration or compress files before upload.
-
-#### CORS Errors
-
-**Solution:** Check CORS configuration and ensure the origin is in `allowed_origins`.
 
 #### Directory Not Created
 
@@ -741,10 +385,10 @@ go test ./pkg/upload/... -v
 2. **Set reasonable file size limits** - Prevent DoS attacks
 3. **Use UUID naming** - Prevent collisions and security issues
 4. **Secure upload directories** - Store outside web root when possible
-5. **Configure CORS properly** - Use specific origins in production
-6. **Monitor upload activity** - Log and track upload attempts
-7. **Implement rate limiting** - Prevent abuse of upload endpoints
-8. **Regular cleanup** - Remove old or unused uploaded files
+5. **Monitor upload activity** - Log and track upload attempts
+6. **Implement rate limiting in API Gateway** - Prevent abuse of upload endpoints
+7. **Regular cleanup** - Remove old or unused uploaded files
+8. **Implement authentication in API Gateway** - Protect upload endpoints with proper authentication
 
 ## Advanced Usage
 

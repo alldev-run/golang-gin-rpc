@@ -391,29 +391,5 @@ upload:
   naming_strategy: "uuid"  # uuid, timestamp, original, custom
   custom_name_template: "{date}_{original}_{random}"  # Used when naming_strategy is "custom"
   preserve_extension: true
-  enable_cors: true
-  cors:
-    allowed_origins:
-      - "*"
-    allowed_methods:
-      - "GET"
-      - "POST"
-      - "OPTIONS"
-      - "DELETE"
-    allowed_headers:
-      - "Origin"
-      - "Content-Type"
-      - "Accept"
-      - "Authorization"
-    exposed_headers: []
-    allow_credentials: false
-    max_age: 86400  # 24 hours
-  port: 8081  # Port for standalone upload server
-  enable_server: false  # Enable standalone upload server
   auto_create_dir: true
   enable_overwrite: false
-  enable_auth: false  # Enable authentication
-  auth_username: "admin"  # Authentication username
-  auth_password: "password"  # Authentication password
-  token_secret: ""  # Optional signing secret for short-lived download tokens (fallback: auth_password)
-  token_ttl_seconds: 300  # Signed token validity in seconds

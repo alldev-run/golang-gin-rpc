@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -11,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/audit"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+	"github.com/gin-gonic/gin"
 )
 
 type exampleAuditSink struct{}
@@ -85,6 +84,27 @@ func main() {
 			"status":  "running",
 		})
 	})
+
+	// Register upload routes if upload service is enabled
+	// API Gateway layer creates HTTP handlers using the core Uploader from bootstrap
+	uploader := bs.GetUploader()
+	if uploader != nil {
+		uploadGroup := r.Group("/api/upload")
+
+		// Example: Create a simple upload handler using the Uploader
+		uploadGroup.POST("/upload", func(c *gin.Context) {
+			// TODO: Implement upload handler using uploader.Upload()
+			// This demonstrates that API Gateway layer is responsible for HTTP handling
+			c.JSON(200, gin.H{
+				"message":    "Upload service is available",
+				"upload_dir": uploader.GetConfig().UploadDir,
+			})
+		})
+
+		logger.Info("Upload service routes registered")
+	} else {
+		logger.Info("Upload service not enabled or not initialized")
+	}
 
 	// Handle signals
 	sigCh := make(chan os.Signal, 1)

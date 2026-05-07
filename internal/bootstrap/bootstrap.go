@@ -30,6 +30,7 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
 	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
 	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/pkg/upload"
 	"github.com/alldev-run/golang-gin-rpc/pkg/version"
 	"github.com/alldev-run/golang-gin-rpc/pkg/websocket"
 )
@@ -64,6 +65,7 @@ type Bootstrap struct {
 	authManager      *auth.AuthManager
 	tracer           *tracing.Tracer
 	gateway          *gateway.Gateway
+	uploader         *upload.Uploader
 
 	serviceMu        sync.RWMutex
 	serviceFactories map[string]ServiceFactory
@@ -148,6 +150,10 @@ func (b *Bootstrap) InitializeAll() error {
 
 	if err := b.InitializeCache(); err != nil {
 		return fmt.Errorf("failed to initialize cache: %w", err)
+	}
+
+	if err := b.InitializeUpload(); err != nil {
+		return fmt.Errorf("failed to initialize upload: %w", err)
 	}
 
 	if err := b.InitializeErrors(); err != nil {
@@ -1044,6 +1050,23 @@ func (b *Bootstrap) InitializeTracing() error {
 	return nil
 }
 
+// InitializeUpload initializes upload service if enabled
+func (b *Bootstrap) InitializeUpload() error {
+	if !b.config.Upload.Enabled {
+		logger.Info("Upload service disabled, skipping initialization")
+		return nil
+	}
+
+	uploader := upload.NewUploader(&b.config.Upload.Config)
+	b.uploader = uploader
+	b.setDependency("upload.uploader", uploader)
+
+	logger.Info("Upload service initialized successfully",
+		logger.String("upload_dir", b.config.Upload.UploadDir),
+		logger.Bool("auto_create_dir", b.config.Upload.AutoCreateDir))
+	return nil
+}
+
 // InitializeGateway initializes the HTTP gateway
 func (b *Bootstrap) InitializeGateway() error {
 	gatewayConfig := gateway.DefaultConfig()
@@ -1269,6 +1292,11 @@ func (b *Bootstrap) GetTracer() *tracing.Tracer {
 // GetGateway returns the gateway instance
 func (b *Bootstrap) GetGateway() *gateway.Gateway {
 	return b.gateway
+}
+
+// GetUploader returns the upload uploader
+func (b *Bootstrap) GetUploader() *upload.Uploader {
+	return b.uploader
 }
 
 // Close closes all resources

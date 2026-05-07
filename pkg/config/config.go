@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/upload"
 	"gopkg.in/yaml.v3"
 )
 
@@ -53,6 +54,18 @@ type GlobalConfig struct {
 
 	// Security
 	Security SecurityConfig `yaml:"security" json:"security"`
+
+	// Upload service configuration
+	Upload UploadConfig `yaml:"upload" json:"upload"`
+}
+
+// UploadConfig wraps upload.Config with framework-level settings
+type UploadConfig struct {
+	// Enable upload functionality
+	Enabled bool `yaml:"enabled" json:"enabled"`
+
+	// Core upload configuration
+	upload.Config
 }
 
 // AppConfig application basic configuration

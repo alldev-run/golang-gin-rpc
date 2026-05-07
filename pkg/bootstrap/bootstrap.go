@@ -17,6 +17,7 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/upload"
 )
 
 type Bootstrap = internalbootstrap.Bootstrap
@@ -221,4 +222,12 @@ func GetPostgresClient(boot *Bootstrap) (*postgres.Client, error) {
 		return nil, fmt.Errorf("bootstrap instance is nil")
 	}
 	return boot.GetPostgresClient()
+}
+
+// GetUploader returns the upload uploader from bootstrap
+func GetUploader(boot *Bootstrap) (*upload.Uploader, error) {
+	if boot == nil {
+		return nil, fmt.Errorf("bootstrap instance is nil")
+	}
+	return boot.GetUploader(), nil
 }
