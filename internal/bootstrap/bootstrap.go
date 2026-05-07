@@ -1062,8 +1062,8 @@ func (b *Bootstrap) InitializeUpload() error {
 	b.setDependency("upload.uploader", uploader)
 
 	logger.Info("Upload service initialized successfully",
-		logger.String("upload_dir", b.config.Upload.UploadDir),
-		logger.Bool("auto_create_dir", b.config.Upload.AutoCreateDir))
+		logger.String("upload_dir", b.config.Upload.Config.UploadDir),
+		logger.Bool("auto_create_dir", b.config.Upload.Config.AutoCreateDir))
 	return nil
 }
 
