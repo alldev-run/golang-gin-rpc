@@ -56,16 +56,7 @@ type GlobalConfig struct {
 	Security SecurityConfig `yaml:"security" json:"security"`
 
 	// Upload service configuration
-	Upload UploadConfig `yaml:"upload" json:"upload"`
-}
-
-// UploadConfig wraps upload.Config with framework-level settings
-type UploadConfig struct {
-	// Enable upload functionality
-	Enabled bool `yaml:"enabled" json:"enabled"`
-
-	// Core upload configuration
-	upload.Config
+	Upload upload.Config `yaml:"upload" json:"upload"`
 }
 
 // AppConfig application basic configuration
