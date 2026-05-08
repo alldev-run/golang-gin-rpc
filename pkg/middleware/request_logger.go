@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	
+
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
@@ -17,19 +18,19 @@ import (
 type RequestLoggerConfig struct {
 	// SkipPaths is a list of paths to skip logging
 	SkipPaths []string
-	
+
 	// MaxBodySize limits the size of request/response body to log
 	MaxBodySize int64
-	
+
 	// LogRequestBody enables logging request body
 	LogRequestBody bool
-	
+
 	// LogResponseBody enables logging response body
 	LogResponseBody bool
-	
+
 	// LogHeaders enables logging request headers
 	LogHeaders bool
-	
+
 	// SensitiveHeaders is a list of header names to mask or skip
 	SensitiveHeaders []string
 }
@@ -39,13 +40,13 @@ func DefaultRequestLoggerConfig() RequestLoggerConfig {
 	return RequestLoggerConfig{
 		SkipPaths: []string{
 			"/health",
-			"/ready", 
+			"/ready",
 			"/metrics",
 		},
-		MaxBodySize:      1024 * 1024, // 1MB
-		LogRequestBody:   true,
-		LogResponseBody:  false, // Response body logging can be expensive
-		LogHeaders:       true,
+		MaxBodySize:     1024 * 1024, // 1MB
+		LogRequestBody:  true,
+		LogResponseBody: false, // Response body logging can be expensive
+		LogHeaders:      true,
 		SensitiveHeaders: []string{
 			"Authorization",
 			"Cookie",
@@ -83,7 +84,7 @@ func RequestLogger(config ...RequestLoggerConfig) gin.HandlerFunc {
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
-		
+
 		// Set request_id in context and response header
 		c.Set("request_id", requestID)
 		c.Header("X-Request-ID", requestID)
@@ -91,8 +92,18 @@ func RequestLogger(config ...RequestLoggerConfig) gin.HandlerFunc {
 		// Read and potentially replace request body
 		var requestBody []byte
 		if cfg.LogRequestBody && c.Request.Body != nil {
-			requestBody, _ = io.ReadAll(c.Request.Body)
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			// Skip reading binary stream types to avoid breaking upload parsing
+			contentType := c.Request.Header.Get("Content-Type")
+			isBinaryStream := strings.HasPrefix(contentType, "multipart/form-data") ||
+				strings.HasPrefix(contentType, "application/octet-stream") ||
+				strings.HasPrefix(contentType, "application/pdf") ||
+				strings.HasPrefix(contentType, "image/") ||
+				strings.HasPrefix(contentType, "video/") ||
+				strings.HasPrefix(contentType, "audio/")
+			if !isBinaryStream {
+				requestBody, _ = io.ReadAll(c.Request.Body)
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			}
 		}
 
 		// Create response writer wrapper to capture response
@@ -219,7 +230,7 @@ func LogRequestWithID(c *gin.Context, level string, message string, fields ...za
 	if requestID != "" {
 		fields = append([]zap.Field{zap.String("request_id", requestID)}, fields...)
 	}
-	
+
 	frameworkLogger := logger.L()
 	switch level {
 	case "debug":
