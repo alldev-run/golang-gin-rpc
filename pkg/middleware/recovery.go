@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
@@ -13,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
-
 
 // Recovery creates a recovery middleware that recovers from any panics
 func Recovery(config ...RecoveryConfig) gin.HandlerFunc {
@@ -57,7 +57,7 @@ func defaultLogger(c *gin.Context, err interface{}) {
 	path := c.Request.URL.Path
 	ip := c.ClientIP()
 	userAgent := c.Request.UserAgent()
-	
+
 	// Get user information if available
 	var userID string
 	if uid, exists := c.Get("user_id"); exists {
@@ -90,8 +90,21 @@ func logRequest(c *gin.Context, bodyLimit int64) {
 	// Read request body if it exists
 	var body []byte
 	if c.Request.Body != nil {
-		body, _ = io.ReadAll(io.LimitReader(c.Request.Body, bodyLimit))
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+		// Skip reading binary stream types to avoid breaking upload parsing
+		contentType := c.Request.Header.Get("Content-Type")
+		isBinaryStream := contentType == "" ||
+			strings.HasPrefix(contentType, "multipart/form-data") ||
+			strings.HasPrefix(contentType, "application/octet-stream") ||
+			strings.HasPrefix(contentType, "application/pdf") ||
+			strings.HasPrefix(contentType, "image/") ||
+			strings.HasPrefix(contentType, "video/") ||
+			strings.HasPrefix(contentType, "audio/")
+		if !isBinaryStream {
+			var copied bytes.Buffer
+			teeReader := io.TeeReader(c.Request.Body, &copied)
+			body, _ = io.ReadAll(io.LimitReader(teeReader, bodyLimit))
+			c.Request.Body = io.NopCloser(io.MultiReader(bytes.NewReader(copied.Bytes()), c.Request.Body))
+		}
 	}
 
 	c.Next()

@@ -94,7 +94,8 @@ func RequestLogger(config ...RequestLoggerConfig) gin.HandlerFunc {
 		if cfg.LogRequestBody && c.Request.Body != nil {
 			// Skip reading binary stream types to avoid breaking upload parsing
 			contentType := c.Request.Header.Get("Content-Type")
-			isBinaryStream := strings.HasPrefix(contentType, "multipart/form-data") ||
+			isBinaryStream := contentType == "" ||
+				strings.HasPrefix(contentType, "multipart/form-data") ||
 				strings.HasPrefix(contentType, "application/octet-stream") ||
 				strings.HasPrefix(contentType, "application/pdf") ||
 				strings.HasPrefix(contentType, "image/") ||

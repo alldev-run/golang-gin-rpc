@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
 	"github.com/alldev-run/golang-gin-rpc/pkg/metrics"
+	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+	"github.com/gin-gonic/gin"
 )
 
 // Proxy handles HTTP proxying
@@ -81,7 +81,7 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 	// Setup proxy routes
 	for _, route := range g.config.Routes {
 		route.Path = normalizeGinRoutePath(route.Path)
-		
+
 		// Create handler based on protocol
 		var handler gin.HandlerFunc
 		switch route.Protocol {
@@ -89,10 +89,10 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 			handler = func(c *gin.Context) {
 				c.Set("route", route.Service)
 				routeObj := &Route{
-					config:   route,
-					targets:  route.Targets,
-					timeout:  route.Timeout,
-					retries:  route.Retries,
+					config:  route,
+					targets: route.Targets,
+					timeout: route.Timeout,
+					retries: route.Retries,
 				}
 				if g.grpcProxy != nil {
 					if err := g.grpcProxy.ProxyGRPC(c, routeObj); err != nil {
@@ -106,10 +106,10 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 			handler = func(c *gin.Context) {
 				c.Set("route", route.Service)
 				routeObj := &Route{
-					config:   route,
-					targets:  route.Targets,
-					timeout:  route.Timeout,
-					retries:  route.Retries,
+					config:  route,
+					targets: route.Targets,
+					timeout: route.Timeout,
+					retries: route.Retries,
 				}
 				if g.jsonProxy != nil {
 					if err := g.jsonProxy.ProxyJSONRPC(c, routeObj); err != nil {
@@ -206,7 +206,7 @@ func (g *Gateway) checkRoutePermission(c *gin.Context, route RouteConfig) bool {
 func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		
+
 		// Find route targets
 		routePath := normalizeGinRoutePath(routeConfig.Path)
 		routeKey := p.gateway.routeKey(routePath, c.Request.Method)
@@ -259,7 +259,7 @@ func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string,
 	if route.config.StripPrefix {
 		proxyPath = strings.TrimPrefix(proxyPath, route.config.Path)
 	}
-	
+
 	targetURL.Path = path.Join(targetURL.Path, proxyPath)
 	targetURL.RawQuery = c.Request.URL.RawQuery
 
@@ -268,50 +268,51 @@ func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string,
 	if err != nil {
 		return fmt.Errorf("failed to read request body: %w", err)
 	}
-
-	proxyReq, err := http.NewRequestWithContext(ctx, c.Request.Method, targetURL.String(), bytes.NewReader(reqBody))
-	if err != nil {
-		return fmt.Errorf("failed to create proxy request: %w", err)
-	}
-
-	// Copy headers
-	p.copyHeaders(c.Request.Header, proxyReq.Header)
-	
-	// Add route-specific headers
-	for key, value := range route.config.Headers {
-		proxyReq.Header.Set(key, value)
-	}
-
-	// Add route-specific query parameters
-	if len(route.config.Query) > 0 {
-		query := proxyReq.URL.Query()
-		for key, value := range route.config.Query {
-			query.Set(key, value)
-		}
-		proxyReq.URL.RawQuery = query.Encode()
-	}
-
-	// Add gateway headers
-	proxyReq.Header.Set("X-Gateway-Request-ID", c.GetHeader("X-Request-ID"))
-	proxyReq.Header.Set("X-Forwarded-For", c.ClientIP())
-	proxyReq.Header.Set("X-Forwarded-Proto", "http")
-	if c.Request.TLS != nil {
-		proxyReq.Header.Set("X-Forwarded-Proto", "https")
-	}
-
-	// Inject tracing context into proxy request
-	p.gateway.InjectTracingHeaders(proxyReq, c.Request.Context())
+	c.Request.Body = io.NopCloser(bytes.NewReader(reqBody))
 
 	// Execute request with retries
 	var resp *http.Response
 	var lastErr error
-	
+
 	maxRetries := route.retries
 	if maxRetries <= 0 {
 		maxRetries = 1
 	}
 
 	for i := 0; i < maxRetries; i++ {
+		proxyReq, reqErr := http.NewRequestWithContext(ctx, c.Request.Method, targetURL.String(), bytes.NewReader(reqBody))
+		if reqErr != nil {
+			return fmt.Errorf("failed to create proxy request: %w", reqErr)
+		}
+
+		// Copy headers
+		p.copyHeaders(c.Request.Header, proxyReq.Header)
+
+		// Add route-specific headers
+		for key, value := range route.config.Headers {
+			proxyReq.Header.Set(key, value)
+		}
+
+		// Add route-specific query parameters
+		if len(route.config.Query) > 0 {
+			query := proxyReq.URL.Query()
+			for key, value := range route.config.Query {
+				query.Set(key, value)
+			}
+			proxyReq.URL.RawQuery = query.Encode()
+		}
+
+		// Add gateway headers
+		proxyReq.Header.Set("X-Gateway-Request-ID", c.GetHeader("X-Request-ID"))
+		proxyReq.Header.Set("X-Forwarded-For", c.ClientIP())
+		proxyReq.Header.Set("X-Forwarded-Proto", "http")
+		if c.Request.TLS != nil {
+			proxyReq.Header.Set("X-Forwarded-Proto", "https")
+		}
+
+		// Inject tracing context into proxy request
+		p.gateway.InjectTracingHeaders(proxyReq, c.Request.Context())
+
 		resp, err = p.client.Do(proxyReq)
 		if err == nil {
 			break
@@ -329,7 +330,7 @@ func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string,
 
 	// Copy response headers
 	p.copyHeaders(resp.Header, c.Writer.Header())
-	
+
 	// Set status code
 	c.Status(resp.StatusCode)
 
@@ -402,19 +403,19 @@ func (g *Gateway) readinessCheck(c *gin.Context) {
 
 	if healthyRouteCount == 0 {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "not ready",
-			"reason": "no healthy upstream",
-			"routes": routeCount,
+			"status":    "not ready",
+			"reason":    "no healthy upstream",
+			"routes":    routeCount,
 			"timestamp": time.Now().Unix(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":     "ready",
-		"routes":     routeCount,
+		"status":         "ready",
+		"routes":         routeCount,
 		"healthy_routes": healthyRouteCount,
-		"timestamp":  time.Now().Unix(),
+		"timestamp":      time.Now().Unix(),
 	})
 }
 
