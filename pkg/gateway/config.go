@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"time"
+
 	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
@@ -46,6 +47,9 @@ type Config struct {
 
 	// RBAC configuration
 	RBAC RBACConfig `yaml:"rbac" json:"rbac"`
+
+	// BusinessPaths are the URI prefixes that should bypass proxy body logging.
+	BusinessPaths []string `yaml:"business_paths" json:"business_paths"`
 }
 
 // AuditConfig holds audit middleware configuration.
@@ -73,7 +77,7 @@ type CORSConfig struct {
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
-	Enabled bool    `yaml:"enabled" json:"enabled"`
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
 	Requests int    `yaml:"requests" json:"requests"`
 	Window   string `yaml:"window" json:"window"` // duration string like "1m", "30s"
 }
@@ -97,22 +101,22 @@ type LoadBalancerConfig struct {
 type AuthConfig struct {
 	// Enabled indicates if RPC authentication is enabled
 	Enabled bool `yaml:"enabled" json:"enabled"`
-	
+
 	// Type indicates the RPC authentication type (apikey, jwt, oauth2)
 	Type string `yaml:"type" json:"type"`
-	
+
 	// HeaderName is the header name for API key (default: X-API-Key)
 	HeaderName string `yaml:"header_name" json:"header_name"`
-	
+
 	// QueryName is the query parameter name for API key (default: api_key)
 	QueryName string `yaml:"query_name" json:"query_name"`
-	
+
 	// SkipPaths are RPC paths that skip authentication
 	SkipPaths []string `yaml:"skip_paths" json:"skip_paths"`
-	
+
 	// SkipMethods are HTTP methods that skip RPC authentication
 	SkipMethods []string `yaml:"skip_methods" json:"skip_methods"`
-	
+
 	// APIKeys is a map of valid RPC API keys (key -> description/user)
 	APIKeys map[string]string `yaml:"api_keys" json:"api_keys"`
 }
@@ -121,7 +125,7 @@ type AuthConfig struct {
 type SecurityConfig struct {
 	// RPC authentication configuration
 	Auth AuthConfig `yaml:"auth" json:"auth"`
-	
+
 	// TLS configuration for transport layer security
 	TLS TLSConfig `yaml:"tls" json:"tls"`
 }
@@ -130,65 +134,65 @@ type SecurityConfig struct {
 type TLSConfig struct {
 	// Enable TLS for the gateway
 	Enabled bool `yaml:"enabled" json:"enabled"`
-	
+
 	// TLS certificate file path
 	CertFile string `yaml:"cert_file" json:"cert_file"`
-	
+
 	// TLS key file path
 	KeyFile string `yaml:"key_file" json:"key_file"`
-	
+
 	// CA certificate file path
 	CAFile string `yaml:"ca_file" json:"ca_file"`
-	
+
 	// Server name for TLS verification
 	ServerName string `yaml:"server_name" json:"server_name"`
-	
+
 	// Insecure connection (skip certificate verification)
 	Insecure bool `yaml:"insecure" json:"insecure"`
-	
+
 	// Client certificate file path (for mutual TLS)
 	ClientCertFile string `yaml:"client_cert_file" json:"client_cert_file"`
-	
+
 	// Client key file path (for mutual TLS)
 	ClientKeyFile string `yaml:"client_key_file" json:"client_key_file"`
 }
 
 // RouteConfig holds route configuration
 type RouteConfig struct {
-	Path        string            `yaml:"path" json:"path"`
-	Method      string            `yaml:"method" json:"method"`
-	Service     string            `yaml:"service" json:"service"`
-	Targets     []string          `yaml:"targets" json:"targets"`
-	StripPrefix bool              `yaml:"strip_prefix" json:"strip_prefix"`
-	Timeout     time.Duration     `yaml:"timeout" json:"timeout"`
-	Retries     int               `yaml:"retries" json:"retries"`
-	Headers     map[string]string `yaml:"headers" json:"headers"`
-	Query       map[string]string `yaml:"query" json:"query"`
-	Protocol    string            `yaml:"protocol" json:"protocol"` // "http", "grpc", "jsonrpc"
-	RequiredPermissions []string  `yaml:"required_permissions" json:"required_permissions"`
-	PermissionMode      string    `yaml:"permission_mode" json:"permission_mode"` // "any" or "all"
+	Path                string            `yaml:"path" json:"path"`
+	Method              string            `yaml:"method" json:"method"`
+	Service             string            `yaml:"service" json:"service"`
+	Targets             []string          `yaml:"targets" json:"targets"`
+	StripPrefix         bool              `yaml:"strip_prefix" json:"strip_prefix"`
+	Timeout             time.Duration     `yaml:"timeout" json:"timeout"`
+	Retries             int               `yaml:"retries" json:"retries"`
+	Headers             map[string]string `yaml:"headers" json:"headers"`
+	Query               map[string]string `yaml:"query" json:"query"`
+	Protocol            string            `yaml:"protocol" json:"protocol"` // "http", "grpc", "jsonrpc"
+	RequiredPermissions []string          `yaml:"required_permissions" json:"required_permissions"`
+	PermissionMode      string            `yaml:"permission_mode" json:"permission_mode"` // "any" or "all"
 }
 
 // ProtocolConfig holds protocol support configuration
 type ProtocolConfig struct {
 	// Enable HTTP/1.1 support
 	HTTP bool `yaml:"http" json:"http"`
-	
+
 	// Enable HTTP/2 support
 	HTTP2 bool `yaml:"http2" json:"http2"`
-	
+
 	// Enable gRPC proxy support
 	GRPC bool `yaml:"grpc" json:"grpc"`
-	
+
 	// Enable JSON-RPC proxy support
 	JSONRPC bool `yaml:"jsonrpc" json:"jsonrpc"`
-	
+
 	// gRPC configuration
 	GRPCConfig GRPCConfig `yaml:"grpc_config" json:"grpc_config"`
-	
+
 	// JSON-RPC configuration
 	JSONRPCConfig JSONRPCConfig `yaml:"jsonrpc_config" json:"jsonrpc_config"`
-	
+
 	// RPC security configuration
 	Security SecurityConfig `yaml:"security" json:"security"`
 }
@@ -197,22 +201,22 @@ type ProtocolConfig struct {
 type GRPCConfig struct {
 	// Enable TLS for gRPC
 	EnableTLS bool `yaml:"enable_tls" json:"enable_tls"`
-	
+
 	// TLS certificate file path
 	CertFile string `yaml:"cert_file" json:"cert_file"`
-	
+
 	// TLS key file path
 	KeyFile string `yaml:"key_file" json:"key_file"`
-	
+
 	// CA certificate file path
 	CAFile string `yaml:"ca_file" json:"ca_file"`
-	
+
 	// Server name for TLS verification
 	ServerName string `yaml:"server_name" json:"server_name"`
-	
+
 	// Insecure connection (skip certificate verification)
 	Insecure bool `yaml:"insecure" json:"insecure"`
-	
+
 	// Connection timeout
 	Timeout time.Duration `yaml:"timeout" json:"timeout"`
 }
@@ -221,13 +225,13 @@ type GRPCConfig struct {
 type JSONRPCConfig struct {
 	// JSON-RPC version (2.0 or 1.0)
 	Version string `yaml:"version" json:"version"`
-	
+
 	// Enable batch requests
 	EnableBatch bool `yaml:"enable_batch" json:"enable_batch"`
-	
+
 	// Request timeout
 	Timeout time.Duration `yaml:"timeout" json:"timeout"`
-	
+
 	// Custom headers for JSON-RPC requests
 	Headers map[string]string `yaml:"headers" json:"headers"`
 }
@@ -240,7 +244,7 @@ func DefaultConfig() *Config {
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
-		ServiceName: "gateway",
+		ServiceName:  "gateway",
 		CORS: CORSConfig{
 			AllowedOrigins:   []string{"*"},
 			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -249,9 +253,9 @@ func DefaultConfig() *Config {
 			MaxAge:           86400,
 		},
 		RateLimit: RateLimitConfig{
-			Enabled: false,
+			Enabled:  false,
 			Requests: 100,
-			Window: "1m",
+			Window:   "1m",
 		},
 		Discovery: DiscoveryConfig{
 			Type:      "static",
@@ -288,17 +292,17 @@ func DefaultConfig() *Config {
 			},
 			Security: SecurityConfig{
 				Auth: AuthConfig{
-					APIKeys:      make(map[string]string), // 空配置，避免写死
-					HeaderName:   "X-API-Key",
-					QueryName:    "api_key",
-					SkipPaths:    []string{"/health", "/ready", "/info", "/debug/*"},
-					SkipMethods:  []string{"OPTIONS"},
-					Enabled:      false, // 默认禁用
-					Type:         "apikey",
+					APIKeys:     make(map[string]string), // 空配置，避免写死
+					HeaderName:  "X-API-Key",
+					QueryName:   "api_key",
+					SkipPaths:   []string{"/health", "/ready", "/info", "/debug/*"},
+					SkipMethods: []string{"OPTIONS"},
+					Enabled:     false, // 默认禁用
+					Type:        "apikey",
 				},
 				TLS: TLSConfig{
-					Enabled:         false,
-					Insecure:        false,
+					Enabled:  false,
+					Insecure: false,
 				},
 			},
 		},
@@ -309,6 +313,7 @@ func DefaultConfig() *Config {
 				Protocol: "http",
 			},
 		},
+		BusinessPaths: []string{"/", "/debug/", "/api/"},
 		Logging: LoggingConfig{
 			Level:  "info",
 			Format: "json",
@@ -329,13 +334,13 @@ func DefaultConfig() *Config {
 type LoggingConfig struct {
 	// Log level (debug, info, warn, error)
 	Level string `yaml:"level" json:"level"`
-	
+
 	// Log format (json, console)
 	Format string `yaml:"format" json:"format"`
-	
+
 	// HTTP request logging configuration
 	HTTPLogging *HTTPLoggingConfig `yaml:"http_logging" json:"http_logging"`
-	
+
 	// Service logging configuration
 	ServiceLogging *ServiceLoggingConfig `yaml:"service_logging" json:"service_logging"`
 }
@@ -344,48 +349,48 @@ type LoggingConfig struct {
 type ServiceLoggingConfig struct {
 	// Enable service-specific logging
 	Enabled bool `yaml:"enabled" json:"enabled"`
-	
+
 	// Base directory for service logs
 	BaseDir string `yaml:"base_dir" json:"base_dir"`
-	
+
 	// Enable date-based folders
 	EnableDateFolders bool `yaml:"enable_date_folders" json:"enable_date_folders"`
-	
+
 	// Separate files by log level
 	SeparateByLevel bool `yaml:"separate_by_level" json:"separate_by_level"`
-	
+
 	// Inherit global logger configuration
 	InheritGlobalConfig bool `yaml:"inherit_global_config" json:"inherit_global_config"`
-	
+
 	// Override configuration
 	OverrideConfig OverrideLoggerConfig `yaml:"override_config" json:"override_config"`
-	
+
 	// Component-specific configurations
 	Components map[string]ComponentLoggingConfig `yaml:"components" json:"components"`
-	
+
 	// Cleanup configuration
 	Cleanup CleanupConfig `yaml:"cleanup" json:"cleanup"`
 }
 
 // OverrideLoggerConfig holds logger configuration overrides
 type OverrideLoggerConfig struct {
-	Level               string `yaml:"level" json:"level"`
-	Format              string `yaml:"format" json:"format"`
-	MaxSize             int    `yaml:"max_size" json:"max_size"`
-	MaxBackups          int    `yaml:"max_backups" json:"max_backups"`
-	MaxAge              int    `yaml:"max_age" json:"max_age"`
-	Compress            bool   `yaml:"compress" json:"compress"`
-	EnableCaller        bool   `yaml:"enable_caller" json:"enable_caller"`
-	EnableStacktrace    bool   `yaml:"enable_stacktrace" json:"enable_stacktrace"`
-	TimeFormat          string `yaml:"time_format" json:"time_format"`
-	Sampling            SamplingConfig `yaml:"sampling" json:"sampling"`
+	Level            string         `yaml:"level" json:"level"`
+	Format           string         `yaml:"format" json:"format"`
+	MaxSize          int            `yaml:"max_size" json:"max_size"`
+	MaxBackups       int            `yaml:"max_backups" json:"max_backups"`
+	MaxAge           int            `yaml:"max_age" json:"max_age"`
+	Compress         bool           `yaml:"compress" json:"compress"`
+	EnableCaller     bool           `yaml:"enable_caller" json:"enable_caller"`
+	EnableStacktrace bool           `yaml:"enable_stacktrace" json:"enable_stacktrace"`
+	TimeFormat       string         `yaml:"time_format" json:"time_format"`
+	Sampling         SamplingConfig `yaml:"sampling" json:"sampling"`
 }
 
 // ComponentLoggingConfig holds component-specific logging configuration
 type ComponentLoggingConfig struct {
-	BaseDir        string              `yaml:"base_dir" json:"base_dir"`
-	SeparateByLevel bool                `yaml:"separate_by_level" json:"separate_by_level"`
-	OverrideConfig OverrideLoggerConfig `yaml:"override_config" json:"override_config"`
+	BaseDir         string               `yaml:"base_dir" json:"base_dir"`
+	SeparateByLevel bool                 `yaml:"separate_by_level" json:"separate_by_level"`
+	OverrideConfig  OverrideLoggerConfig `yaml:"override_config" json:"override_config"`
 }
 
 // CleanupConfig holds log cleanup configuration
@@ -399,45 +404,45 @@ type CleanupConfig struct {
 
 // SamplingConfig holds log sampling configuration
 type SamplingConfig struct {
-	Enabled    bool   `yaml:"enabled" json:"enabled"`
+	Enabled    bool    `yaml:"enabled" json:"enabled"`
 	Rate       float64 `yaml:"rate" json:"rate"`
-	Tick       string `yaml:"tick" json:"tick"`
-	Initial    int    `yaml:"initial" json:"initial"`
-	Thereafter int    `yaml:"thereafter" json:"thereafter"`
+	Tick       string  `yaml:"tick" json:"tick"`
+	Initial    int     `yaml:"initial" json:"initial"`
+	Thereafter int     `yaml:"thereafter" json:"thereafter"`
 }
 
 // HTTPLoggingConfig holds HTTP request logging configuration
 type HTTPLoggingConfig struct {
 	// Enable HTTP request logging
 	Enabled bool `yaml:"enabled" json:"enabled"`
-	
+
 	// Log request body
 	LogRequestBody bool `yaml:"log_request_body" json:"log_request_body"`
-	
+
 	// Log response body
 	LogResponseBody bool `yaml:"log_response_body" json:"log_response_body"`
-	
+
 	// Maximum body size to log (in bytes)
 	MaxBodySize int64 `yaml:"max_body_size" json:"max_body_size"`
-	
+
 	// Log request headers
 	LogHeaders bool `yaml:"log_headers" json:"log_headers"`
-	
+
 	// Sensitive headers to mask
 	SensitiveHeaders []string `yaml:"sensitive_headers" json:"sensitive_headers"`
-	
+
 	// Skip logging for these paths
 	SkipPaths []string `yaml:"skip_paths" json:"skip_paths"`
-	
+
 	// Slow request threshold (duration string, e.g., "1s", "500ms")
 	SlowRequestThreshold string `yaml:"slow_request_threshold" json:"slow_request_threshold"`
-	
+
 	// Enable request ID generation
 	EnableRequestID bool `yaml:"enable_request_id" json:"enable_request_id"`
-	
+
 	// Custom request ID header name (default: X-Request-ID)
 	RequestIDHeader string `yaml:"request_id_header" json:"request_id_header"`
-	
+
 	// Log level thresholds
 	LogLevelThresholds LogLevelThresholds `yaml:"log_level_thresholds" json:"log_level_thresholds"`
 }
@@ -446,10 +451,10 @@ type HTTPLoggingConfig struct {
 type LogLevelThresholds struct {
 	// Status codes >= this level will be logged as ERROR
 	ErrorThreshold int `yaml:"error_threshold" json:"error_threshold"`
-	
+
 	// Status codes >= this level will be logged as WARN
 	WarnThreshold int `yaml:"warn_threshold" json:"warn_threshold"`
-	
+
 	// Status codes >= this level will be logged as INFO
 	InfoThreshold int `yaml:"info_threshold" json:"info_threshold"`
 }

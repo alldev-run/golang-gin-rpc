@@ -247,6 +247,32 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 }
 
 // proxyRequest proxies the request to the target service
+func (p *Proxy) shouldSkipProxyBody(req *http.Request) bool {
+	if req == nil || p == nil || p.gateway == nil || p.gateway.config == nil {
+		return true
+	}
+	path := req.URL.Path
+	for _, prefix := range p.gateway.config.BusinessPaths {
+		if prefix != "" && strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	contentType := req.Header.Get("Content-Type")
+	if contentType == "" {
+		return true
+	}
+	lower := strings.ToLower(contentType)
+	if strings.HasPrefix(lower, "multipart/form-data") ||
+		strings.HasPrefix(lower, "application/octet-stream") ||
+		strings.HasPrefix(lower, "application/pdf") ||
+		strings.HasPrefix(lower, "image/") ||
+		strings.HasPrefix(lower, "video/") ||
+		strings.HasPrefix(lower, "audio/") {
+		return true
+	}
+	return false
+}
+
 func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string, route *Route) error {
 	// Create target URL
 	targetURL, err := url.Parse(target)
@@ -264,11 +290,16 @@ func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string,
 	targetURL.RawQuery = c.Request.URL.RawQuery
 
 	// Create proxy request
-	reqBody, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read request body: %w", err)
+	var reqBody []byte
+	if p.shouldSkipProxyBody(c.Request) {
+		reqBody = []byte{}
+	} else {
+		reqBody, err = io.ReadAll(c.Request.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read request body: %w", err)
+		}
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
 	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(reqBody))
 
 	// Execute request with retries
 	var resp *http.Response
