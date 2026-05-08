@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
@@ -22,7 +23,7 @@ func RequestIDFromConfig(cfg *gateway.Config) gin.HandlerFunc {
 	if cfg.Logging.HTTPLogging == nil {
 		return RequestID()
 	}
-	
+
 	httpConfig := cfg.Logging.HTTPLogging
 	if !httpConfig.EnableRequestID {
 		// 如果禁用了 Request ID，返回空中间件
@@ -30,20 +31,20 @@ func RequestIDFromConfig(cfg *gateway.Config) gin.HandlerFunc {
 			c.Next()
 		}
 	}
-	
+
 	return func(c *gin.Context) {
 		// 检查是否已有请求ID
 		headerName := "X-Request-ID"
 		if httpConfig.RequestIDHeader != "" {
 			headerName = httpConfig.RequestIDHeader
 		}
-		
+
 		requestID := c.GetHeader(headerName)
 		if requestID == "" {
 			// 生成新的请求ID
 			requestID = uuid.New().String()
 		}
-		
+
 		// 设置到上下文和响应头
 		c.Set("request_id", requestID)
 		c.Header("X-Request-ID", requestID)
@@ -60,7 +61,7 @@ func RequestID() gin.HandlerFunc {
 			// 生成新的请求ID
 			requestID = uuid.New().String()
 		}
-		
+
 		// 设置到上下文和响应头
 		c.Set("request_id", requestID)
 		c.Header("X-Request-ID", requestID)
@@ -76,8 +77,8 @@ func Recovery() gin.HandlerFunc {
 // Logging 日志中间件 - 增强版支持请求体和响应体记录
 func Logging() gin.HandlerFunc {
 	return LoggingWithConfig(LoggingConfig{
-		LogRequestBody:  false,  // 默认不记录请求体，避免性能影响
-		LogResponseBody: false,  // 默认不记录响应体，避免性能影响
+		LogRequestBody:  false,      // 默认不记录请求体，避免性能影响
+		LogResponseBody: false,      // 默认不记录响应体，避免性能影响
 		MaxBodySize:     1024 * 512, // 512KB
 		SkipPaths:       []string{"/health", "/ready", "/metrics"},
 	})
@@ -91,52 +92,52 @@ func LoggingFromConfig(cfg *gateway.Config) gin.HandlerFunc {
 			c.Next()
 		}
 	}
-	
+
 	httpConfig := cfg.Logging.HTTPLogging
-	
+
 	// 设置默认值
 	maxBodySize := httpConfig.MaxBodySize
 	if maxBodySize <= 0 {
 		maxBodySize = 1024 * 512 // 默认 512KB
 	}
-	
+
 	slowThreshold := 1 * time.Second
 	if httpConfig.SlowRequestThreshold != "" {
 		if duration, err := time.ParseDuration(httpConfig.SlowRequestThreshold); err == nil {
 			slowThreshold = duration
 		}
 	}
-	
+
 	return LoggingWithConfig(LoggingConfig{
-		LogRequestBody:  httpConfig.LogRequestBody,
-		LogResponseBody: httpConfig.LogResponseBody,
-		MaxBodySize:     maxBodySize,
-		LogHeaders:      httpConfig.LogHeaders,
-		SkipPaths:       httpConfig.SkipPaths,
-		SlowThreshold:   slowThreshold,
-		EnableRequestID: httpConfig.EnableRequestID,
-		RequestIDHeader: httpConfig.RequestIDHeader,
+		LogRequestBody:   httpConfig.LogRequestBody,
+		LogResponseBody:  httpConfig.LogResponseBody,
+		MaxBodySize:      maxBodySize,
+		LogHeaders:       httpConfig.LogHeaders,
+		SkipPaths:        httpConfig.SkipPaths,
+		SlowThreshold:    slowThreshold,
+		EnableRequestID:  httpConfig.EnableRequestID,
+		RequestIDHeader:  httpConfig.RequestIDHeader,
 		SensitiveHeaders: httpConfig.SensitiveHeaders,
-		ErrorThreshold:  httpConfig.LogLevelThresholds.ErrorThreshold,
-		WarnThreshold:   httpConfig.LogLevelThresholds.WarnThreshold,
-		InfoThreshold:   httpConfig.LogLevelThresholds.InfoThreshold,
+		ErrorThreshold:   httpConfig.LogLevelThresholds.ErrorThreshold,
+		WarnThreshold:    httpConfig.LogLevelThresholds.WarnThreshold,
+		InfoThreshold:    httpConfig.LogLevelThresholds.InfoThreshold,
 	})
 }
 
 // LoggingConfig 日志配置
 type LoggingConfig struct {
-	LogRequestBody      bool
-	LogResponseBody     bool
-	MaxBodySize         int64
-	LogHeaders          bool
-	SkipPaths           []string
-	SlowThreshold       time.Duration
-	EnableRequestID     bool
-	RequestIDHeader     string
-	SensitiveHeaders    []string
-	ErrorThreshold      int
-	WarnThreshold       int
-	InfoThreshold       int
+	LogRequestBody   bool
+	LogResponseBody  bool
+	MaxBodySize      int64
+	LogHeaders       bool
+	SkipPaths        []string
+	SlowThreshold    time.Duration
+	EnableRequestID  bool
+	RequestIDHeader  string
+	SensitiveHeaders []string
+	ErrorThreshold   int
+	WarnThreshold    int
+	InfoThreshold    int
 }
 
 // LoggingWithConfig 带配置的日志中间件
@@ -144,7 +145,7 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-		
+
 		// 检查是否跳过日志记录
 		for _, skipPath := range config.SkipPaths {
 			if path == skipPath {
@@ -152,7 +153,7 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 				return
 			}
 		}
-		
+
 		// 处理 Request ID
 		var requestID string
 		if config.EnableRequestID {
@@ -160,23 +161,34 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 			if config.RequestIDHeader != "" {
 				headerName = config.RequestIDHeader
 			}
-			
+
 			requestID = c.GetHeader(headerName)
 			if requestID == "" {
 				requestID = uuid.New().String()
 			}
-			
+
 			c.Set("request_id", requestID)
 			c.Header("X-Request-ID", requestID)
 		}
-		
+
 		// 读取请求体（如果需要）
 		var requestBody []byte
 		if config.LogRequestBody && c.Request.Body != nil {
-			requestBody, _ = io.ReadAll(c.Request.Body)
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			// Skip reading binary stream types to avoid breaking upload parsing
+			contentType := c.Request.Header.Get("Content-Type")
+			isBinaryStream := contentType == "" ||
+				strings.HasPrefix(contentType, "multipart/form-data") ||
+				strings.HasPrefix(contentType, "application/octet-stream") ||
+				strings.HasPrefix(contentType, "application/pdf") ||
+				strings.HasPrefix(contentType, "image/") ||
+				strings.HasPrefix(contentType, "video/") ||
+				strings.HasPrefix(contentType, "audio/")
+			if !isBinaryStream {
+				requestBody, _ = io.ReadAll(c.Request.Body)
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			}
 		}
-		
+
 		// 包装响应写入器以捕获响应体（如果需要）
 		var responseWriter *responseBodyWriter
 		if config.LogResponseBody {
@@ -186,13 +198,13 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 			}
 			c.Writer = responseWriter
 		}
-		
+
 		// 处理请求
 		c.Next()
-		
+
 		// 计算延迟
 		latency := time.Since(start)
-		
+
 		// 构建基础字段
 		pathParams := make(map[string]string, len(c.Params))
 		for _, p := range c.Params {
@@ -201,18 +213,18 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 		queryParams := c.Request.URL.Query()
 
 		fields := httplog.Fields{
-			Method:    c.Request.Method,
-			Path:      path,
-			Query:     c.Request.URL.RawQuery,
-			PathParams: pathParams,
+			Method:      c.Request.Method,
+			Path:        path,
+			Query:       c.Request.URL.RawQuery,
+			PathParams:  pathParams,
 			QueryParams: queryParams,
-			ClientIP:  c.ClientIP(),
-			UserAgent: c.Request.UserAgent(),
-			Status:    c.Writer.Status(),
-			Latency:   latency,
-			RequestID: requestID,
+			ClientIP:    c.ClientIP(),
+			UserAgent:   c.Request.UserAgent(),
+			Status:      c.Writer.Status(),
+			Latency:     latency,
+			RequestID:   requestID,
 		}
-		
+
 		// 添加请求头字段（如果启用）
 		if config.LogHeaders {
 			for name := range c.Request.Header {
@@ -223,7 +235,7 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 				// 这里可以添加请求头到日志中
 			}
 		}
-		
+
 		// 添加请求体字段（如果启用且有内容）
 		if config.LogRequestBody && len(requestBody) > 0 {
 			if int64(len(requestBody)) <= config.MaxBodySize {
@@ -240,7 +252,7 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 				fields.RequestBodyStr = &largeMsg
 			}
 		}
-		
+
 		// 添加响应体字段（如果启用且有内容）
 		if config.LogResponseBody && responseWriter != nil && responseWriter.body.Len() > 0 {
 			responseBody := responseWriter.body.Bytes()
@@ -258,10 +270,10 @@ func LoggingWithConfig(config LoggingConfig) gin.HandlerFunc {
 				fields.ResponseBodyStr = &largeMsg
 			}
 		}
-		
+
 		// 使用增强的日志函数记录
 		httplog.LogWithLevelEnhancedWithThresholds(fields, config.ErrorThreshold, config.WarnThreshold, config.InfoThreshold)
-		
+
 		// 如果是慢请求，额外记录慢请求日志
 		if latency > config.SlowThreshold {
 			httplog.LogSlowRequestEnhanced(fields, config.SlowThreshold)
@@ -294,7 +306,7 @@ func (r *responseBodyWriter) Write(b []byte) (int, error) {
 func CORSFromGatewayConfig(cfg *gateway.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// 检查是否允许的源
 		allowed := false
 		for _, allowedOrigin := range cfg.CORS.AllowedOrigins {
@@ -303,11 +315,11 @@ func CORSFromGatewayConfig(cfg *gateway.Config) gin.HandlerFunc {
 				break
 			}
 		}
-		
+
 		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}
-		
+
 		// 设置其他CORS头
 		if len(cfg.CORS.AllowedMethods) > 0 {
 			c.Header("Access-Control-Allow-Methods", joinStrings(cfg.CORS.AllowedMethods, ", "))
@@ -318,13 +330,13 @@ func CORSFromGatewayConfig(cfg *gateway.Config) gin.HandlerFunc {
 		if len(cfg.CORS.ExposedHeaders) > 0 {
 			c.Header("Access-Control-Expose-Headers", joinStrings(cfg.CORS.ExposedHeaders, ", "))
 		}
-		
+
 		// 处理预检请求
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -348,14 +360,14 @@ func TracingFromGatewayConfig(cfg *gateway.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cfg.Tracing != nil && cfg.Tracing.Enabled {
 			httpMiddleware := tracing.NewHTTPMiddleware(tracing.GlobalTracer())
-			
+
 			// 创建一个包装的 http.Handler
 			wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				c.Next()
 			})
-			
+
 			tracedHandler := httpMiddleware.Wrap("http-gateway", wrappedHandler)
-			
+
 			// 执行追踪中间件
 			tracedHandler.ServeHTTP(c.Writer, c.Request)
 		}
@@ -373,7 +385,7 @@ func joinStrings(strs []string, sep string) string {
 	if len(strs) == 0 {
 		return ""
 	}
-	
+
 	result := strs[0]
 	for i := 1; i < len(strs); i++ {
 		result += sep + strs[i]
