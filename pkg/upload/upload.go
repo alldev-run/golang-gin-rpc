@@ -133,13 +133,8 @@ func (u *Uploader) Upload(fileHeader *multipart.FileHeader) *UploadResult {
 	}
 
 	result.SavedFilename = newFilename
-	// Return relative path for frontend use
-	relPath, err := filepath.Rel(u.config.UploadDir, filePath)
-	if err != nil {
-		result.FilePath = filePath
-	} else {
-		result.FilePath = relPath
-	}
+	// Return path starting from configured UploadDir for frontend use
+	result.FilePath = filepath.Join(u.config.UploadDir, newFilename)
 	result.Success = true
 
 	logger.Info("File uploaded successfully",
@@ -230,13 +225,8 @@ func (u *Uploader) UploadFromBytes(filename string, data []byte) *UploadResult {
 	}
 
 	result.SavedFilename = newFilename
-	// Return relative path for frontend use
-	relPath, err := filepath.Rel(u.config.UploadDir, filePath)
-	if err != nil {
-		result.FilePath = filePath
-	} else {
-		result.FilePath = relPath
-	}
+	// Return path starting from configured UploadDir for frontend use
+	result.FilePath = filepath.Join(u.config.UploadDir, newFilename)
 	result.MimeType = mimeType
 	result.Success = true
 
