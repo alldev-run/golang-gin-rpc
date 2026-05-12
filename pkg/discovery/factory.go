@@ -7,6 +7,7 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/discovery/consul"
 	"github.com/alldev-run/golang-gin-rpc/pkg/discovery/etcd"
+	"github.com/alldev-run/golang-gin-rpc/pkg/discovery/nacos"
 	"github.com/alldev-run/golang-gin-rpc/pkg/discovery/zookeeper"
 )
 
@@ -31,6 +32,12 @@ func NewDiscovery(conf Config) (Discovery, error) {
 			return nil, err
 		}
 		return &zookeeperAdapter{registry: registry}, nil
+	case RegistryTypeNacos:
+		registry, err := nacos.NewRegistry(conf.Address, conf.Timeout, conf.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &nacosAdapter{registry: registry}, nil
 	case "":
 		return nil, errors.New("discovery type is required")
 	default:
@@ -159,6 +166,50 @@ func (z *zookeeperAdapter) GetService(ctx context.Context, serviceName string) (
 	}
 	var instances []*ServiceInstance
 	for _, inst := range zkInstances {
+		instances = append(instances, &ServiceInstance{
+			ID:      inst.ID,
+			Name:    inst.Name,
+			Address: inst.Address,
+			Port:    inst.Port,
+			Payload: inst.Payload,
+		})
+	}
+	return instances, nil
+}
+
+type nacosAdapter struct {
+	registry *nacos.Registry
+}
+
+func (n *nacosAdapter) Register(ctx context.Context, instance *ServiceInstance) error {
+	nacosInst := &nacos.ServiceInstance{
+		ID:      instance.ID,
+		Name:    instance.Name,
+		Address: instance.Address,
+		Port:    instance.Port,
+		Payload: instance.Payload,
+	}
+	return n.registry.Register(ctx, nacosInst)
+}
+
+func (n *nacosAdapter) Deregister(ctx context.Context, instance *ServiceInstance) error {
+	nacosInst := &nacos.ServiceInstance{
+		ID:      instance.ID,
+		Name:    instance.Name,
+		Address: instance.Address,
+		Port:    instance.Port,
+		Payload: instance.Payload,
+	}
+	return n.registry.Deregister(ctx, nacosInst)
+}
+
+func (n *nacosAdapter) GetService(ctx context.Context, serviceName string) ([]*ServiceInstance, error) {
+	nacosInstances, err := n.registry.GetService(ctx, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	var instances []*ServiceInstance
+	for _, inst := range nacosInstances {
 		instances = append(instances, &ServiceInstance{
 			ID:      inst.ID,
 			Name:    inst.Name,

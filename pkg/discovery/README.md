@@ -7,6 +7,7 @@
 - `consul`
 - `etcd`
 - `zookeeper`
+- `nacos`
 - `static`
 
 它适合用于：
@@ -34,6 +35,8 @@
   - Etcd 注册与查询实现
 - `zookeeper/`
   - Zookeeper 注册与查询实现
+- `nacos/`
+  - Nacos 注册与查询实现
 
 ## 核心抽象
 
@@ -124,6 +127,20 @@ type Discovery interface {
 
 - `RegistryTypeStatic`
 
+### Nacos
+
+特点：
+
+- 阿里巴巴开源的服务发现与配置管理平台
+- 使用 Nacos Naming Service 进行服务注册与发现
+- 支持服务健康检查和实例自动下线
+- 支持命名空间（Namespace）进行环境隔离
+- 支持通过 Options 配置端口、命名空间、日志目录等
+
+配置类型：
+
+- `RegistryTypeNacos`
+
 ## 配置结构
 
 `pkg/discovery/config.go` 中的核心配置：
@@ -163,6 +180,14 @@ cfg := discovery.EtcdConfig("127.0.0.1:2379")
 ```go
 cfg := discovery.ZookeeperConfig("127.0.0.1:2181")
 cfg.Options["base_path"] = "/services"
+```
+
+### Nacos 配置
+
+```go
+cfg := discovery.NacosConfig("127.0.0.1:8848")
+cfg.Options["namespace"] = "dev"
+cfg.Options["port"] = 8848
 ```
 
 ## 创建 discovery 实例
@@ -295,6 +320,12 @@ cfg := discovery.Config{
   - 依赖有效会话
   - 使用 ephemeral 节点，连接断开会自动删除实例
 
+- **Nacos**
+  - 依赖 Nacos Server 服务
+  - 支持命名空间隔离，建议不同环境使用不同 namespace
+  - 默认端口为 8848，可通过 Options["port"] 配置
+  - 支持通过 Options 配置日志目录和缓存目录
+
 - **Static**
   - 更适合开发和测试，不适合作为动态注册中心
 
@@ -315,4 +346,4 @@ go test ./pkg/discovery/...
 
 ## 总结
 
-`pkg/discovery` 现在提供了统一的服务发现抽象，并支持 `consul`、`etcd`、`zookeeper` 和 `static` 四种模式，可直接用于服务注册、注销和实例查询。
+`pkg/discovery` 现在提供了统一的服务发现抽象，并支持 `consul`、`etcd`、`zookeeper`、`nacos` 和 `static` 五种模式，可直接用于服务注册、注销和实例查询。
