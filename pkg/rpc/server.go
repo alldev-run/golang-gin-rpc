@@ -8,17 +8,18 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimiter"
+	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
-	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
 )
 
 // ServerType represents the type of RPC server
@@ -31,16 +32,16 @@ const (
 
 // Config holds RPC server configuration
 type Config struct {
-	Type        ServerType `yaml:"type" json:"type"`
-	Host        string     `yaml:"host" json:"host"`
-	Port        int        `yaml:"port" json:"port"`
-	Network     string     `yaml:"network" json:"network"` // tcp, unix
-	Timeout     int        `yaml:"timeout" json:"timeout"`   // seconds
-	MaxMsgSize  int        `yaml:"max_msg_size" json:"max_msg_size"`
-	EnableTLS   bool       `yaml:"enable_tls" json:"enable_tls"`
-	CertFile    string     `yaml:"cert_file" json:"cert_file"`
-	KeyFile     string     `yaml:"key_file" json:"key_file"`
-	Reflection  bool       `yaml:"reflection" json:"reflection"` // gRPC reflection
+	Type       ServerType `yaml:"type" json:"type"`
+	Host       string     `yaml:"host" json:"host"`
+	Port       int        `yaml:"port" json:"port"`
+	Network    string     `yaml:"network" json:"network"` // tcp, unix
+	Timeout    int        `yaml:"timeout" json:"timeout"` // seconds
+	MaxMsgSize int        `yaml:"max_msg_size" json:"max_msg_size"`
+	EnableTLS  bool       `yaml:"enable_tls" json:"enable_tls"`
+	CertFile   string     `yaml:"cert_file" json:"cert_file"`
+	KeyFile    string     `yaml:"key_file" json:"key_file"`
+	Reflection bool       `yaml:"reflection" json:"reflection"` // gRPC reflection
 }
 
 // DefaultConfig returns default RPC configuration
@@ -100,6 +101,7 @@ type JSONRPCServer struct {
 	rateLimiter *ratelimiter.Manager
 	observer    clientObserver
 	routesSetup bool
+	routesMu    sync.RWMutex
 }
 
 // NewServer creates a new RPC server based on configuration
@@ -159,7 +161,7 @@ func NewJSONRPCServer(config Config) *JSONRPCServer {
 
 	// Initialize tracing interceptor
 	tracingInterceptor := tracing.NewJSONRPCInterceptor(tracing.GlobalTracer())
-	
+
 	// Add tracing middleware
 	engine.Use(tracingInterceptor.Middleware())
 
@@ -168,12 +170,12 @@ func NewJSONRPCServer(config Config) *JSONRPCServer {
 	auth := NewRPCAuth(authConfig)
 
 	return &JSONRPCServer{
-		config:     &config,
-		server:     &http.Server{Addr: config.Host, Handler: engine},
-		engine:     engine,
-		services:   make(map[string]interface{}),
-		tracing:    tracingInterceptor,
-		auth:       auth,
+		config:      &config,
+		server:      &http.Server{Addr: config.Host, Handler: engine},
+		engine:      engine,
+		services:    make(map[string]interface{}),
+		tracing:     tracingInterceptor,
+		auth:        auth,
 		rateLimiter: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
 	}
 }
@@ -364,6 +366,9 @@ func (s *JSONRPCServer) Type() ServerType {
 
 // setupRoutes sets up JSON-RPC routes
 func (s *JSONRPCServer) setupRoutes() {
+	s.routesMu.Lock()
+	defer s.routesMu.Unlock()
+
 	if s.routesSetup {
 		return
 	}
@@ -571,7 +576,7 @@ func (s *JSONRPCServer) handleJSONRPC(c *gin.Context) {
 			})
 			return
 		}
-		
+
 		// Record metrics
 		start := time.Now()
 		defer func() {
@@ -628,10 +633,10 @@ type JSONRPCRequest struct {
 }
 
 type JSONRPCResponse struct {
-	JSONRPC string         `json:"jsonrpc"`
-	Result  interface{}    `json:"result,omitempty"`
-	Error   *JSONRPCError  `json:"error,omitempty"`
-	ID      interface{}    `json:"id,omitempty"`
+	JSONRPC string        `json:"jsonrpc"`
+	Result  interface{}   `json:"result,omitempty"`
+	Error   *JSONRPCError `json:"error,omitempty"`
+	ID      interface{}   `json:"id,omitempty"`
 }
 
 type JSONRPCError struct {
@@ -822,15 +827,15 @@ func (s *JSONRPCServer) SetObserver(observer clientObserver) {
 
 // ServiceInfo provides information about registered services
 type ServiceInfo struct {
-	Name    string      `json:"name"`
-	Type    ServerType  `json:"type"`
-	Methods []string    `json:"methods"`
+	Name    string     `json:"name"`
+	Type    ServerType `json:"type"`
+	Methods []string   `json:"methods"`
 }
 
 // GetServiceInfo returns information about all services
 func GetServiceInfo(server Server) []ServiceInfo {
 	var infos []ServiceInfo
-	
+
 	switch server.Type() {
 	case ServerTypeGRPC:
 		if grpcServer, ok := server.(*GRPCServer); ok {
@@ -853,7 +858,7 @@ func GetServiceInfo(server Server) []ServiceInfo {
 			}
 		}
 	}
-	
+
 	return infos
 }
 
@@ -861,7 +866,7 @@ func GetServiceInfo(server Server) []ServiceInfo {
 func getServiceMethods(service interface{}) []string {
 	var methods []string
 	serviceType := reflect.TypeOf(service)
-	
+
 	for i := 0; i < serviceType.NumMethod(); i++ {
 		method := serviceType.Method(i)
 		// Only include exported methods
@@ -869,6 +874,6 @@ func getServiceMethods(service interface{}) []string {
 			methods = append(methods, method.Name)
 		}
 	}
-	
+
 	return methods
 }

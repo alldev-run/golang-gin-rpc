@@ -7,22 +7,22 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // ManagerConfig holds service discovery manager configuration
 type ManagerConfig struct {
-	Enabled          bool          `yaml:"enabled" json:"enabled"`
-	RegistryType     string        `yaml:"registry_type" json:"registry_type"`
-	RegistryAddress  string        `yaml:"registry_address" json:"registry_address"`
-	Timeout          time.Duration `yaml:"timeout" json:"timeout"`
+	Enabled             bool          `yaml:"enabled" json:"enabled"`
+	RegistryType        string        `yaml:"registry_type" json:"registry_type"`
+	RegistryAddress     string        `yaml:"registry_address" json:"registry_address"`
+	Timeout             time.Duration `yaml:"timeout" json:"timeout"`
 	HealthCheckInterval time.Duration `yaml:"health_check_interval" json:"health_check_interval"`
-	AutoRegister     bool          `yaml:"auto_register" json:"auto_register"`
-	ServiceName      string        `yaml:"service_name" json:"service_name"`
-	ServiceAddress   string        `yaml:"service_address" json:"service_address"`
-	ServicePort      int           `yaml:"service_port" json:"service_port"`
-	ServiceTags      []string      `yaml:"service_tags" json:"service_tags"`
+	AutoRegister        bool          `yaml:"auto_register" json:"auto_register"`
+	ServiceName         string        `yaml:"service_name" json:"service_name"`
+	ServiceAddress      string        `yaml:"service_address" json:"service_address"`
+	ServicePort         int           `yaml:"service_port" json:"service_port"`
+	ServiceTags         []string      `yaml:"service_tags" json:"service_tags"`
 }
 
 // DefaultManagerConfig returns default discovery manager configuration
@@ -43,7 +43,7 @@ func DefaultManagerConfig() ManagerConfig {
 
 // ServiceDiscoveryManager manages service discovery operations
 type ServiceDiscoveryManager struct {
-	config     ManagerConfig
+	config    ManagerConfig
 	discovery Discovery
 	instances map[string]*ServiceInstance
 	mu        sync.RWMutex
@@ -55,7 +55,7 @@ type ServiceDiscoveryManager struct {
 func NewServiceDiscoveryManager(config ManagerConfig) (*ServiceDiscoveryManager, error) {
 	if !config.Enabled {
 		return &ServiceDiscoveryManager{
-			config:     config,
+			config:    config,
 			instances: make(map[string]*ServiceInstance),
 			stopCh:    make(chan struct{}),
 		}, nil
@@ -74,7 +74,7 @@ func NewServiceDiscoveryManager(config ManagerConfig) (*ServiceDiscoveryManager,
 	}
 
 	return &ServiceDiscoveryManager{
-		config:     config,
+		config:    config,
 		discovery: discovery,
 		instances: make(map[string]*ServiceInstance),
 		stopCh:    make(chan struct{}),
@@ -209,7 +209,7 @@ func (m *ServiceDiscoveryManager) GetAllServices(ctx context.Context) (map[strin
 	}
 
 	services := make(map[string][]*ServiceInstance)
-	
+
 	m.mu.RLock()
 	for _, instance := range m.instances {
 		services[instance.Name] = append(services[instance.Name], instance)
@@ -246,12 +246,12 @@ func (m *ServiceDiscoveryManager) GetConfig() ManagerConfig {
 // registerSelf registers the current service instance
 func (m *ServiceDiscoveryManager) registerSelf() error {
 	instance := &ServiceInstance{
-		ID:   fmt.Sprintf("%s-%d", m.config.ServiceName, time.Now().Unix()),
-		Name: m.config.ServiceName,
+		ID:      fmt.Sprintf("%s-%d", m.config.ServiceName, time.Now().Unix()),
+		Name:    m.config.ServiceName,
 		Address: m.config.ServiceAddress,
-		Port:   m.config.ServicePort,
+		Port:    m.config.ServicePort,
 		Payload: map[string]string{
-			"version":     "1.0.0",
+			"version":       "1.0.0",
 			"registered_at": time.Now().Format(time.RFC3339),
 		},
 	}
@@ -326,7 +326,7 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 
 	for _, instance := range instances {
 		// Simple health check - in a real implementation, you would check the service health
-		logger.Debug("Health check", 
+		logger.Debug("Health check",
 			zap.String("service", instance.Name),
 			zap.String("address", fmt.Sprintf("%s:%d", instance.Address, instance.Port)))
 	}
@@ -334,10 +334,10 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 
 // ServiceWatcher watches for service changes
 type ServiceWatcher struct {
-	manager   *ServiceDiscoveryManager
+	manager     *ServiceDiscoveryManager
 	serviceName string
-	watchCh   chan []*ServiceInstance
-	stopCh    chan struct{}
+	watchCh     chan []*ServiceInstance
+	stopCh      chan struct{}
 }
 
 // NewServiceWatcher creates a new service watcher
@@ -377,7 +377,7 @@ func (w *ServiceWatcher) watchLoop(ctx context.Context) {
 		case <-ticker.C:
 			instances, err := w.manager.GetService(ctx, w.serviceName)
 			if err != nil {
-				logger.Errorf("Failed to get service during watch", 
+				logger.Errorf("Failed to get service during watch",
 					zap.String("service", w.serviceName),
 					zap.Error(err))
 				continue
