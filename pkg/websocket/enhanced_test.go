@@ -303,3 +303,190 @@ func TestManager_ClusterBroadcastAndTargetedDelivery(t *testing.T) {
 		t.Fatalf("expected targeted payload hello-user-b, got %s", string(targetedPayload))
 	}
 }
+
+func TestBroadcastErrors(t *testing.T) {
+	errs := &BroadcastErrors{}
+	
+	if errs.Count() != 0 {
+		t.Fatalf("expected 0 errors, got %d", errs.Count())
+	}
+	
+	errs.Add(nil)
+	if errs.Count() != 0 {
+		t.Fatalf("expected 0 errors after adding nil, got %d", errs.Count())
+	}
+	
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	errs.Add(err1)
+	errs.Add(err2)
+	
+	if errs.Count() != 2 {
+		t.Fatalf("expected 2 errors, got %d", errs.Count())
+	}
+	
+	if errs.First() != err1 {
+		t.Fatalf("expected first error to be err1, got %v", errs.First())
+	}
+	
+	all := errs.All()
+	if len(all) != 2 {
+		t.Fatalf("expected 2 errors in All(), got %d", len(all))
+	}
+}
+
+func TestManager_ConcurrentBroadcast(t *testing.T) {
+	manager := NewManager()
+	server := NewServer(ServerConfig{Path: "/ws", ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second})
+	server.HandleManaged("/ws", manager, func(ctx context.Context, conn *Conn) {
+		<-ctx.Done()
+	})
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	defer ln.Close()
+	if err := server.StartListener(ln); err != nil {
+		t.Fatalf("StartListener() error = %v", err)
+	}
+	defer server.Stop(context.Background())
+
+	clients := make([]*Client, 10)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for i := 0; i < 10; i++ {
+		clients[i] = NewClient(Config{
+			URL:         "ws://" + ln.Addr().String() + "/ws",
+			Origin:      "http://" + ln.Addr().String(),
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 5 * time.Second,
+		})
+		if err := clients[i].Connect(ctx); err != nil {
+			t.Fatalf("client %d Connect() error = %v", i, err)
+		}
+		defer clients[i].Close()
+	}
+
+	waitForCondition(t, 2*time.Second, func() bool { return manager.Count() == 10 })
+
+	if err := manager.BroadcastText(ctx, "concurrent-broadcast"); err != nil {
+		t.Fatalf("BroadcastText() error = %v", err)
+	}
+
+	for i, client := range clients {
+		_, payload, err := client.Receive(ctx)
+		if err != nil {
+			t.Fatalf("client %d Receive() error = %v", i, err)
+		}
+		if string(payload) != "concurrent-broadcast" {
+			t.Fatalf("client %d expected concurrent-broadcast, got %s", i, string(payload))
+		}
+	}
+}
+
+func TestManager_GlobalHeartbeat(t *testing.T) {
+	manager := NewManager()
+	server := NewServer(ServerConfig{
+		Path:             "/ws",
+		ReadTimeout:      5 * time.Second,
+		WriteTimeout:     5 * time.Second,
+		HeartbeatTimeout: 2 * time.Second,
+	})
+	server.HandleManaged("/ws", manager, func(ctx context.Context, conn *Conn) {
+		<-ctx.Done()
+	})
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	defer ln.Close()
+	if err := server.StartListener(ln); err != nil {
+		t.Fatalf("StartListener() error = %v", err)
+	}
+	defer server.Stop(context.Background())
+
+	client := NewClient(Config{
+		URL:         "ws://" + ln.Addr().String() + "/ws",
+		Origin:      "http://" + ln.Addr().String(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer client.Close()
+
+	waitForCondition(t, time.Second, func() bool { return manager.Count() == 1 })
+
+	time.Sleep(3 * time.Second)
+
+	if manager.Count() != 0 {
+		t.Fatalf("expected connection to be closed due to heartbeat timeout, but count is %d", manager.Count())
+	}
+}
+
+func TestManager_IDIndexSafety(t *testing.T) {
+	manager := NewManager()
+	server := NewServer(ServerConfig{Path: "/ws", ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second})
+	server.HandleManaged("/ws", manager, func(ctx context.Context, conn *Conn) {
+		<-ctx.Done()
+	})
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	defer ln.Close()
+	if err := server.StartListener(ln); err != nil {
+		t.Fatalf("StartListener() error = %v", err)
+	}
+	defer server.Stop(context.Background())
+
+	client1 := NewClient(Config{
+		URL:         "ws://" + ln.Addr().String() + "/ws",
+		Origin:      "http://" + ln.Addr().String(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	})
+	client2 := NewClient(Config{
+		URL:         "ws://" + ln.Addr().String() + "/ws",
+		Origin:      "http://" + ln.Addr().String(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client1.Connect(ctx); err != nil {
+		t.Fatalf("client1.Connect() error = %v", err)
+	}
+	defer client1.Close()
+	if err := client2.Connect(ctx); err != nil {
+		t.Fatalf("client2.Connect() error = %v", err)
+	}
+	defer client2.Close()
+
+	waitForCondition(t, time.Second, func() bool { return manager.Count() == 2 })
+
+	conns := manager.snapshotConnections()
+	if len(conns) != 2 {
+		t.Fatalf("expected 2 connections in snapshot, got %d", len(conns))
+	}
+
+	for _, conn := range conns {
+		connID := conn.Identity().ConnectionID
+		if connID == "" {
+			t.Fatal("expected non-empty connection ID")
+		}
+	}
+
+	if err := manager.BroadcastText(ctx, "test"); err != nil {
+		t.Fatalf("BroadcastText() error = %v", err)
+	}
+}

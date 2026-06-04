@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
@@ -12,19 +13,169 @@ import (
 
 type Manager struct {
 	mu            sync.RWMutex
-	conns         map[*Conn]struct{}
-	byConnID      map[string]*Conn
+	conns         map[string]*Conn
 	clusterMu     sync.RWMutex
 	clusterConfig ClusterConfig
 	clusterCtx    context.Context
 	clusterCancel context.CancelFunc
+	workerPool    *broadcastWorkerPool
+	heartbeatCtx   context.Context
+	heartbeatCancel context.CancelFunc
+}
+
+type broadcastWorkerPool struct {
+	tasks chan broadcastTask
+	wg    sync.WaitGroup
+}
+
+type broadcastTask struct {
+	conn *Conn
+	fn   func(*Conn) error
+}
+
+type BroadcastErrors struct {
+	errors []error
+	mu     sync.Mutex
+}
+
+func (be *BroadcastErrors) Add(err error) {
+	if err == nil {
+		return
+	}
+	be.mu.Lock()
+	defer be.mu.Unlock()
+	be.errors = append(be.errors, err)
+}
+
+func (be *BroadcastErrors) Count() int {
+	be.mu.Lock()
+	defer be.mu.Unlock()
+	return len(be.errors)
+}
+
+func (be *BroadcastErrors) Error() string {
+	be.mu.Lock()
+	defer be.mu.Unlock()
+	if len(be.errors) == 0 {
+		return ""
+	}
+	if len(be.errors) == 1 {
+		return be.errors[0].Error()
+	}
+	return errors.Join(be.errors...).Error()
+}
+
+func (be *BroadcastErrors) First() error {
+	be.mu.Lock()
+	defer be.mu.Unlock()
+	if len(be.errors) == 0 {
+		return nil
+	}
+	return be.errors[0]
+}
+
+func (be *BroadcastErrors) All() []error {
+	be.mu.Lock()
+	defer be.mu.Unlock()
+	return append([]error(nil), be.errors...)
 }
 
 func NewManager() *Manager {
-	return &Manager{
-		conns:    make(map[*Conn]struct{}),
-		byConnID: make(map[string]*Conn),
+	m := &Manager{
+		conns:      make(map[string]*Conn),
+		workerPool: newBroadcastWorkerPool(100),
 	}
+	m.startGlobalHeartbeat()
+	return m
+}
+
+func (m *Manager) startGlobalHeartbeat() {
+	m.heartbeatCtx, m.heartbeatCancel = context.WithCancel(context.Background())
+	go m.globalHeartbeatLoop(m.heartbeatCtx)
+}
+
+func (m *Manager) globalHeartbeatLoop(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m.checkAllConnections()
+		}
+	}
+}
+
+func (m *Manager) checkAllConnections() {
+	m.mu.RLock()
+	conns := make([]*Conn, 0, len(m.conns))
+	for _, conn := range m.conns {
+		conns = append(conns, conn)
+	}
+	m.mu.RUnlock()
+
+	now := time.Now()
+	for _, conn := range conns {
+		conn.mu.RLock()
+		lastSeen := conn.lastSeen
+		closed := conn.closed
+		heartbeatTimeout := conn.config.HeartbeatTimeout
+		idleTimeout := conn.config.IdleTimeout
+		identity := conn.identity
+		tracer := conn.tracer
+		traceCtx := conn.traceCtx
+		observer := conn.observer
+		conn.mu.RUnlock()
+
+		if closed {
+			continue
+		}
+
+		if heartbeatTimeout > 0 && now.Sub(lastSeen) > heartbeatTimeout {
+			_, span := startWebsocketSpan(traceCtx, tracer, "websocket.server.heartbeat_timeout", websocketTraceAttrs(identity)...)
+			observer.OnHeartbeatTimeout(identity)
+			endSpan(span, context.DeadlineExceeded)
+			_ = conn.CloseWithCode(CloseCodeHeartbeatTimeout, context.DeadlineExceeded)
+			m.Unregister(conn)
+			continue
+		}
+
+		if idleTimeout > 0 && now.Sub(lastSeen) > idleTimeout {
+			_, span := startWebsocketSpan(traceCtx, tracer, "websocket.server.idle_timeout", websocketTraceAttrs(identity)...)
+			endSpan(span, context.DeadlineExceeded)
+			_ = conn.CloseWithCode(CloseCodeIdleTimeout, context.DeadlineExceeded)
+			m.Unregister(conn)
+			continue
+		}
+	}
+}
+
+func newBroadcastWorkerPool(workerCount int) *broadcastWorkerPool {
+	p := &broadcastWorkerPool{
+		tasks: make(chan broadcastTask, workerCount*2),
+	}
+	p.wg.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
+		go p.worker()
+	}
+	return p
+}
+
+func (p *broadcastWorkerPool) worker() {
+	defer p.wg.Done()
+	for task := range p.tasks {
+		_ = task.fn(task.conn)
+	}
+}
+
+func (p *broadcastWorkerPool) submit(conn *Conn, fn func(*Conn) error) {
+	p.tasks <- broadcastTask{conn: conn, fn: fn}
+}
+
+func (p *broadcastWorkerPool) close() {
+	close(p.tasks)
+	p.wg.Wait()
 }
 
 func (m *Manager) EnableCluster(ctx context.Context, config ClusterConfig) error {
@@ -80,10 +231,9 @@ func (m *Manager) Register(conn *Conn) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.conns[conn] = struct{}{}
 	identity := conn.Identity()
 	if identity.ConnectionID != "" {
-		m.byConnID[identity.ConnectionID] = conn
+		m.conns[identity.ConnectionID] = conn
 	}
 }
 
@@ -93,10 +243,9 @@ func (m *Manager) Unregister(conn *Conn) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.conns, conn)
 	identity := conn.Identity()
 	if identity.ConnectionID != "" {
-		delete(m.byConnID, identity.ConnectionID)
+		delete(m.conns, identity.ConnectionID)
 	}
 }
 
@@ -246,7 +395,7 @@ func (m *Manager) SendToConnection(ctx context.Context, connectionID string, mes
 		return nil
 	}
 	m.mu.RLock()
-	conn := m.byConnID[connectionID]
+	conn := m.conns[connectionID]
 	m.mu.RUnlock()
 	traceCtx, span := startWebsocketSpan(ctx, nil, "websocket.manager.broadcast.connection",
 		attribute.String("websocket.connection_id", connectionID),
@@ -276,14 +425,19 @@ func (m *Manager) CloseAll() error {
 	}
 	m.mu.Lock()
 	conns := make([]*Conn, 0, len(m.conns))
-	for conn := range m.conns {
+	for _, conn := range m.conns {
 		conns = append(conns, conn)
 	}
-	m.conns = make(map[*Conn]struct{})
-	m.byConnID = make(map[string]*Conn)
+	m.conns = make(map[string]*Conn)
 	m.mu.Unlock()
 	for _, conn := range conns {
 		_ = conn.CloseWithCode(CloseCodeServerShutdown, nil)
+	}
+	if m.workerPool != nil {
+		m.workerPool.close()
+	}
+	if m.heartbeatCancel != nil {
+		m.heartbeatCancel()
 	}
 	return m.DisableCluster()
 }
@@ -296,13 +450,22 @@ func (m *Manager) broadcast(ctx context.Context, fn func(*Conn) error) error {
 }
 
 func (m *Manager) broadcastSnapshot(ctx context.Context, conns []*Conn, fn func(*Conn) error) error {
-	var firstErr error
-	for _, conn := range conns {
-		if err := fn(conn); err != nil && firstErr == nil {
-			firstErr = err
-		}
+	if len(conns) == 0 {
+		return nil
 	}
-	return firstErr
+	broadcastErrs := &BroadcastErrors{}
+	var wg sync.WaitGroup
+	for _, conn := range conns {
+		wg.Add(1)
+		go func(c *Conn) {
+			defer wg.Done()
+			if err := fn(c); err != nil {
+				broadcastErrs.Add(err)
+			}
+		}(conn)
+	}
+	wg.Wait()
+	return broadcastErrs.First()
 }
 
 func (m *Manager) connectionsByFilter(fn func(Identity) bool) []*Conn {
@@ -312,7 +475,7 @@ func (m *Manager) connectionsByFilter(fn func(Identity) bool) []*Conn {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	conns := make([]*Conn, 0, len(m.conns))
-	for conn := range m.conns {
+	for _, conn := range m.conns {
 		if fn(conn.Identity()) {
 			conns = append(conns, conn)
 		}
@@ -327,7 +490,7 @@ func (m *Manager) snapshotConnections() []*Conn {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	conns := make([]*Conn, 0, len(m.conns))
-	for conn := range m.conns {
+	for _, conn := range m.conns {
 		conns = append(conns, conn)
 	}
 	return conns
@@ -339,7 +502,7 @@ func (m *Manager) observeBroadcast(target string, count int, err error) {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	for conn := range m.conns {
+	for _, conn := range m.conns {
 		conn.observer.OnBroadcast(target, count, err)
 		break
 	}
@@ -411,7 +574,7 @@ func (m *Manager) handleClusterMessage(ctx context.Context, payload []byte) erro
 		})
 	case "send_connection_text":
 		m.mu.RLock()
-		conn := m.byConnID[envelope.Target]
+		conn := m.conns[envelope.Target]
 		m.mu.RUnlock()
 		if conn == nil {
 			return nil

@@ -209,9 +209,6 @@ func (s *Server) serveHTTPConn(w http.ResponseWriter, req *http.Request, handler
 	endSpan(handshakeSpan, nil)
 	ctx, cancel := context.WithCancel(traceCtx)
 	defer cancel()
-	if s.config.HeartbeatTimeout > 0 || s.config.IdleTimeout > 0 {
-		go conn.monitorLiveness(ctx)
-	}
 	handler(ctx, conn)
 	_ = conn.CloseWithCode(CloseCodeNormal, nil)
 }
@@ -414,36 +411,3 @@ func (c *Conn) markSeen() {
 	c.lastSeen = time.Now()
 }
 
-func (c *Conn) monitorLiveness(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			c.mu.RLock()
-			lastSeen := c.lastSeen
-			closed := c.closed
-			identity := c.identity
-			c.mu.RUnlock()
-			if closed {
-				return
-			}
-			now := time.Now()
-			if c.config.HeartbeatTimeout > 0 && now.Sub(lastSeen) > c.config.HeartbeatTimeout {
-				_, span := startWebsocketSpan(c.traceCtx, c.tracer, "websocket.server.heartbeat_timeout", websocketTraceAttrs(identity)...)
-				c.observer.OnHeartbeatTimeout(identity)
-				endSpan(span, context.DeadlineExceeded)
-				_ = c.CloseWithCode(CloseCodeHeartbeatTimeout, context.DeadlineExceeded)
-				return
-			}
-			if c.config.IdleTimeout > 0 && now.Sub(lastSeen) > c.config.IdleTimeout {
-				_, span := startWebsocketSpan(c.traceCtx, c.tracer, "websocket.server.idle_timeout", websocketTraceAttrs(identity)...)
-				endSpan(span, context.DeadlineExceeded)
-				_ = c.CloseWithCode(CloseCodeIdleTimeout, context.DeadlineExceeded)
-				return
-			}
-		}
-	}
-}

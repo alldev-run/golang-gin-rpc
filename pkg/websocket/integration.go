@@ -107,9 +107,6 @@ func serveConfigConn(config ServerConfig, manager *Manager, w http.ResponseWrite
 	endSpan(handshakeSpan, nil)
 	ctx, cancel := context.WithCancel(traceCtx)
 	defer cancel()
-	if config.HeartbeatTimeout > 0 || config.IdleTimeout > 0 {
-		go conn.monitorLiveness(ctx)
-	}
 	handler(ctx, conn)
 	_ = conn.CloseWithCode(CloseCodeNormal, nil)
 }
