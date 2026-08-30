@@ -95,13 +95,13 @@ func GetImplementedTypes() []MessageType {
 	return []MessageType{
 		MessageTypeRabbitMQ,
 		MessageTypeKafka,
+		MessageTypeNATS,
 	}
 }
 
 // GetFutureTypes returns messaging types planned for future implementation
 func GetFutureTypes() []MessageType {
 	return []MessageType{
-		MessageTypeNATS,
 		MessageTypeRedis,
 	}
 }

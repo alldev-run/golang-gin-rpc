@@ -24,6 +24,8 @@ func NewClient(config Config) (Client, error) {
 		return NewRabbitMQClient(config)
 	case MessageTypeKafka:
 		return NewKafkaClient(config)
+	case MessageTypeNATS:
+		return NewNATSClient(config)
 	default:
 		return nil, fmt.Errorf("unsupported messaging type: %s", msgType.DisplayName())
 	}
@@ -93,6 +95,13 @@ func ValidateConfig(config Config) error {
 	case MessageTypeKafka:
 		if config.Host == "" {
 			return fmt.Errorf("Kafka requires host")
+		}
+		if config.Port == 0 {
+			config.Port = msgType.DefaultPort()
+		}
+	case MessageTypeNATS:
+		if config.Host == "" {
+			return fmt.Errorf("NATS requires host")
 		}
 		if config.Port == 0 {
 			config.Port = msgType.DefaultPort()
