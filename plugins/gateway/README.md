@@ -1,15 +1,15 @@
 # HTTP Gateway
 
-`pkg/gateway` 提供一个可嵌入的多协议网关组件，支持 HTTP / gRPC / JSON-RPC 路由、服务发现、负载均衡、基础安全中间件、追踪和健康检查。
+`plugins/gateway` 提供一个可嵌入的多协议网关组件，支持 HTTP / gRPC / JSON-RPC 路由、服务发现、负载均衡、基础安全中间件、追踪和健康检查。
 
 ## 当前实现能力
 
 - 协议路由：按 `route.protocol` 分发到 HTTP、gRPC、JSON-RPC 处理器
 - 基础中间件：CORS、限流、请求 ID、访问日志
 - RPC 认证：`protocols.security.auth` 对 RPC 路由生效（HTTP 路由默认不校验）
-- 追踪：通过 `pkg/tracing` 注入/透传追踪上下文
+- 追踪：通过 `plugins/tracing` 注入/透传追踪上下文
 - 负载均衡：`round_robin` / `random` / `weighted` / `least_connections`
-- 服务发现：启用时从 `pkg/discovery` 拉取实例，失败回退到路由静态 `targets`
+- 服务发现：启用时从 `plugins/discovery` 拉取实例，失败回退到路由静态 `targets`
 - 可观测性端点：`/health`、`/ready`、`/info`、`/metrics`
 
 ## 配置结构（与代码一致）
@@ -154,6 +154,6 @@ defer svc.Close()
 ## 本地验证
 
 ```bash
-go test ./pkg/gateway -v
-go test ./pkg/loadbalancer -v
+go test ./plugins/gateway -v
+go test ./plugins/loadbalancer -v
 ```

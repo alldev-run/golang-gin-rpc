@@ -2,7 +2,7 @@
 
 ## Overview
 
-`pkg/configcenter` provides enterprise configuration governance:
+`plugins/configcenter` provides enterprise configuration governance:
 
 - Unified `Provider` abstraction (`etcd`, `consul`, `memory`)
 - Read-through cache with TTL
@@ -78,12 +78,12 @@ cc := configcenter.New(consulProvider)
 
 ## Boundary with Service Discovery
 
-`pkg/configcenter` and `pkg/discovery` may both use Consul/Etcd backends, but they are **different control planes**.
+`plugins/configcenter` and `plugins/discovery` may both use Consul/Etcd backends, but they are **different control planes**.
 
 | Module | Responsibility | Typical Data |
 |---|---|---|
-| `pkg/configcenter` | Configuration governance and dynamic policy distribution | rate limit thresholds, circuit breaker policies, feature flags, routing rules |
-| `pkg/discovery` | Service registration and endpoint discovery | service instances, host:port, health state |
+| `plugins/configcenter` | Configuration governance and dynamic policy distribution | rate limit thresholds, circuit breaker policies, feature flags, routing rules |
+| `plugins/discovery` | Service registration and endpoint discovery | service instances, host:port, health state |
 
 ### Do
 

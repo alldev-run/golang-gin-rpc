@@ -1,6 +1,6 @@
-# pkg/db
+# plugins/db
 
-`pkg/db` 提供数据库访问与治理相关能力，覆盖：
+`plugins/db` 提供数据库访问与治理相关能力，覆盖：
 
 - 多数据库客户端封装
 - 工厂模式创建数据库实例
@@ -53,7 +53,7 @@
 
 ## 适用场景
 
-`pkg/db` 当前适合：
+`plugins/db` 当前适合：
 
 - 常规业务系统数据库开发
 - CRUD 与分页查询
@@ -72,7 +72,7 @@
 #### 基本使用
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db"
 
 // MySQL 查询（默认）
 rows, err := db.Select("users").
@@ -219,7 +219,7 @@ boot.InitializeAll() // 自动设置全局 factory，db.Select 立即可用
 
 ## 当前状态判断
 
-按当前仓库状态，`pkg/db` 已经**基本满足日常开发中的数据库相关操作**，包括：
+按当前仓库状态，`plugins/db` 已经**基本满足日常开发中的数据库相关操作**，包括：
 
 - 常规增删改查
 - 分页
@@ -235,11 +235,11 @@ boot.InitializeAll() // 自动设置全局 factory，db.Select 立即可用
 - 中小型服务数据库层封装
 - 联调、灰度、上线准备
 
-那么当前 `pkg/db` 是可用的。
+那么当前 `plugins/db` 是可用的。
 
 ## 当前保留项
 
-当前仍建议保留预期，不直接把 `pkg/db` 定义为完全封顶的平台级数据库基础设施。还可以继续加强的方向包括：
+当前仍建议保留预期，不直接把 `plugins/db` 定义为完全封顶的平台级数据库基础设施。还可以继续加强的方向包括：
 
 - 更复杂的主从切换与故障编排
 - 更成熟的分布式事务治理
@@ -249,10 +249,10 @@ boot.InitializeAll() // 自动设置全局 factory，db.Select 立即可用
 
 ## 回归建议
 
-修改 `pkg/db` 后，建议至少执行：
+修改 `plugins/db` 后，建议至少执行：
 
 ```bash
-go test ./pkg/db/...
+go test ./plugins/db/...
 ```
 
 如果改动影响了更广的业务基础设施层，建议再执行：
@@ -263,7 +263,7 @@ go test ./pkg/...
 
 ## 总结
 
-`pkg/db` 当前已经可以作为业务开发中的数据库基础层使用，适合支撑：
+`plugins/db` 当前已经可以作为业务开发中的数据库基础层使用，适合支撑：
 
 - 日常数据库开发
 - 常规生产开发准备

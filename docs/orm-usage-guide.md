@@ -2,7 +2,7 @@
 
 ## 概述
 
-`pkg/db/orm` 是一个轻量级、数据库无关的 SQL 查询构建器，提供事务管理和结构体扫描功能。它不是 ActiveRecord ORM（无模式迁移、无关系映射），而是专注于构建安全的 SQL 查询。
+`plugins/db/orm` 是一个轻量级、数据库无关的 SQL 查询构建器，提供事务管理和结构体扫描功能。它不是 ActiveRecord ORM（无模式迁移、无关系映射），而是专注于构建安全的 SQL 查询。
 
 ## 核心特性
 
@@ -25,7 +25,7 @@ import (
     "database/sql"
     
     bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 func main() {
@@ -70,7 +70,7 @@ func useORM(o *orm.ORM) {
 import (
     "database/sql"
     _ "github.com/go-sql-driver/mysql"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 func directDB() {
@@ -89,7 +89,7 @@ func directDB() {
 
 ## 全局 Helper 快速使用（推荐）
 
-`pkg/db/helper.go` 提供了更简洁的全局数据库访问方式，无需手动创建 ORM 实例，在 bootstrap 初始化后即可直接使用。
+`plugins/db/helper.go` 提供了更简洁的全局数据库访问方式，无需手动创建 ORM 实例，在 bootstrap 初始化后即可直接使用。
 
 ### 3. 使用全局 Helper
 
@@ -100,7 +100,7 @@ import (
     "context"
     
     bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
 )
 
 func main() {
@@ -1147,7 +1147,7 @@ err = row.Scan(&summary.Total, &summary.AvgAge)
 软删除功能需要使用独立的 `SoftDelete` 结构体：
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 
 // 创建软删除实例
 softDelete := orm.NewSoftDelete()
@@ -1202,7 +1202,7 @@ if affected == 0 {
 ```go
 import (
     "fmt"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 // 创建缓存实例
@@ -1926,4 +1926,4 @@ rows, err := db.Query(ctx, sql, args...)
 
 ---
 
-*注意：本文档已根据 `pkg/db/orm/scopes.go` 的实际实现更新，确保所有示例代码均可编译运行。之前版本的文档描述了不存在或名称不符的 API（如 `ActiveScope`、`NotDeletedScope`、`PaginationScope` 等），现已修正为正确的 API（`Active`、`NotDeleted`、`Paginate` 等）。*
+*注意：本文档已根据 `plugins/db/orm/scopes.go` 的实际实现更新，确保所有示例代码均可编译运行。之前版本的文档描述了不存在或名称不符的 API（如 `ActiveScope`、`NotDeletedScope`、`PaginationScope` 等），现已修正为正确的 API（`Active`、`NotDeleted`、`Paginate` 等）。*

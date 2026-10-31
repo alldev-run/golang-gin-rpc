@@ -1,6 +1,6 @@
 # Actor Discovery
 
-`pkg/actor/discovery` 将 Actor 系统与服务发现后端（`pkg/discovery.Discovery`）桥接，
+`plugins/actor/discovery` 将 Actor 系统与服务发现后端（`plugins/discovery.Discovery`）桥接，
 让 Actor 既能注册/注销服务实例，也能以消息形式接收发现结果。
 
 ## 特性
@@ -20,9 +20,9 @@ import (
     "log"
     "time"
 
-    "github.com/alldev-run/golang-gin-rpc/pkg/actor"
-    "github.com/alldev-run/golang-gin-rpc/pkg/actor/discovery"
-    sd "github.com/alldev-run/golang-gin-rpc/pkg/discovery"
+    "github.com/alldev-run/golang-gin-rpc/plugins/actor"
+    "github.com/alldev-run/golang-gin-rpc/plugins/actor/discovery"
+    sd "github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 )
 
 type receiver struct {

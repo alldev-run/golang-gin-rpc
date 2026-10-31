@@ -21,18 +21,18 @@ Paths auto-mounted:
 
 ## Overview
 
-`pkg/audit` + `pkg/middleware` provides an enterprise-friendly audit trail capability:
+`plugins/audit` + `plugins/middleware` provides an enterprise-friendly audit trail capability:
 
-- Structured audit event model (`pkg/audit`)
-- Sensitive field masking (`pkg/audit.Masker`)
-- Pluggable sinks (`pkg/audit.Sink`, `MultiSink`, `LogSink`)
-- HTTP audit middleware (`pkg/middleware.Audit`)
+- Structured audit event model (`plugins/audit`)
+- Sensitive field masking (`plugins/audit.Masker`)
+- Pluggable sinks (`plugins/audit.Sink`, `MultiSink`, `LogSink`)
+- HTTP audit middleware (`plugins/middleware.Audit`)
 
 ## Quick Start
 
 ```go
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+    "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
 )
 
 router := gin.New()
@@ -57,7 +57,7 @@ router.Use(middleware.Audit(cfg))
 
 ## Gateway Integration
 
-`pkg/gateway.Gateway` now wires `middleware.Audit(...)` in `SetupRoutes(...)`.
+`plugins/gateway.Gateway` now wires `middleware.Audit(...)` in `SetupRoutes(...)`.
 
 ```go
 gw := bootstrap.GetGateway()
@@ -72,7 +72,7 @@ See runnable example: `examples/gateway/main.go`.
 
 ## ConfigCenter Dynamic Governance
 
-You can update audit policy at runtime via `pkg/configcenter` without restarting services.
+You can update audit policy at runtime via `plugins/configcenter` without restarting services.
 
 ```go
 base := middleware.DefaultAuditConfig()
@@ -109,7 +109,7 @@ Delete key `governance/audit/http` to reset to middleware boot defaults.
 
 ## Audit Metrics
 
-Audit pipeline now emits Prometheus metrics via `pkg/metrics`:
+Audit pipeline now emits Prometheus metrics via `plugins/metrics`:
 
 - `audit_writes_total{sink,result}`
 - `audit_write_duration_seconds{sink,result}`

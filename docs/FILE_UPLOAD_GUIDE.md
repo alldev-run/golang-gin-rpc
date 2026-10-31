@@ -16,7 +16,7 @@ The golang-gin-rpc framework provides a core file upload component with configur
 
 ## Overview
 
-The upload package (`pkg/upload`) provides a flexible and secure file upload core component for the golang-gin-rpc framework. It handles:
+The upload package (`plugins/upload`) provides a flexible and secure file upload core component for the golang-gin-rpc framework. It handles:
 
 - File validation by extension and MIME type
 - Configurable file size limits
@@ -29,7 +29,7 @@ HTTP handlers, CORS, authentication, and other interface concerns are implemente
 ## Package Structure
 
 ```
-pkg/upload/
+plugins/upload/
 ├── config.go           # Configuration structures
 ├── namer.go            # File naming strategies
 ├── validator.go        # File validation
@@ -101,7 +101,7 @@ package main
 
 import (
     "fmt"
-    "github.com/alldev-run/golang-gin-rpc/pkg/upload"
+    "github.com/alldev-run/golang-gin-rpc/plugins/upload"
 )
 
 func main() {
@@ -184,7 +184,7 @@ if err != nil {
 ```go
 import (
     "github.com/gin-gonic/gin"
-    "github.com/alldev-run/golang-gin-rpc/pkg/upload"
+    "github.com/alldev-run/golang-gin-rpc/plugins/upload"
 )
 
 func uploadHandler(c *gin.Context, uploader *upload.Uploader) {
@@ -373,10 +373,10 @@ logger:
 
 ### Testing Upload Functionality
 
-Use the test files provided in `pkg/upload/example_test.go`:
+Use the test files provided in `plugins/upload/example_test.go`:
 
 ```bash
-go test ./pkg/upload/... -v
+go test ./plugins/upload/... -v
 ```
 
 ## Best Practices

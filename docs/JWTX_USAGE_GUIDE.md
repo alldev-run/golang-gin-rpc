@@ -1,6 +1,6 @@
 # JWTX 认证使用指南
 
-本文档介绍 `github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx` 包的使用方法，该包提供了 JWT token 管理功能，包括访问令牌/刷新令牌对生成、令牌验证、令牌刷新、令牌撤销以及 Gin 中间件集成。
+本文档介绍 `github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx` 包的使用方法，该包提供了 JWT token 管理功能，包括访问令牌/刷新令牌对生成、令牌验证、令牌刷新、令牌撤销以及 Gin 中间件集成。
 
 ## 概述
 
@@ -89,8 +89,8 @@ package main
 
 import (
     "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
-    "github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
+    "github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
+    "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 )
 
 func main() {
@@ -219,7 +219,7 @@ package main
 
 import (
     "log"
-    "github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
+    "github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
 )
 
 func main() {
@@ -305,7 +305,7 @@ if err != nil {
 
 ## Gin 中间件集成
 
-项目提供了 `pkg/middleware/auth.go` 中的 JWT 中间件，推荐使用项目提供的中间件而非 jwtx 包自带的中间件。
+项目提供了 `plugins/middleware/auth.go` 中的 JWT 中间件，推荐使用项目提供的中间件而非 jwtx 包自带的中间件。
 
 ### 1. 使用项目提供的 JWT 中间件
 
@@ -314,7 +314,7 @@ package main
 
 import (
     "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+    "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
     "github.com/gin-gonic/gin"
 )
 
@@ -404,7 +404,7 @@ router.GET("/data", func(c *gin.Context) {
 结合 RBAC 进行权限控制：
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/rbac"
+import "github.com/alldev-run/golang-gin-rpc/plugins/rbac"
 
 // 创建 RBAC 策略
 policy := rbac.NewPolicy()
@@ -431,8 +431,8 @@ import (
     "time"
     
     "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
-    "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+    "github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
+    "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
     "github.com/gin-gonic/gin"
 )
 
@@ -688,7 +688,7 @@ package jwtx_test
 import (
     "testing"
     "time"
-    "github.com/alldev-run/golang-gin-rpc/pkg/auth/jwtx"
+    "github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
 )
 
 func TestTokenFlow(t *testing.T) {
@@ -740,7 +740,7 @@ func TestTokenFlow(t *testing.T) {
 
 运行测试：
 ```bash
-go test ./pkg/auth/jwtx/... -v
+go test ./plugins/auth/jwtx/... -v
 ```
 
 测试覆盖：
@@ -768,7 +768,7 @@ A: 可以，但会失去令牌撤销和版本控制功能。如果不需要这�
 A: 通过 deviceID 区分不同设备的令牌。可以限制每个用户的最大设备数，或在用户登录时撤销旧设备的令牌。
 
 ### Q: 项目中间件和 jwtx 中间件有什么区别？
-A: 项目提供的 `pkg/middleware/auth.go` 中间件功能更丰富，支持跳过路径、多种令牌查找方式（header/query/cookie）、RBAC 集成等。推荐使用项目提供的中间件。
+A: 项目提供的 `plugins/middleware/auth.go` 中间件功能更丰富，支持跳过路径、多种令牌查找方式（header/query/cookie）、RBAC 集成等。推荐使用项目提供的中间件。
 
 ## 相关文档
 

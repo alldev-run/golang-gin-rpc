@@ -1,11 +1,11 @@
 # Gateway 服务发现配置指南
 
-本文档描述 `pkg/gateway` 中服务发现相关能力，已按当前实现校准。
+本文档描述 `plugins/gateway` 中服务发现相关能力，已按当前实现校准。
 
 ## 实现说明
 
 - Gateway 服务发现开关：`discovery.enabled`
-- 开启后通过 `pkg/discovery` 按 `discovery.type` 和 `discovery.endpoints` 拉取实例
+- 开启后通过 `plugins/discovery` 按 `discovery.type` 和 `discovery.endpoints` 拉取实例
 - 关闭或拉取失败时，会回退使用每条路由里的静态 `targets`
 - 路由端点会定时刷新（后台循环）
 
@@ -15,7 +15,7 @@
 
 ```yaml
 discovery:
-  type: "static"          # static / consul / etcd / zookeeper（由 pkg/discovery 决定）
+  type: "static"          # static / consul / etcd / zookeeper（由 plugins/discovery 决定）
   endpoints: []
   namespace: "default"
   timeout: "5s"
@@ -87,6 +87,6 @@ routes:
 
 ## 相关文档
 
-- `pkg/gateway/README.md`
+- `plugins/gateway/README.md`
 - `docs/gateway.md`
-- `pkg/discovery/README.md`
+- `plugins/discovery/README.md`

@@ -1,6 +1,6 @@
 # HTTP Gateway 使用指南
 
-本文档面向 `api/http-gateway` 示例与 `pkg/gateway` 组件的实际使用方式，内容已按当前代码实现校准。
+本文档面向 `api/http-gateway` 示例与 `plugins/gateway` 组件的实际使用方式，内容已按当前代码实现校准。
 
 ## 快速启动
 
@@ -20,7 +20,7 @@ curl http://localhost:8080/info
 curl http://localhost:8080/metrics
 ```
 
-说明：`/debug/*` 为示例业务路由层提供的端点，不属于 `pkg/gateway` 固定内置端点。
+说明：`/debug/*` 为示例业务路由层提供的端点，不属于 `plugins/gateway` 固定内置端点。
 
 ## 配置要点
 
@@ -72,21 +72,21 @@ load_balancer:
 
 ### 路由冲突（例如 `/health` 重复注册）
 
-`pkg/gateway` 已注册 `/health`、`/ready`、`/info`、`/metrics`，业务层避免重复注册同路径。
+`plugins/gateway` 已注册 `/health`、`/ready`、`/info`、`/metrics`，业务层避免重复注册同路径。
 
 ### 配置看起来生效但行为异常
 
-确认使用的是 `api/http-gateway/config/config.yaml`，并检查字段是否与 `pkg/gateway/config.go` 中结构一致。
+确认使用的是 `api/http-gateway/config/config.yaml`，并检查字段是否与 `plugins/gateway/config.go` 中结构一致。
 
 ## 验证建议
 
 ```bash
-go test ./pkg/gateway -v
+go test ./plugins/gateway -v
 go test ./api/http-gateway -v
 ```
 
 ## 相关文档
 
-- `pkg/gateway/README.md`
+- `plugins/gateway/README.md`
 - `docs/gateway-discovery.md`
 - `docs/gateway-auth-complete-guide.md`

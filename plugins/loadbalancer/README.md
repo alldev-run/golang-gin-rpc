@@ -24,7 +24,7 @@ import (
     "fmt"
     "log"
     
-    "github.com/alldev-run/golang-gin-rpc/pkg/loadbalancer"
+    "github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer"
 )
 
 func main() {
@@ -231,7 +231,7 @@ BenchmarkWeighted-8      	20000000	        58.7 ns/op
 ### HTTP 网关集成
 
 ```go
-// pkg/gateway 中已集成
+// plugins/gateway 中已集成
 factory := gateway.NewLoadBalancerFactory()
 lb := factory.Create("weighted")
 ```
@@ -293,7 +293,7 @@ func (p *DBPool) GetDB() (*sql.DB, error) {
 
 ## API 参考
 
-详细 API 文档请参考 [GoDoc](https://pkg.go.dev/alldev-rpc/pkg/loadbalancer)。
+详细 API 文档请参考 [GoDoc](https://pkg.go.dev/alldev-rpc/plugins/loadbalancer)。
 
 ## 许可证
 

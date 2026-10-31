@@ -129,7 +129,7 @@ import (
     "log"
     "time"
     
-    "github.com/alldev-run/golang-gin-rpc/pkg/messaging"
+    "github.com/alldev-run/golang-gin-rpc/plugins/messaging"
 )
 
 func main() {
@@ -196,7 +196,7 @@ import (
     "log"
     "time"
     
-    "github.com/alldev-run/golang-gin-rpc/pkg/messaging"
+    "github.com/alldev-run/golang-gin-rpc/plugins/messaging"
 )
 
 func main() {

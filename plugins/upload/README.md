@@ -5,7 +5,7 @@ The upload package provides core file upload functionality for the golang-gin-rp
 ## Package Structure
 
 ```
-pkg/upload/
+plugins/upload/
 ├── config.go           # Configuration structures
 ├── namer.go            # File naming strategies
 ├── validator.go        # File validation
@@ -24,7 +24,7 @@ pkg/upload/
 ## Installation
 
 ```bash
-go get github.com/alldev-run/golang-gin-rpc/pkg/upload
+go get github.com/alldev-run/golang-gin-rpc/plugins/upload
 ```
 
 ## Configuration
@@ -63,7 +63,7 @@ package main
 
 import (
     "fmt"
-    "github.com/alldev-run/golang-gin-rpc/pkg/upload"
+    "github.com/alldev-run/golang-gin-rpc/plugins/upload"
 )
 
 func main() {

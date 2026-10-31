@@ -48,7 +48,7 @@ __API_PATH__/
 
 ### 当前能力
 - 链路追踪接入示例
-- 基于 `pkg/gateway` 的多协议路由示例
+- 基于 `plugins/gateway` 的多协议路由示例
 - 自动化 HTTP 请求日志记录
 - 请求 ID 自动生成与传递
 - 支持通过配置控制请求/响应日志行为
@@ -93,4 +93,4 @@ go test ./__API_PATH__ -v
 ## 相关文档
 
 - `docs/gateway.md`
-- `pkg/gateway/README.md`
+- `plugins/gateway/README.md`

@@ -1,6 +1,6 @@
-# pkg/websocket
+# plugins/websocket
 
-`pkg/websocket` 提供基础可用的 WebSocket client / server 封装，覆盖：
+`plugins/websocket` 提供基础可用的 WebSocket client / server 封装，覆盖：
 
 - client 建连、收发、关闭
 - server 启动、关闭、路由注册
@@ -201,7 +201,7 @@ import (
     "net/http"
 
     apperrors "github.com/alldev-run/golang-gin-rpc/pkg/errors"
-    "github.com/alldev-run/golang-gin-rpc/pkg/websocket"
+    "github.com/alldev-run/golang-gin-rpc/plugins/websocket"
     userpb "github.com/alldev-run/golang-gin-rpc/proto"
 )
 
@@ -278,7 +278,7 @@ _ = manager.BroadcastText(context.Background(), "hello all")
 
 ## 节点与集群配置
 
-`pkg/websocket` 现在提供独立的配置结构：
+`plugins/websocket` 现在提供独立的配置结构：
 
 - `NodeConfig`
 - `ClusterTransportConfig`
@@ -338,7 +338,7 @@ _ = manager.BroadcastText(context.Background(), "hello all")
   - 适合本地测试
 
 - `rabbitmq` / `kafka`
-  - 适合通过 `pkg/messaging` 接入真实多节点总线
+  - 适合通过 `plugins/messaging` 接入真实多节点总线
 
 ### 代码侧启用多节点
 
@@ -369,7 +369,7 @@ clusterConfig.Transport = websocket.NewMessagingClusterTransport(msgClient)
 
 ## 链路追踪
 
-`pkg/websocket` 已接入仓库现有 `pkg/tracing`，覆盖：
+`plugins/websocket` 已接入仓库现有 `plugins/tracing`，覆盖：
 
 - client 握手
 - client 收发消息
@@ -385,7 +385,7 @@ clusterConfig.Transport = websocket.NewMessagingClusterTransport(msgClient)
 
 ## Gin / HTTP 路由集成
 
-`pkg/websocket` 提供了两组集成辅助：
+`plugins/websocket` 提供了两组集成辅助：
 
 - `HTTPHandler`
 - `ManagedHTTPHandler`
@@ -479,7 +479,7 @@ _ = payload
 
 ## 适用范围
 
-当前 `pkg/websocket` 适合：
+当前 `plugins/websocket` 适合：
 
 - 基础实时通信开发
 - WebSocket echo / chat / notification 场景
@@ -502,15 +502,15 @@ _ = payload
 本次相关能力已通过：
 
 ```bash
-go test ./pkg/websocket
+go test ./plugins/websocket
 ```
 
-后续修改 `pkg/websocket` 后，建议至少执行：
+后续修改 `plugins/websocket` 后，建议至少执行：
 
 ```bash
-go test ./pkg/websocket
+go test ./plugins/websocket
 ```
 
 ## 总结
 
-`pkg/websocket` 现在已经具备基础的 client / server / manager / 广播 / 自动重连 / 心跳 / Gin/HTTP 集成能力，可以作为业务项目中的基础 WebSocket 能力层继续开发使用。
+`plugins/websocket` 现在已经具备基础的 client / server / manager / 广播 / 自动重连 / 心跳 / Gin/HTTP 集成能力，可以作为业务项目中的基础 WebSocket 能力层继续开发使用。

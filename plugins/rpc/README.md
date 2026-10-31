@@ -1,6 +1,6 @@
-# pkg/rpc
+# plugins/rpc
 
-`pkg/rpc` 提供统一的 RPC 基础设施封装，覆盖：
+`plugins/rpc` 提供统一的 RPC 基础设施封装，覆盖：
 
 - gRPC 服务端与客户端
 - JSON-RPC 服务端与客户端
@@ -56,7 +56,7 @@
 
 ### Server
 
-`pkg/rpc` 支持两类 server：
+`plugins/rpc` 支持两类 server：
 
 - `ServerTypeGRPC`
 - `ServerTypeJSONRPC`
@@ -88,8 +88,8 @@
 
 此外还提供独立客户端工具：
 
-- `pkg/rpc/grpc`
-- `pkg/rpc/jsonrpc`
+- `plugins/rpc/grpc`
+- `plugins/rpc/jsonrpc`
 
 ## 快速开始
 
@@ -202,9 +202,9 @@ defer manager.Stop()
 
 位于：
 
-- `pkg/rpc/examples/calculator_service.go`
-- `pkg/rpc/examples/echo_service.go`
-- `pkg/rpc/examples/user_service.go`
+- `plugins/rpc/examples/calculator_service.go`
+- `plugins/rpc/examples/echo_service.go`
+- `plugins/rpc/examples/user_service.go`
 
 ### 可执行示例
 
@@ -224,22 +224,22 @@ defer manager.Stop()
 本次已检查：
 
 ```bash
-go test ./pkg/rpc/... ./examples/rpc
+go test ./plugins/rpc/... ./examples/rpc
 ```
 
 结果：通过。
 
 说明当前：
 
-- `pkg/rpc` 主包可编译
-- `pkg/rpc/examples` 可编译
+- `plugins/rpc` 主包可编译
+- `plugins/rpc/examples` 可编译
 - `examples/rpc` 可编译
 
 注意：本次检查主要确认了示例的**构建可用性**。如果要做端到端示例运行验证，可以继续执行真实启动检查，这会实际监听端口并启动示例服务。
 
 ## 当前适用范围
 
-当前 `pkg/rpc` 已适合：
+当前 `plugins/rpc` 已适合：
 
 - 基础业务 RPC 开发
 - gRPC / JSON-RPC 双栈服务封装
@@ -257,10 +257,10 @@ go test ./pkg/rpc/... ./examples/rpc
 
 ## 回归建议
 
-修改 `pkg/rpc` 后，建议至少执行：
+修改 `plugins/rpc` 后，建议至少执行：
 
 ```bash
-go test ./pkg/rpc/...
+go test ./plugins/rpc/...
 go test ./examples/rpc
 ```
 

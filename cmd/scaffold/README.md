@@ -50,8 +50,8 @@ go run .\api\my-gateway
 模板解析优先级如下：
 
 1. `SCAFFOLD_TEMPLATE_DIR` 环境变量指定目录
-2. 当前项目内 `./pkg/gateway/templates/<template>`
-3. 已下载模块缓存中的 `github.com/alldev-run/golang-gin-rpc/pkg/gateway/templates/<template>`
+2. 当前项目内 `./plugins/gateway/templates/<template>`
+3. 已下载模块缓存中的 `github.com/alldev-run/golang-gin-rpc/plugins/gateway/templates/<template>`
 
 可选：强制使用本地模板目录
 
@@ -64,7 +64,7 @@ scaffold create-api --name my-gateway --template http-gateway
 
 模板目录位于：
 
-- `pkg/gateway/templates/<template>/`
+- `plugins/gateway/templates/<template>/`
 
 在仓库根目录执行：
 
@@ -75,7 +75,7 @@ go run ./cmd/scaffold create-api --name <new-api> --template <template>
 示例（Windows PowerShell）：
 
 ```powershell
-# 从 pkg/gateway/templates/http-gateway 生成 api/demo-api
+# 从 plugins/gateway/templates/http-gateway 生成 api/demo-api
 go run .\cmd\scaffold create-api --name demo-api --template http-gateway
 
 # 启动生成的项目
@@ -95,7 +95,7 @@ go run ./cmd/scaffold export-template --name <api-name> --template <template>
 示例（Windows PowerShell）：
 
 ```powershell
-# 将 api/demo-api 导出回 pkg/gateway/templates/http-gateway
+# 将 api/demo-api 导出回 plugins/gateway/templates/http-gateway
 # 其中 *.go 会导出为 *.go.gotmpl，并自动注入 token
 go run .\cmd\scaffold export-template --name demo-api --template http-gateway
 ```

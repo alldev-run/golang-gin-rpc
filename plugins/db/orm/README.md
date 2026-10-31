@@ -1,4 +1,4 @@
-# pkg/db/orm
+# plugins/db/orm
 
 This package provides a lightweight, database-agnostic SQL query builder + small helpers (transactions, struct scanning).
 
@@ -6,11 +6,11 @@ It is **not** an ActiveRecord ORM (no schema migration, no relationship mapping)
 
 - Create a `Dialect` (MySQL / PostgreSQL / SQLite / ClickHouse)
 - Use builders to generate SQL
-- Execute SQL via a `DB` implementation (e.g. `*sql.DB`, `*sql.Tx`, or adapters like `pkg/db/mysql.Client`)
+- Execute SQL via a `DB` implementation (e.g. `*sql.DB`, `*sql.Tx`, or adapters like `plugins/db/mysql.Client`)
 
 ## Quick start
 
-### Use with `pkg/db/mysql`
+### Use with `plugins/db/mysql`
 
 ```go
 cfg := mysql.DefaultConfig()

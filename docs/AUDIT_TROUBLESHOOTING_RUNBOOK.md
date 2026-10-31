@@ -4,7 +4,7 @@
 
 This runbook is for production troubleshooting of the HTTP audit pipeline:
 
-- Middleware emit path (`pkg/middleware.Audit`)
+- Middleware emit path (`plugins/middleware.Audit`)
 - Sink write path (`LogSink` / `FileSink` / `SQLSink` / `AsyncSink`)
 - Dynamic governance via `configcenter`
 - Audit Prometheus metrics and alerts

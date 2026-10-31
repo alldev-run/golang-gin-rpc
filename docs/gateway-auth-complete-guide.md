@@ -1,6 +1,6 @@
 # Gateway RPC 认证指南
 
-本文档说明 `pkg/gateway` 当前 API Key 认证能力（以代码实现为准）。
+本文档说明 `plugins/gateway` 当前 API Key 认证能力（以代码实现为准）。
 
 ## 认证边界
 
@@ -100,5 +100,5 @@ go run examples/config-manager.go enable
 ## 测试
 
 ```bash
-go test ./pkg/gateway -v -run TestGatewayAuth
+go test ./plugins/gateway -v -run TestGatewayAuth
 ```

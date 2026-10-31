@@ -394,14 +394,14 @@ func resolveTemplateSource(projectRoot, template string) (string, error) {
 		}
 	}
 
-	localSrc := filepath.Join(projectRoot, "pkg", "gateway", "templates", template)
+	localSrc := filepath.Join(projectRoot, "plugins", "gateway", "templates", template)
 	if stat, err := os.Stat(localSrc); err == nil && stat.IsDir() {
 		return localSrc, nil
 	}
 
 	frameworkRoots := queryFrameworkRoots(projectRoot)
 	for _, frameworkRoot := range frameworkRoots {
-		moduleSrc := filepath.Join(frameworkRoot, "pkg", "gateway", "templates", template)
+		moduleSrc := filepath.Join(frameworkRoot, "plugins", "gateway", "templates", template)
 		if stat, err := os.Stat(moduleSrc); err == nil && stat.IsDir() {
 			return moduleSrc, nil
 		}
@@ -607,7 +607,7 @@ func readModuleName(goModPath string) (string, error) {
 func exportTemplate(args []string) {
 	fsFlag := flag.NewFlagSet("export-template", flag.ExitOnError)
 	srcName := fsFlag.String("name", "", "api name under ./api, e.g. http-gateway")
-	template := fsFlag.String("template", "http-gateway", "template name under ./pkg/gateway/templates")
+	template := fsFlag.String("template", "http-gateway", "template name under ./plugins/gateway/templates")
 	_ = fsFlag.Parse(args)
 
 	if strings.TrimSpace(*srcName) == "" {
@@ -625,7 +625,7 @@ func exportTemplate(args []string) {
 	}
 
 	src := filepath.Join(root, "api", *srcName)
-	dst := filepath.Join(root, "pkg", "gateway", "templates", *template)
+	dst := filepath.Join(root, "plugins", "gateway", "templates", *template)
 
 	if _, err := os.Stat(src); err != nil {
 		fatalf("source api not found: %s", src)

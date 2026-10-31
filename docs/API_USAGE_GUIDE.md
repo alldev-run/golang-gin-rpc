@@ -22,9 +22,9 @@ package main
 
 import (
     "context"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db"
-    "github.com/alldev-run/golang-gin-rpc/pkg/mysql"
-    "github.com/alldev-run/golang-gin-rpc/pkg/redis"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
+    "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 )
 
 func main() {
@@ -144,7 +144,7 @@ affected, err = client.Save(ctx, "users", "id", newID, map[string]interface{}{
     "version": 1, // current version value
 })
 
-// DELETE queries using DeleteBuilder (统一使用 pkg/db/orm)
+// DELETE queries using DeleteBuilder (统一使用 plugins/db/orm)
 result, err := orm.NewDeleteBuilder(client, "users").
     Where("status = ?", "inactive").
     And("created_at < ?", time.Now().Add(-30*24*time.Hour)).
@@ -159,8 +159,8 @@ affected, err := result.RowsAffected()
 
 ```go
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/pool"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/pool"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
 )
 
 // Configure pool
@@ -234,7 +234,7 @@ if err := p.Unregister("mysql-main"); err != nil {
 ```go
 import (
     "database/sql"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/rwproxy"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/rwproxy"
 )
 
 // Create master connection
@@ -314,7 +314,7 @@ if err := client.RemoveReplica(0); err != nil {
 ### Basic Circuit Breaker Usage
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/circuitbreaker"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/circuitbreaker"
 
 // Create breaker
 config := circuitbreaker.Config{
@@ -399,7 +399,7 @@ breaker.ForceClosed()
 ### Wrapping Database Operations
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/slowquery"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/slowquery"
 
 // Configure logger
 config := slowquery.Config{
@@ -466,7 +466,7 @@ logger.LogManual("complex_operation", duration, err,
 ### Creating Migrations
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/migration"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/migration"
 
 // Create migrator
 m := migration.New(db)
@@ -543,7 +543,7 @@ if err := m.Down(ctx); err != nil {
 
 ```go
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/metrics"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/metrics"
     "github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -689,9 +689,9 @@ import (
     "time"
     
     "github.com/gin-gonic/gin"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/poolcb"
-    "github.com/alldev-run/golang-gin-rpc/pkg/mysql"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/poolcb"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 )
 
 type Server struct {

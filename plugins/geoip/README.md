@@ -14,7 +14,7 @@
 ### 基本使用
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/geoip"
+import "github.com/alldev-run/golang-gin-rpc/plugins/geoip"
 
 // 创建管理器
 manager, err := geoip.NewManager("/path/to/GeoLite2-Country.mmdb")

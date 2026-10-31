@@ -1,6 +1,6 @@
-# pkg/discovery
+# plugins/discovery
 
-`pkg/discovery` 提供统一的服务发现抽象，用于在不同注册中心之间切换实现，同时保持业务侧注册、注销和查询服务实例的调用方式一致。
+`plugins/discovery` 提供统一的服务发现抽象，用于在不同注册中心之间切换实现，同时保持业务侧注册、注销和查询服务实例的调用方式一致。
 
 当前支持：
 
@@ -143,7 +143,7 @@ type Discovery interface {
 
 ## 配置结构
 
-`pkg/discovery/config.go` 中的核心配置：
+`plugins/discovery/config.go` 中的核心配置：
 
 - `Type`
 - `Address`
@@ -293,7 +293,7 @@ cfg := discovery.Config{
 - `auto_register`
 - `service_name`
 
-而 `pkg/discovery` 当前直接使用的代码结构体是：
+而 `plugins/discovery` 当前直接使用的代码结构体是：
 
 - `Type`
 - `Address`
@@ -303,7 +303,7 @@ cfg := discovery.Config{
 也就是说：
 
 - `configs/discovery.yaml` 更像上层应用配置示例
-- `pkg/discovery.Config` 是底层 discovery 模块配置模型
+- `plugins/discovery.Config` 是底层 discovery 模块配置模型
 
 如果后续需要，我可以继续把两者映射关系补齐。
 
@@ -334,7 +334,7 @@ cfg := discovery.Config{
 当前相关回归可以执行：
 
 ```bash
-go test ./pkg/discovery/...
+go test ./plugins/discovery/...
 ```
 
 如果你本地具备对应环境，也可以补充集成测试环境变量后运行：
@@ -346,4 +346,4 @@ go test ./pkg/discovery/...
 
 ## 总结
 
-`pkg/discovery` 现在提供了统一的服务发现抽象，并支持 `consul`、`etcd`、`zookeeper`、`nacos` 和 `static` 五种模式，可直接用于服务注册、注销和实例查询。
+`plugins/discovery` 现在提供了统一的服务发现抽象，并支持 `consul`、`etcd`、`zookeeper`、`nacos` 和 `static` 五种模式，可直接用于服务注册、注销和实例查询。

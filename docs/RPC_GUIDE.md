@@ -14,7 +14,7 @@
 ## 📁 项目结构
 
 ```
-pkg/rpc/
+plugins/rpc/
 ├── README.md              # RPC 包说明文档
 ├── auth.go                # 认证相关功能
 ├── client.go              # RPC 客户端核心实现
@@ -71,8 +71,8 @@ package main
 
 import (
     "context"
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc"
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc/examples"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/examples"
 )
 
 // 创建自定义服务
@@ -107,7 +107,7 @@ package main
 import (
     "log"
     "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc/examples"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/examples"
 )
 
 func main() {
@@ -158,7 +158,7 @@ package main
 import (
     "context"
     "log"
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc/grpc"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/grpc"
 )
 
 func main() {
@@ -184,8 +184,8 @@ package main
 import (
     "context"
     "log"
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc/jsonrpc"
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc/examples"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/jsonrpc"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/examples"
 )
 
 func main() {
@@ -435,8 +435,8 @@ rpcManager.RegisterService(myService)
 查看 `examples/` 目录下的完整示例：
 
 - `examples/rpc/main.go` - RPC 框架使用示例
-- `pkg/rpc/examples/user_service.go` - 用户管理服务示例
-- `pkg/rpc/examples/calculator_service.go` - 计算器服务示例
+- `plugins/rpc/examples/user_service.go` - 用户管理服务示例
+- `plugins/rpc/examples/calculator_service.go` - 计算器服务示例
 
 ---
 

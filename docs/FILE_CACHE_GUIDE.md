@@ -43,7 +43,7 @@ type FileCacheConfig struct {
 ### 1. Basic File Cache
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 
 // Create default file cache
 cache, err := orm.NewDefaultFileCache("/tmp/my_cache")

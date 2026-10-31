@@ -1,6 +1,6 @@
 # Actor NATS Bridge
 
-`pkg/actor/nats` 将 Actor 系统与消息系统（NATS 或任意实现了 `messaging.Client` 的后端）
+`plugins/actor/nats` 将 Actor 系统与消息系统（NATS 或任意实现了 `messaging.Client` 的后端）
 桥接，让 Actor 可以发布消息、订阅主题，并把订阅到的消息以 Actor 消息形式投递。
 
 ## 特性
@@ -11,24 +11,24 @@
 - **配置驱动**：可通过 `messaging.Config` 直接构建底层 client。
 - **后端无关**：`Bridge` 持有 `messaging.Client` 接口，NATS / Kafka / RabbitMQ 均可接入。
 
-## 与 `pkg/messaging` 的关系
+## 与 `plugins/messaging` 的关系
 
-`pkg/actor/nats` 与 `pkg/messaging` 是**两层不同的抽象**，组合使用而非互相替代：
+`plugins/actor/nats` 与 `plugins/messaging` 是**两层不同的抽象**，组合使用而非互相替代：
 
 ```
 ┌──────────────────────────────────────────────┐
-│  pkg/actor/nats.Bridge                       │  集成层
+│  plugins/actor/nats.Bridge                       │  集成层
 │  - subject -> actor.PID 路由                  │  把消息投递到 Actor mailbox
 │  - messaging.Message -> nats.Message 转换     │
 └──────────────────┬───────────────────────────┘
                    │ 持有
 ┌──────────────────▼───────────────────────────┐
-│  pkg/messaging.Client (接口)                  │  传输层
+│  plugins/messaging.Client (接口)                  │  传输层
 │  - NATSClient / KafkaClient / RabbitMQClient  │  处理连接、订阅、发布字节流
 └──────────────────────────────────────────────┘
 ```
 
-| 关注点 | `pkg/messaging` | `pkg/actor/nats.Bridge` |
+| 关注点 | `plugins/messaging` | `plugins/actor/nats.Bridge` |
 |---|---|---|
 | 知道 Actor 是什么？ | 否 | 是 |
 | 处理线协议/连接 | 是 | 否 |
@@ -62,9 +62,9 @@ import (
     "log"
     "time"
 
-    "github.com/alldev-run/golang-gin-rpc/pkg/actor"
-    actorNats "github.com/alldev-run/golang-gin-rpc/pkg/actor/nats"
-    "github.com/alldev-run/golang-gin-rpc/pkg/messaging"
+    "github.com/alldev-run/golang-gin-rpc/plugins/actor"
+    actorNats "github.com/alldev-run/golang-gin-rpc/plugins/actor/nats"
+    "github.com/alldev-run/golang-gin-rpc/plugins/messaging"
 )
 
 type orderActor struct{}

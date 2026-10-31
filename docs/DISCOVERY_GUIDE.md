@@ -14,7 +14,7 @@
 ## 📁 项目结构
 
 ```
-pkg/discovery/
+plugins/discovery/
 ├── interface.go              # 服务发现接口定义
 ├── factory.go                # 服务发现工厂
 ├── manager.go                 # 服务发现管理器
@@ -98,7 +98,7 @@ package main
 import (
     "context"
     "log"
-    "github.com/alldev-run/golang-gin-rpc/pkg/discovery"
+    "github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 )
 
 func main() {
@@ -149,7 +149,7 @@ package main
 import (
     "context"
     "log"
-    "github.com/alldev-run/golang-gin-rpc/pkg/discovery"
+    "github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 )
 
 func main() {

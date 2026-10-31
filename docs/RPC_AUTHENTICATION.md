@@ -1,19 +1,19 @@
-# RPC 认证指南（`pkg/rpc`）
+# RPC 认证指南（`plugins/rpc`）
 
-本文档描述的是 `pkg/rpc` 当前实现的 API Key 认证能力（以 `pkg/rpc/auth.go` 与 `pkg/rpc/server.go` 为准）。
+本文档描述的是 `plugins/rpc` 当前实现的 API Key 认证能力（以 `plugins/rpc/auth.go` 与 `plugins/rpc/server.go` 为准）。
 
 说明：网关侧认证请参考 `docs/gateway-auth-complete-guide.md`。
 
 ## 能力范围
 
 - 认证模型：API Key
-- 作用范围：`pkg/rpc` 的 gRPC / JSON-RPC 服务端
+- 作用范围：`plugins/rpc` 的 gRPC / JSON-RPC 服务端
 - 控制粒度：按 RPC 方法名跳过认证（`SkipMethods`）
 - 运行时管理：支持设置配置、增删查 API Key
 
 ## 配置结构
 
-`pkg/rpc` 认证配置是代码结构体 `rpc.AuthConfig`，不是固定的 `rpc_auth:` YAML 节点。
+`plugins/rpc` 认证配置是代码结构体 `rpc.AuthConfig`，不是固定的 `rpc_auth:` YAML 节点。
 
 ```go
 type AuthConfig struct {
@@ -96,7 +96,7 @@ jsonServer.SetAuthConfig(cfg)
 
 ## 上下文工具函数
 
-`pkg/rpc/auth.go` 暴露了以下工具函数：
+`plugins/rpc/auth.go` 暴露了以下工具函数：
 
 - `GetAPIKeyFromContext(ctx)`
 - `GetAPIUserFromContext(ctx)`
@@ -113,5 +113,5 @@ jsonServer.SetAuthConfig(cfg)
 ## 回归建议
 
 ```bash
-go test ./pkg/rpc/... -v
+go test ./plugins/rpc/... -v
 ```

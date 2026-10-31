@@ -284,7 +284,7 @@ fmt.Printf("Tracing enabled: %v\n", tracer.IsEnabled())
 ### 与 Gin 集成
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+import "github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 
 func main() {
     r := gin.New()
@@ -300,7 +300,7 @@ func main() {
 ### 与 gRPC 集成
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+import "github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 
 func setupGRPCServer() *grpc.Server {
     tracer := tracing.GlobalTracer()

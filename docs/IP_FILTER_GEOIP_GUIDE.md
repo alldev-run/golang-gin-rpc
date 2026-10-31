@@ -84,7 +84,7 @@ gateway:
 package main
 
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+    "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
     "github.com/gin-gonic/gin"
 )
 
@@ -123,7 +123,7 @@ func main() {
 package main
 
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+    "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
 )
 
 func setupMiddleware() {
@@ -166,7 +166,7 @@ func handler(c *gin.Context) {
 
 ## GeoIP2 包使用
 
-直接使用 `pkg/geoip` 进行 IP 地理位置查询：
+直接使用 `plugins/geoip` 进行 IP 地理位置查询：
 
 ```go
 package main
@@ -175,7 +175,7 @@ import (
     "fmt"
     "log"
     
-    "github.com/alldev-run/golang-gin-rpc/pkg/geoip"
+    "github.com/alldev-run/golang-gin-rpc/plugins/geoip"
 )
 
 func main() {

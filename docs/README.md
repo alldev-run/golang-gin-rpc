@@ -1,19 +1,22 @@
-# Database Module Documentation
+# Database 插件文档（plugins/db）
 
 ## Overview
 
-This document focuses on the `pkg/db` module in `github.com/alldev-run/golang-gin-rpc`.
+This document focuses on the `plugins/db` plugin module in `github.com/alldev-run/golang-gin-rpc`.
 
-`pkg/db` provides reusable database access components for Go services, including client factory, connection pooling extensions, read-write split helpers, ORM builder, migration utilities, and related observability helpers.
+`plugins/db` provides reusable database access components for Go services, including client factory (driver registry), connection pooling extensions, read-write split helpers, ORM builder, migration utilities, and related observability helpers.
 
-## Supported Databases (`pkg/db`)
+> 框架整体的插件机制见 [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md)。
 
-| Database | Package | Type |
-|----------|---------|------|
-| MySQL | `pkg/db/mysql` | SQL |
-| PostgreSQL | `pkg/db/postgres` | SQL |
-| ClickHouse | `pkg/db/clickhouse` | Column Store |
-| MongoDB | `pkg/db/mongodb` | Document Store |
+## Supported Databases (`plugins/db`)
+
+| Database | Package | Type | 链接方式 |
+|----------|---------|------|---------|
+| MySQL | `plugins/db/mysql` | SQL | 随 db 插件内置 |
+| PostgreSQL | `plugins/db/postgres` | SQL | 随 db 插件内置 |
+| ClickHouse | `plugins/db/clickhouse` | Column Store | 需 import 才链接（驱动注册表） |
+| MongoDB | `plugins/db/mongodb` | Document Store | 需 import 才链接（驱动注册表） |
+| Elasticsearch | `plugins/search/elasticsearch` | Search | 需 import 才链接（驱动注册表） |
 
 ## Architecture
 
@@ -21,21 +24,21 @@ This document focuses on the `pkg/db` module in `github.com/alldev-run/golang-gi
 ┌─────────────────────────────────────────────────────────────┐
 │                    Application Layer                        │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/sqlprevention (SQL Injection Prevention)           │
+│  plugins/db/sqlprevention (SQL Injection Prevention)           │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/poolcb (Connection Pool + Circuit Breaker)         │
+│  plugins/db/poolcb (Connection Pool + Circuit Breaker)         │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/poolrw (Pool + Read-Write Split)                    │
+│  plugins/db/poolrw (Pool + Read-Write Split)                    │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/rwproxy (Read-Write Proxy)                          │
+│  plugins/db/rwproxy (Read-Write Proxy)                          │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/pool (Connection Pool)                              │
+│  plugins/db/pool (Connection Pool)                              │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/slowquery (Slow Query Logger)                       │
+│  plugins/db/slowquery (Slow Query Logger)                       │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/circuitbreaker (Circuit Breaker)                  │
+│  plugins/db/circuitbreaker (Circuit Breaker)                  │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/db/metrics (Prometheus Metrics)                        │
+│  plugins/db/metrics (Prometheus Metrics)                        │
 ├─────────────────────────────────────────────────────────────┤
 │  Individual Database Clients                               │
 └─────────────────────────────────────────────────────────────┘
@@ -47,8 +50,8 @@ This document focuses on the `pkg/db` module in `github.com/alldev-run/golang-gi
 
 ```go
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/db"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/poolcb"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/poolcb"
 )
 ```
 
@@ -148,7 +151,7 @@ package repository
 import (
     "context"
 
-    "github.com/alldev-run/golang-gin-rpc/pkg/db"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
 )
 
 type UserRepository struct {
@@ -287,7 +290,7 @@ import (
     "log"
 
     bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 func initORM() *orm.ORM {
@@ -388,8 +391,8 @@ import (
     "log"
 
     bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db"
-    "github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
+    "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 type UserRepository struct {
@@ -511,7 +514,7 @@ defer client.Close()
 ### SQL Operations with Read-Write Split
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/poolrw"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/poolrw"
 
 // Configure master and replicas
 cfg := poolrw.RWPoolConfig{
@@ -645,7 +648,7 @@ circuit_breaker_failures_total{name}
 - Safe identifier validation
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/sqlprevention"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/sqlprevention"
 
 // Validate input
 validator := sqlprevention.New(sqlprevention.DefaultConfig())
@@ -730,7 +733,7 @@ go run ./cmd/scaffold gen-migration --name add_user_status --dir db/migrations
 go run ./cmd/scaffold gen-migration --name add_user_index --version 20260324190000
 ```
 
-The generated files are plain SQL templates. Fill in `UP` and `DOWN` SQL, then register/run them via `pkg/db/migration`.
+The generated files are plain SQL templates. Fill in `UP` and `DOWN` SQL, then register/run them via `plugins/db/migration`.
 
 Run SQL migration files directly with scaffold CLI:
 
@@ -759,7 +762,7 @@ go run ./cmd/scaffold run-migration \
 ```
 
 ```go
-import "github.com/alldev-run/golang-gin-rpc/pkg/db/migration"
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/migration"
 
 // Create migrator
 m := migration.New(db)
@@ -840,10 +843,10 @@ mysqlClient, _ := factory.Create(db.Config{
 
 ```bash
 # Run all tests
-go test ./pkg/db/...
+go test ./plugins/db/...
 
 # Run specific package tests
-go test ./pkg/db/poolcb/... -v
+go test ./plugins/db/poolcb/... -v
 
 # Integration tests (requires Docker)
 docker-compose -f deploy/docker-compose.integration.yml up -d

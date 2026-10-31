@@ -57,7 +57,7 @@ client := jsonrpc.NewTracedClient(config)
 package main
 
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc"
     "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
 )
 
@@ -100,7 +100,7 @@ package main
 
 import (
     "context"
-    "github.com/alldev-run/golang-gin-rpc/pkg/rpc/jsonrpc"
+    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/jsonrpc"
 )
 
 func main() {

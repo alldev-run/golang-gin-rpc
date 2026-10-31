@@ -1,6 +1,6 @@
 # Actor
 
-轻量级 Actor 模型实现，位于 `pkg/actor`。
+轻量级 Actor 模型实现，位于 `plugins/actor`。
 
 ## 特性
 
@@ -16,7 +16,7 @@
 ## 目录结构
 
 ```
-pkg/actor/
+plugins/actor/
 ├── actor.go          # 核心接口：Message / PID / Context / Actor / 生命周期接口
 ├── system.go         # Actor 系统：创建、查找、发送、停止
 ├── cell.go           # 单个 Actor 的运行时封装与主循环
@@ -38,7 +38,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/alldev-run/golang-gin-rpc/pkg/actor"
+    "github.com/alldev-run/golang-gin-rpc/plugins/actor"
 )
 
 type HelloActor struct{}
@@ -202,7 +202,7 @@ func (a *MyActor) PostStop(ctx actor.Context) {
 ## 子包
 
 - **[discovery](./discovery/README.md)**：将 Actor 系统与服务发现后端桥接，提供 `Registry`、`RegistryActor` 及注册/发现消息类型。
-- **[nats](./nats/README.md)**：将 Actor 系统与消息系统（NATS 或任意 `messaging.Client`，如 Kafka/RabbitMQ）桥接，把主题消息路由到指定 Actor 的 mailbox。与 `pkg/messaging` 是两层抽象：`messaging` 负责传输，`nats.Bridge` 负责 Actor 路由。
+- **[nats](./nats/README.md)**：将 Actor 系统与消息系统（NATS 或任意 `messaging.Client`，如 Kafka/RabbitMQ）桥接，把主题消息路由到指定 Actor 的 mailbox。与 `plugins/messaging` 是两层抽象：`messaging` 负责传输，`nats.Bridge` 负责 Actor 路由。
 
 ## 注意事项
 

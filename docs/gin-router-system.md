@@ -24,7 +24,7 @@
    - 集成 Gin 引擎和中间件配置
    - 调试路由和业务路由管理
 
-4. **`pkg/middleware/gin/gin_middleware.go`** - Gin 中间件集合
+4. **`plugins/middleware/gin/gin_middleware.go`** - Gin 中间件集合
    - 完全基于 Gin 的中间件实现
    - 支持请求ID、CORS、限流、日志等
    - 兼容 Gateway 配置系统
