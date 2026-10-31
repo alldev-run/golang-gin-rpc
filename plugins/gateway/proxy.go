@@ -246,31 +246,35 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 	}
 }
 
-// proxyRequest proxies the request to the target service
-func (p *Proxy) shouldSkipProxyBody(req *http.Request) bool {
-	if req == nil || p == nil || p.gateway == nil || p.gateway.config == nil {
-		return true
+// shouldStreamBody reports whether the upstream body should be streamed
+// instead of buffered. Binary payloads (uploads, media) and configured
+// BusinessPaths prefixes are streamed straight through to avoid holding them
+// in memory. Streaming bodies cannot be replayed on retry — the second
+// attempt would see a consumed reader — so these requests effectively forfeit
+// retry body replay. The body is always forwarded either way.
+func (p *Proxy) shouldStreamBody(req *http.Request) bool {
+	if req == nil || req.Body == nil {
+		return false
 	}
-	path := req.URL.Path
-	for _, prefix := range p.gateway.config.BusinessPaths {
-		if prefix != "" && strings.HasPrefix(path, prefix) {
-			return true
+	if p != nil && p.gateway != nil && p.gateway.config != nil {
+		path := req.URL.Path
+		for _, prefix := range p.gateway.config.BusinessPaths {
+			if prefix != "" && strings.HasPrefix(path, prefix) {
+				return true
+			}
 		}
 	}
 	contentType := req.Header.Get("Content-Type")
 	if contentType == "" {
-		return true
+		return false
 	}
 	lower := strings.ToLower(contentType)
-	if strings.HasPrefix(lower, "multipart/form-data") ||
+	return strings.HasPrefix(lower, "multipart/form-data") ||
 		strings.HasPrefix(lower, "application/octet-stream") ||
 		strings.HasPrefix(lower, "application/pdf") ||
 		strings.HasPrefix(lower, "image/") ||
 		strings.HasPrefix(lower, "video/") ||
-		strings.HasPrefix(lower, "audio/") {
-		return true
-	}
-	return false
+		strings.HasPrefix(lower, "audio/")
 }
 
 func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string, route *Route) error {
@@ -289,14 +293,15 @@ func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string,
 	targetURL.Path = path.Join(targetURL.Path, proxyPath)
 	targetURL.RawQuery = c.Request.URL.RawQuery
 
-	// Create proxy request
+	// Prepare the upstream body: always forwarded. Text bodies are buffered
+	// so retries can replay them; binary payloads stream straight through.
+	streamBody := p.shouldStreamBody(c.Request)
 	var reqBody []byte
-	if p.shouldSkipProxyBody(c.Request) {
-		reqBody = []byte{}
-	} else {
-		reqBody, err = io.ReadAll(c.Request.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read request body: %w", err)
+	if !streamBody && c.Request.Body != nil {
+		var readErr error
+		reqBody, readErr = io.ReadAll(c.Request.Body)
+		if readErr != nil {
+			return fmt.Errorf("failed to read request body: %w", readErr)
 		}
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
 	}
@@ -311,7 +316,13 @@ func (p *Proxy) proxyRequest(ctx context.Context, c *gin.Context, target string,
 	}
 
 	for i := 0; i < maxRetries; i++ {
-		proxyReq, reqErr := http.NewRequestWithContext(ctx, c.Request.Method, targetURL.String(), bytes.NewReader(reqBody))
+		var bodyReader io.Reader
+		if streamBody {
+			bodyReader = c.Request.Body // streamed once; retries cannot replay
+		} else {
+			bodyReader = bytes.NewReader(reqBody)
+		}
+		proxyReq, reqErr := http.NewRequestWithContext(ctx, c.Request.Method, targetURL.String(), bodyReader)
 		if reqErr != nil {
 			return fmt.Errorf("failed to create proxy request: %w", reqErr)
 		}

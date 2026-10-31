@@ -1,4 +1,4 @@
-# HTTP Gateway 可用配置示例（与 pkg/gateway/config.go 对齐）
+# HTTP Gateway 可用配置示例（与 plugins/gateway/config.go 对齐）
 
 host: "0.0.0.0"
 port: 8080
@@ -28,7 +28,7 @@ rate_limit:
   window: "1m"
 
 discovery:
-  type: "static"             # static / consul / etcd / zookeeper（由 pkg/discovery 决定）
+  type: "static"             # static / consul / etcd / zookeeper / nacos（由 plugins/discovery 决定）
   endpoints: []
   namespace: "default"
   timeout: "5s"
@@ -111,6 +111,9 @@ routes:
     retries: 3
     headers: {}
     query: {}
+    # RBAC 路由权限（rbac.enabled 时生效；角色来自认证 claims 的 roles 字段）
+    # required_permissions: ["user:read"]
+    # permission_mode: "any"     # any / all
 
   - path: "/grpc/user/*"
     method: "POST"
@@ -129,6 +132,29 @@ routes:
       - "http://localhost:8087/rpc"
     timeout: "30s"
     retries: 3
+
+# 业务路径前缀：命中前缀的请求体流式转发到上游（不整体缓冲，大报文友好）；
+# 流式请求重试时无法重放请求体。请求体本身始终会被转发。
+business_paths: []
+
+audit:
+  enabled: true
+  skip_paths:
+    - "/health"
+    - "/ready"
+    - "/metrics"
+  sensitive_keys:
+    - "password"
+    - "token"
+    - "authorization"
+    - "api_key"
+    - "secret"
+
+rbac:
+  enabled: false
+  role_permissions:
+    admin: ["user:read", "user:write"]
+    viewer: ["user:read"]
 
 logging:
   level: "info"

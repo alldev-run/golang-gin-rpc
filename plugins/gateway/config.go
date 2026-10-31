@@ -48,7 +48,10 @@ type Config struct {
 	// RBAC configuration
 	RBAC RBACConfig `yaml:"rbac" json:"rbac"`
 
-	// BusinessPaths are the URI prefixes that should bypass proxy body logging.
+	// BusinessPaths are the URI prefixes whose request bodies are streamed to
+	// the upstream instead of buffered in memory (for large business payloads).
+	// Streamed bodies cannot be replayed on retry. The body itself is always
+	// forwarded regardless of this setting.
 	BusinessPaths []string `yaml:"business_paths" json:"business_paths"`
 }
 
@@ -313,7 +316,7 @@ func DefaultConfig() *Config {
 				Protocol: "http",
 			},
 		},
-		BusinessPaths: []string{"/", "/debug/", "/api/"},
+		BusinessPaths: []string{},
 		Logging: LoggingConfig{
 			Level:  "info",
 			Format: "json",

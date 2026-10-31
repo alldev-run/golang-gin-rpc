@@ -7,6 +7,8 @@
 - 协议路由：按 `route.protocol` 分发到 HTTP、gRPC、JSON-RPC 处理器
 - 基础中间件：CORS、限流、请求 ID、访问日志
 - RPC 认证：`protocols.security.auth` 对 RPC 路由生效（HTTP 路由默认不校验）
+- 审计日志：`audit` 段输出结构化审计事件（支持敏感字段脱敏）
+- RBAC 路由权限：`rbac` + `routes[*].required_permissions` 控制路由访问
 - 追踪：通过 `plugins/tracing` 注入/透传追踪上下文
 - 负载均衡：`round_robin` / `random` / `weighted` / `least_connections`
 - 服务发现：启用时从 `plugins/discovery` 拉取实例，失败回退到路由静态 `targets`
@@ -92,6 +94,24 @@ routes:
     strip_prefix: false
     timeout: "30s"
     retries: 3
+    # RBAC 路由权限（rbac.enabled 时生效）
+    # required_permissions: ["user:read"]
+    # permission_mode: "any"     # any / all
+
+# 业务路径前缀：命中前缀的请求体流式转发到上游（不整体缓冲，大报文友好）；
+# 流式请求重试时无法重放请求体。请求体本身始终会被转发。
+business_paths: []
+
+audit:
+  enabled: true
+  skip_paths: ["/health", "/ready", "/metrics"]
+  sensitive_keys: ["password", "token", "authorization", "api_key", "secret"]
+
+rbac:
+  enabled: false
+  role_permissions:
+    admin: ["user:read", "user:write"]
+    viewer: ["user:read"]
 
 logging:
   level: "info"
@@ -147,8 +167,10 @@ defer svc.Close()
 ## 注意事项
 
 - `routes[*].path` 会自动从 `/*` 归一化为 Gin 可识别的 `/*path`
+- 代理始终转发请求体：文本类 body（JSON/XML 等）先缓冲以支持重试重放；二进制类（multipart/octet-stream/图片/音视频/PDF）与命中 `business_paths` 前缀的请求流式透传，重试时无法重放 body
 - 启用服务发现后，若发现失败会回退使用路由静态 `targets`
 - RPC 认证只针对识别为 gRPC / JSON-RPC 的路由
+- RBAC 路由权限依赖认证中间件写入的 claims（角色取自 `claims.Payload["roles"]`，逗号分隔）
 - gRPC 代理当前实现主要用于网关链路和路由联调，业务层需结合实际 gRPC 协议定义继续完善
 
 ## 本地验证
