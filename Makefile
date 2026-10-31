@@ -30,8 +30,9 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ''
 	@echo 'Scaffold:'
-	@echo '  make create-api NAME=<new-api> [TEMPLATE=http-gateway] (templates live in pkg/gateway/templates)'
-	@echo '  make export-template NAME=<api-name> [TEMPLATE=http-gateway] (sync api/<name> back into pkg/gateway/templates)'
+	@echo '  make init NAME=<app-name> [COMPONENTS=api-gateway,db,cache] [PORT=8080] (interactive when COMPONENTS omitted)'
+	@echo '  make create-api NAME=<new-api> [TEMPLATE=http-gateway] (templates live in plugins/gateway/templates)'
+	@echo '  make export-template NAME=<api-name> [TEMPLATE=http-gateway] (sync api/<name> back into plugins/gateway/templates)'
 
 # Build targets
 build: ## Build the application and all plugin modules
@@ -202,14 +203,21 @@ info: ## Show project information
 	@echo "Log Dir: $(LOG_DIR)"
 	@echo "Temp Dir: $(TEMP_DIR)"
 
-create-api: ## Create a new api project from template (default template: pkg/gateway/templates/http-gateway). Usage: make create-api NAME=foo [TEMPLATE=http-gateway]
+init: ## Create a new app skeleton under api/<NAME> with selected components (interactive when COMPONENTS omitted). Usage: make init NAME=foo [COMPONENTS=api-gateway,db,cache] [PORT=8080]
+	@if [ -z "$(NAME)" ]; then \
+		echo "missing NAME. example: make init NAME=my-app COMPONENTS=api-gateway,db,metrics PORT=8080"; \
+		exit 2; \
+	fi
+	@$(GOCMD) run ./cmd/scaffold init --name "$(NAME)" $(if $(COMPONENTS),--components "$(COMPONENTS)") --port "$(or $(PORT),8080)"
+
+create-api: ## Create a new api project from template (default template: plugins/gateway/templates/http-gateway). Usage: make create-api NAME=foo [TEMPLATE=http-gateway]
 	@if [ -z "$(NAME)" ]; then \
 		echo "missing NAME. example: make create-api NAME=user-gateway TEMPLATE=http-gateway"; \
 		exit 2; \
 	fi
 	@$(GOCMD) run ./cmd/scaffold create-api --name "$(NAME)" --template "$(or $(TEMPLATE),http-gateway)"
 
-export-template: ## Export api/<NAME> into pkg/gateway/templates/<TEMPLATE> (Go files become .gotmpl and tokens are injected). Usage: make export-template NAME=http-gateway [TEMPLATE=http-gateway]
+export-template: ## Export api/<NAME> into plugins/gateway/templates/<TEMPLATE> (Go files become .gotmpl and tokens are injected). Usage: make export-template NAME=http-gateway [TEMPLATE=http-gateway]
 	@if [ -z "$(NAME)" ]; then \
 		echo "missing NAME. example: make export-template NAME=zzz-demo TEMPLATE=http-gateway"; \
 		exit 2; \

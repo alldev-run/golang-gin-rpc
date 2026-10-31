@@ -26,6 +26,8 @@ type FrameworkOptions = internalbootstrap.FrameworkOptions
 
 type APIGatewayServiceOptions = internalbootstrap.APIGatewayServiceOptions
 
+type WebSocketServiceOptions = internalbootstrap.WebSocketServiceOptions
+
 func NewBootstrap(configPath string) (*Bootstrap, error) {
 	return internalbootstrap.NewBootstrap(configPath)
 }
@@ -49,12 +51,28 @@ func StartFramework(ctx context.Context, boot *Bootstrap, options FrameworkOptio
 	return boot.StartFramework(ctx, options)
 }
 
+// StopFramework stops managed services and the plugin app in reverse start order.
+func StopFramework(ctx context.Context, boot *Bootstrap, services ...string) {
+	if boot == nil {
+		return
+	}
+	boot.StopFramework(ctx, services...)
+}
+
 // RegisterAPIGatewayServiceFactory registers API gateway service factory via package helper.
 func RegisterAPIGatewayServiceFactory(boot *Bootstrap, options APIGatewayServiceOptions) error {
 	if boot == nil {
 		return fmt.Errorf("bootstrap instance is nil")
 	}
 	return boot.RegisterAPIGatewayServiceFactory(options)
+}
+
+// RegisterWebSocketServiceFactory registers WebSocket service factory via package helper.
+func RegisterWebSocketServiceFactory(boot *Bootstrap, options WebSocketServiceOptions) error {
+	if boot == nil {
+		return fmt.Errorf("bootstrap instance is nil")
+	}
+	return boot.RegisterWebSocketServiceFactory(options)
 }
 
 // LoadDatabaseConfig loads database configuration from a YAML file and updates the bootstrap instance

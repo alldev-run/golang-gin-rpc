@@ -23,10 +23,12 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fatalf("usage: scaffold <command> [args]\ncommands: create-api, clean-logs, export-template, gen-migration, run-migration")
+		fatalf("usage: scaffold <command> [args]\ncommands: init, create-api, clean-logs, export-template, gen-migration, run-migration")
 	}
 
 	switch os.Args[1] {
+	case "init":
+		initApp(os.Args[2:])
 	case "create-api":
 		createAPI(os.Args[2:])
 	case "clean-logs":
@@ -851,4 +853,378 @@ func fatalf(format string, args ...any) {
 
 func exit(code int) {
 	os.Exit(code)
+}
+
+// ===== scaffold init:一条命令生成应用骨架,按需选择组件 =====
+
+// initComponent describes a selectable component for `scaffold init`.
+type initComponent struct {
+	name string
+	kind string // "service" or "plugin"
+	desc string
+}
+
+// initCatalog lists all selectable components, services first so the menu groups naturally.
+var initCatalog = []initComponent{
+	{"api-gateway", "service", "HTTP 网关服务 (gin)"},
+	{"rpc", "service", "gRPC/JSON-RPC 托管服务"},
+	{"websocket", "service", "WebSocket 托管服务"},
+	{"db", "plugin", "数据库 (mysql/postgres/clickhouse)"},
+	{"cache", "plugin", "Redis 缓存"},
+	{"discovery", "plugin", "服务发现 (consul/etcd/zookeeper/nacos)"},
+	{"tracing", "plugin", "链路追踪 (jaeger/otlp)"},
+	{"auth", "plugin", "JWT 认证"},
+	{"metrics", "plugin", "Prometheus 指标 (:9090)"},
+	{"health", "plugin", "健康检查 (db/cache 未启用时自动降级)"},
+	{"errors", "plugin", "错误处理"},
+	{"upload", "plugin", "文件上传"},
+}
+
+// initDefaults mirrors the default-enabled set in configs/config.yaml.
+var initDefaults = []string{"api-gateway", "metrics", "health", "errors"}
+
+func initApp(args []string) {
+	fsFlag := flag.NewFlagSet("init", flag.ExitOnError)
+	name := fsFlag.String("name", "", "app name, e.g. my-app")
+	components := fsFlag.String("components", "", "comma separated components (numbers or names); empty = interactive menu, defaults on non-TTY")
+	port := fsFlag.Int("port", 8080, "server.http.port in generated config")
+	_ = fsFlag.Parse(args)
+
+	if strings.TrimSpace(*name) == "" {
+		fatalf("missing --name. example: scaffold init --name my-app --components api-gateway,db,cache")
+	}
+	if strings.Contains(*name, string(os.PathSeparator)) || strings.Contains(*name, "/") || strings.Contains(*name, "\\") {
+		fatalf("invalid --name: %q", *name)
+	}
+	if *port <= 0 || *port > 65535 {
+		fatalf("invalid --port: %d", *port)
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		fatalf("getwd: %v", err)
+	}
+	module, err := readModuleName(filepath.Join(root, "go.mod"))
+	if err != nil {
+		fatalf("read module from go.mod: %v", err)
+	}
+
+	// Resolve selection: flags > interactive menu (TTY) > defaults (non-TTY).
+	var sel []string
+	switch {
+	case strings.TrimSpace(*components) != "":
+		sel, err = parseComponents(*components)
+	default:
+		if stdinIsTTY() {
+			sel, err = promptComponents(os.Stdin, os.Stdout)
+		} else {
+			sel = append([]string(nil), initDefaults...)
+			fmt.Printf("non-interactive stdin, using default components: %s\n", strings.Join(sel, ","))
+		}
+	}
+	if err != nil {
+		fatalf("%v", err)
+	}
+
+	src, err := resolveTemplateSource(root, "app-skeleton")
+	if err != nil {
+		fatalf("resolve template failed: %v", err)
+	}
+	dst := filepath.Join(root, "api", *name)
+	if _, err := os.Stat(dst); err == nil {
+		fatalf("target already exists: %s", dst)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		fatalf("create api dir: %v", err)
+	}
+
+	rollback := func(stage string) {
+		_ = os.RemoveAll(dst)
+		fatalf("init failed at %s: %v", stage, err)
+	}
+
+	tokens := map[string]string{
+		"__MODULE__":           module,
+		"__APP_NAME__":         *name,
+		"__API_PATH__":         filepath.ToSlash(filepath.Join("api", *name)),
+		"__EXTRA_IMPORTS__":    buildExtraImports(sel),
+		"__SERVICES_LIST__":    buildServicesList(sel),
+		"__WEBSOCKET_WIRING__": buildServiceWiring(sel, *port),
+	}
+	if err := copyTreeWithReplace(src, dst, copyOptions{TemplateDir: true}, func(_ string, data []byte) []byte {
+		s := string(data)
+		for k, v := range tokens {
+			s = strings.ReplaceAll(s, k, v)
+		}
+		return []byte(s)
+	}); err != nil {
+		rollback("template copy")
+	}
+
+	cfgPath := filepath.Join(dst, "config", "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
+		rollback("config dir")
+	}
+	if err := os.WriteFile(cfgPath, buildConfigYAML(sel, *name, *port), 0o644); err != nil {
+		rollback("config write")
+	}
+
+	fmt.Printf("created: %s\n", dst)
+	fmt.Printf("components: %s\n", strings.Join(sel, ","))
+	fmt.Printf("next:\n  go build ./api/%s\n  go run ./api/%s\n", *name, *name)
+}
+
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
+
+// promptComponents prints the numbered menu and reads a single selection line.
+func promptComponents(in io.Reader, out io.Writer) ([]string, error) {
+	fmt.Fprintln(out, "选择要启用的组件(输入编号或名称,逗号分隔;回车=默认):")
+	for i, c := range initCatalog {
+		tag := "组件"
+		if c.kind == "service" {
+			tag = "服务"
+		}
+		fmt.Fprintf(out, "  [%2d] %-12s %s\n", i+1, c.name, tag+" — "+c.desc)
+	}
+	fmt.Fprintf(out, "  默认: %s\n> ", strings.Join(initDefaults, ","))
+
+	line, err := bufio.NewReader(in).ReadString('\n')
+	if err != nil && strings.TrimSpace(line) == "" {
+		return nil, fmt.Errorf("read selection: %w", err)
+	}
+	return parseSelectionInput(line)
+}
+
+// parseSelectionInput accepts numbers (1-based catalog index), names, or both.
+func parseSelectionInput(line string) ([]string, error) {
+	fields := strings.FieldsFunc(line, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t' || r == '\n' || r == '\r'
+	})
+	if len(fields) == 0 {
+		return append([]string(nil), initDefaults...), nil
+	}
+	var parts []string
+	for _, f := range fields {
+		if n, err := strconv.Atoi(f); err == nil {
+			if n < 1 || n > len(initCatalog) {
+				return nil, fmt.Errorf("component number out of range: %d", n)
+			}
+			parts = append(parts, initCatalog[n-1].name)
+			continue
+		}
+		parts = append(parts, f)
+	}
+	return dedupeValidComponents(parts)
+}
+
+// parseComponents parses a --components flag value.
+func parseComponents(s string) ([]string, error) {
+	fields := strings.Split(s, ",")
+	var parts []string
+	for _, f := range fields {
+		if trimmed := strings.TrimSpace(f); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return dedupeValidComponents(parts)
+}
+
+func dedupeValidComponents(parts []string) ([]string, error) {
+	seen := make(map[string]bool, len(parts))
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		name := strings.ToLower(p)
+		if !isValidInitComponent(name) {
+			return nil, fmt.Errorf("unknown component %q; valid: %s", p, strings.Join(initComponentNames(), ", "))
+		}
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no components selected; valid: %s", strings.Join(initComponentNames(), ", "))
+	}
+	return out, nil
+}
+
+func isValidInitComponent(name string) bool {
+	for _, c := range initCatalog {
+		if c.name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func initComponentNames() []string {
+	names := make([]string, len(initCatalog))
+	for i, c := range initCatalog {
+		names[i] = c.name
+	}
+	return names
+}
+
+func isSelected(sel []string, name string) bool {
+	for _, c := range sel {
+		if c == name {
+			return true
+		}
+	}
+	return false
+}
+
+func initKind(name string) string {
+	for _, c := range initCatalog {
+		if c.name == name {
+			return c.kind
+		}
+	}
+	return ""
+}
+
+// buildServicesList renders the Go slice literal for frameworkOptions.Services.
+func buildServicesList(sel []string) string {
+	var quoted []string
+	for _, c := range initCatalog {
+		if c.kind == "service" && isSelected(sel, c.name) {
+			quoted = append(quoted, strconv.Quote(c.name))
+		}
+	}
+	return strings.Join(quoted, ", ")
+}
+
+// buildExtraImports renders additional import lines for the selected services.
+// A trailing newline keeps the closing paren on its own line; empty when unused.
+func buildExtraImports(sel []string) string {
+	if isSelected(sel, "websocket") {
+		return "\t\"github.com/alldev-run/golang-gin-rpc/plugins/websocket\"\n"
+	}
+	return ""
+}
+
+// buildServiceWiring renders option wiring for services that need it (websocket).
+func buildServiceWiring(sel []string, httpPort int) string {
+	if !isSelected(sel, "websocket") {
+		return ""
+	}
+	return fmt.Sprintf(`	// WebSocket 监听地址默认取 http 端口 +1,可在下方调整
+	wsCfg := websocket.DefaultServerConfig()
+	wsCfg.Addr = ":%d"
+	frameworkOptions.WebSocket = &bootstrap.WebSocketServiceOptions{
+		Name:   "websocket",
+		Config: wsCfg,
+	}
+`, httpPort+1)
+}
+
+// buildConfigYAML generates config.yaml with toggles and sections matching the
+// selection. Key shapes follow pkg/config GlobalConfig (server.http.*, database.primary...).
+func buildConfigYAML(sel []string, appName string, port int) []byte {
+	var b strings.Builder
+	b.WriteString("# Generated by scaffold init — 组件开关: plugins.* + framework.services\n")
+	fmt.Fprintf(&b, "app:\n  name: %s\n  environment: development\n\n", appName)
+
+	b.WriteString("plugins:\n")
+	for _, c := range initCatalog {
+		if c.kind != "plugin" {
+			continue
+		}
+		fmt.Fprintf(&b, "  %s: { enabled: %t }\n", c.name, isSelected(sel, c.name))
+	}
+
+	quoted := strings.Split(buildServicesList(sel), ", ")
+	fmt.Fprintf(&b, "\nframework:\n  services: [%s]\n  validate_dependency_coverage: true\n\n", strings.Join(quoted, ", "))
+
+	fmt.Fprintf(&b, `server:
+  http:
+    host: "0.0.0.0"
+    port: %d
+    read_timeout: "30s"
+    write_timeout: "30s"
+    idle_timeout: "60s"
+`, port)
+
+	if isSelected(sel, "db") {
+		b.WriteString(`
+# 数据库:驱动可换 postgres / clickhouse 等(见 plugins/db)
+database:
+  primary:
+    enabled: true
+    driver: mysql
+    host: "127.0.0.1"
+    port: 3306
+    database: app_db
+    username: root
+    password: ""
+    log_enabled: true
+`)
+	}
+	if isSelected(sel, "cache") {
+		b.WriteString(`
+redis:
+  host: "127.0.0.1"
+  port: 6379
+`)
+	}
+	if isSelected(sel, "rpc") {
+		b.WriteString(`
+rpc:
+  enabled: true
+  protocol: grpc
+`)
+	}
+	if isSelected(sel, "discovery") {
+		b.WriteString(`
+discovery:
+  enabled: true
+  type: consul
+  endpoints: ["127.0.0.1:8500"]
+  namespace: default
+`)
+	}
+	if isSelected(sel, "metrics") || isSelected(sel, "tracing") {
+		b.WriteString("\nobservability:\n")
+		if isSelected(sel, "metrics") {
+			b.WriteString(`  metrics:
+    enabled: true
+    type: prometheus
+    endpoint: ":9090"
+    namespace: ` + appName + "\n")
+		}
+		if isSelected(sel, "tracing") {
+			b.WriteString(`  tracing:
+    enabled: true
+    type: jaeger
+    endpoint: "http://127.0.0.1:14268/api/traces"
+    sample_rate: 1.0
+`)
+		}
+	}
+	if isSelected(sel, "auth") {
+		b.WriteString(`
+security:
+  jwt:
+    enabled: true
+    secret: "change-me"
+    algorithm: HS256
+    expiration: 24h
+`)
+	}
+	if isSelected(sel, "upload") {
+		b.WriteString(`
+upload:
+  enabled: true
+  upload_dir: ./uploads
+  auto_create_dir: true
+`)
+	}
+	return []byte(b.String())
 }

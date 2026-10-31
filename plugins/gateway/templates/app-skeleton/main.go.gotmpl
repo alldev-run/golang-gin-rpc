@@ -1,0 +1,43 @@
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+__EXTRA_IMPORTS__)
+
+// __APP_NAME__ 由 scaffold init 生成,组件选择见 config/config.yaml。
+func main() {
+	configPath := "./__API_PATH__/config/config.yaml"
+	if len(os.Args) > 1 {
+		configPath = os.Args[1]
+	}
+
+	boot, err := bootstrap.NewBootstrap(configPath)
+	if err != nil {
+		log.Fatalf("failed to initialize bootstrap: %v", err)
+	}
+	defer boot.Close()
+
+	frameworkOptions := bootstrap.DefaultFrameworkOptions()
+	frameworkOptions.Services = []string{__SERVICES_LIST__}
+__WEBSOCKET_WIRING__
+	ctx := context.Background()
+	if err := bootstrap.StartFramework(ctx, boot, frameworkOptions); err != nil {
+		log.Fatalf("failed to start framework: %v", err)
+	}
+	log.Printf("__APP_NAME__ started, services: %v", frameworkOptions.Services)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	bootstrap.StopFramework(shutdownCtx, boot, frameworkOptions.Services...)
+}
