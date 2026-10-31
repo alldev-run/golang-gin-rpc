@@ -1,3 +1,31 @@
 go 1.25.7
 
-use .
+use (
+	.
+	./plugins/actor
+	./plugins/alert
+	./plugins/audit
+	./plugins/auth
+	./plugins/bloomfilter
+	./plugins/cache
+	./plugins/circuitbreaker
+	./plugins/configcenter
+	./plugins/db
+	./plugins/discovery
+	./plugins/gateway
+	./plugins/geoip
+	./plugins/health
+	./plugins/loadbalancer
+	./plugins/messaging
+	./plugins/metrics
+	./plugins/middleware
+	./plugins/push
+	./plugins/ratelimit
+	./plugins/rbac
+	./plugins/rpc
+	./plugins/scheduler
+	./plugins/search
+	./plugins/tracing
+	./plugins/upload
+	./plugins/websocket
+)

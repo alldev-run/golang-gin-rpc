@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/routes"
-	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
-	"github.com/alldev-run/golang-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway/router"
 )
 
 type Router struct {

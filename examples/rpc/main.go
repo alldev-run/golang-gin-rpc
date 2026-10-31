@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	"github.com/alldev-run/golang-gin-rpc/pkg/ratelimiter"
-	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
-	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/examples"
-	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/grpc"
-	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/jsonrpc"
+	"github.com/alldev-run/golang-gin-rpc/plugins/ratelimit/ratelimiter"
+	"github.com/alldev-run/golang-gin-rpc/plugins/rpc"
+	"github.com/alldev-run/golang-gin-rpc/examples/rpc-lib"
+	"github.com/alldev-run/golang-gin-rpc/plugins/rpc/grpc"
+	"github.com/alldev-run/golang-gin-rpc/plugins/rpc/jsonrpc"
 
 	"go.uber.org/zap"
 )

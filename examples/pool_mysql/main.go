@@ -8,9 +8,9 @@ import (
 	"time"
 
 	appconfig "github.com/alldev-run/golang-gin-rpc/pkg/config"
-	"github.com/alldev-run/golang-gin-rpc/pkg/db"
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/pool"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/pool"
 )
 
 func main() {

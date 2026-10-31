@@ -11,13 +11,13 @@ import (
 	"gopkg.in/yaml.v3"
 
 	internalbootstrap "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-	"github.com/alldev-run/golang-gin-rpc/pkg/cache/redis"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
-	"github.com/alldev-run/golang-gin-rpc/pkg/db"
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/postgres"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	"github.com/alldev-run/golang-gin-rpc/pkg/upload"
+	"github.com/alldev-run/golang-gin-rpc/plugins/upload"
 )
 
 type Bootstrap = internalbootstrap.Bootstrap

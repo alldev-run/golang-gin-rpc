@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-	"github.com/alldev-run/golang-gin-rpc/pkg/audit"
+	"github.com/alldev-run/golang-gin-rpc/plugins/audit"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	middlewarepkg "github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+	middlewarepkg "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
 	"github.com/gin-gonic/gin"
 )
 

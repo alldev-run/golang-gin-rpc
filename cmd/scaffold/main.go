@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/migration"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/migration"
 	_ "github.com/go-sql-driver/mysql"
 )
 
