@@ -110,6 +110,36 @@ func (c *Context) MustGetService(name string) any {
 	return svc
 }
 
+// GetServiceT 是 GetService 的泛型版本：按名称获取服务并断言为 T。
+// 找不到或类型不匹配时返回 (零值, false)。
+func GetServiceT[T any](c *Context, name string) (T, bool) {
+	svc, ok := c.services.get(name)
+	if !ok {
+		var zero T
+		return zero, false
+	}
+	typed, ok := svc.(T)
+	if !ok {
+		var zero T
+		return zero, false
+	}
+	return typed, true
+}
+
+// MustGetServiceT 是 MustGetService 的泛型版本：按名称获取服务并断言为 T，
+// 找不到或类型不匹配时 panic。
+func MustGetServiceT[T any](c *Context, name string) T {
+	svc, ok := c.services.get(name)
+	if !ok {
+		panic(fmt.Sprintf("kernel: service %q not found (missing or disabled plugin?)", name))
+	}
+	typed, ok := svc.(T)
+	if !ok {
+		panic(fmt.Sprintf("kernel: service %q is not of requested type", name))
+	}
+	return typed
+}
+
 // serviceRegistry 是并发安全的服务定位器。
 type serviceRegistry struct {
 	mu       sync.RWMutex

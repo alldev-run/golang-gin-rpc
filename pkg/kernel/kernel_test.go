@@ -304,3 +304,34 @@ func TestSoftDependencyOrdering(t *testing.T) {
 		"stop:enhancer", "stop:base",
 	}, actions)
 }
+
+func TestGetServiceT(t *testing.T) {
+	sr := newServiceRegistry()
+	sr.set("counter", 42)
+	sr.set("name", "alice")
+
+	ctx := &Context{Context: stdctx.Background(), source: nil, services: sr, log: nil}
+
+	if v, ok := GetServiceT[int](ctx, "counter"); !ok || v != 42 {
+		t.Fatalf("expected 42, got %v (ok=%v)", v, ok)
+	}
+	if _, ok := GetServiceT[int](ctx, "missing"); ok {
+		t.Fatalf("expected miss for missing service")
+	}
+	if _, ok := GetServiceT[string](ctx, "counter"); ok {
+		t.Fatalf("expected miss for type mismatch")
+	}
+}
+
+func TestMustGetServiceT_Panics(t *testing.T) {
+	sr := newServiceRegistry()
+	ctx := &Context{Context: stdctx.Background(), source: nil, services: sr, log: nil}
+
+	require.Panics(t, func() { MustGetServiceT[int](ctx, "x") })
+
+	sr.set("x", "not-int")
+	require.Panics(t, func() { MustGetServiceT[int](ctx, "x") })
+
+	sr.set("y", 7)
+	require.Equal(t, 7, MustGetServiceT[int](ctx, "y"))
+}
