@@ -3,50 +3,47 @@ module github.com/alldev-run/golang-gin-rpc
 go 1.25.7
 
 require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
-	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/IBM/sarama v1.47.0
-	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf
-	github.com/elastic/go-elasticsearch/v8 v8.19.3
+	github.com/ClickHouse/clickhouse-go/v2 v2.43.0 // indirect
+	github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
+	github.com/IBM/sarama v1.47.0 // indirect
+	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.3 // indirect
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/go-zookeeper/zk v1.0.4
-	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/uuid v1.6.0
-	github.com/hashicorp/consul/api v1.33.4
-	github.com/lib/pq v1.11.2
-	github.com/mattn/go-sqlite3 v1.14.34
-	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
-	github.com/nats-io/nats.go v1.53.1
-	github.com/oschwald/geoip2-golang v1.11.0
+	github.com/go-zookeeper/zk v1.0.4 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/hashicorp/consul/api v1.33.4 // indirect
+	github.com/lib/pq v1.11.2 // indirect
+	github.com/mattn/go-sqlite3 v1.14.34 // indirect
+	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5 // indirect
+	github.com/nats-io/nats.go v1.53.1 // indirect
+	github.com/oschwald/geoip2-golang v1.11.0 // indirect
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/redis/go-redis/v9 v9.18.0
+	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
+	github.com/redis/go-redis/v9 v9.18.0 // indirect
 	github.com/stretchr/testify v1.11.1
-	go.etcd.io/etcd/client/v3 v3.6.8
-	go.mongodb.org/mongo-driver/v2 v2.5.0
-	go.opentelemetry.io/otel v1.42.0
-	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.42.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.42.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.42.0
-	go.opentelemetry.io/otel/exporters/zipkin v1.42.0
-	go.opentelemetry.io/otel/sdk v1.42.0
-	go.opentelemetry.io/otel/trace v1.42.0
+	go.etcd.io/etcd/client/v3 v3.6.8 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
+	go.opentelemetry.io/otel v1.42.0 // indirect
+	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.42.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.42.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.42.0 // indirect
+	go.opentelemetry.io/otel/exporters/zipkin v1.42.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.42.0 // indirect
+	go.opentelemetry.io/otel/trace v1.42.0 // indirect
 	go.uber.org/zap v1.27.1
-	golang.org/x/crypto v0.49.0
-	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.20.0
-	golang.org/x/time v0.15.0
+	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/grpc v1.79.2
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
-	nhooyr.io/websocket v1.8.17
+	nhooyr.io/websocket v1.8.17 // indirect
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/ClickHouse/ch-go v0.71.0 // indirect
 	github.com/alibabacloud-go/alibabacloud-gateway-pop v0.0.6 // indirect
@@ -103,7 +100,7 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/mock v1.6.0 // indirect
+	github.com/golang/mock v1.7.0-rc.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -174,3 +171,95 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260311181403-84a4fc48630c // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
+
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250603155806-513f23925822
+
+replace cloud.google.com/go => cloud.google.com/go v0.121.0
+
+// 框架插件模块(本地路径,见 go.work;拆分到独立仓库时改为线上版本)
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/actor => ./plugins/actor
+
+require github.com/alldev-run/golang-gin-rpc/plugins/audit v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/audit => ./plugins/audit
+
+require github.com/alldev-run/golang-gin-rpc/plugins/auth v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/auth => ./plugins/auth
+
+require github.com/alldev-run/golang-gin-rpc/plugins/cache v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/cache => ./plugins/cache
+
+require github.com/alldev-run/golang-gin-rpc/plugins/circuitbreaker v0.0.0 // indirect
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/circuitbreaker => ./plugins/circuitbreaker
+
+require github.com/alldev-run/golang-gin-rpc/plugins/configcenter v0.0.0 // indirect
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/configcenter => ./plugins/configcenter
+
+require github.com/alldev-run/golang-gin-rpc/plugins/db v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/db => ./plugins/db
+
+require github.com/alldev-run/golang-gin-rpc/plugins/discovery v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/discovery => ./plugins/discovery
+
+require github.com/alldev-run/golang-gin-rpc/plugins/gateway v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/gateway => ./plugins/gateway
+
+require github.com/alldev-run/golang-gin-rpc/plugins/geoip v0.0.0 // indirect
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/geoip => ./plugins/geoip
+
+require github.com/alldev-run/golang-gin-rpc/plugins/health v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/health => ./plugins/health
+
+require github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer v0.0.0 // indirect
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer => ./plugins/loadbalancer
+
+require github.com/alldev-run/golang-gin-rpc/plugins/messaging v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/messaging => ./plugins/messaging
+
+require github.com/alldev-run/golang-gin-rpc/plugins/metrics v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/metrics => ./plugins/metrics
+
+require github.com/alldev-run/golang-gin-rpc/plugins/middleware v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/middleware => ./plugins/middleware
+
+require github.com/alldev-run/golang-gin-rpc/plugins/ratelimit v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/ratelimit => ./plugins/ratelimit
+
+require github.com/alldev-run/golang-gin-rpc/plugins/rbac v0.0.0 // indirect
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/rbac => ./plugins/rbac
+
+require github.com/alldev-run/golang-gin-rpc/plugins/rpc v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/rpc => ./plugins/rpc
+
+require github.com/alldev-run/golang-gin-rpc/plugins/search v0.0.0 // indirect
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/search => ./plugins/search
+
+require github.com/alldev-run/golang-gin-rpc/plugins/tracing v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/tracing => ./plugins/tracing
+
+require github.com/alldev-run/golang-gin-rpc/plugins/upload v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/upload => ./plugins/upload
+
+require github.com/alldev-run/golang-gin-rpc/plugins/websocket v0.0.0
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/websocket => ./plugins/websocket

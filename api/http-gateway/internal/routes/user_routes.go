@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/model"
-	"github.com/alldev-run/golang-gin-rpc/pkg/middleware"
-	"github.com/alldev-run/golang-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/plugins/middleware"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway/router"
 
 	"github.com/gin-gonic/gin"
 )

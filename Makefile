@@ -14,6 +14,7 @@ GOCLEAN = $(GOCMD) clean
 GOTEST = $(GOCMD) test
 GOGET = $(GOCMD) get
 GOMOD = $(GOCMD) mod
+GOVET = $(GOCMD) vet
 
 # Build variables
 BUILD_FLAGS = -v
@@ -33,11 +34,13 @@ help: ## Show this help message
 	@echo '  make export-template NAME=<api-name> [TEMPLATE=http-gateway] (sync api/<name> back into pkg/gateway/templates)'
 
 # Build targets
-build: ## Build the application
+build: ## Build the application and all plugin modules
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME) .
-	@echo "Build completed: $(BUILD_DIR)/$(APP_NAME)"
+	@echo "Building plugin modules..."
+	@for d in plugins/*/; do (cd $$d && $(GOBUILD) ./... >/dev/null) || exit 1; done
+	@echo "Build completed: $(BUILD_DIR)/$(APP_NAME) (+ `ls -d plugins/*/ | wc -l | tr -d ' '` plugin modules)"
 
 build-debug: ## Build the application with debug symbols
 	@echo "Building $(APP_NAME) in debug mode..."
@@ -66,6 +69,9 @@ fmt: ## Format Go code
 	@echo "Formatting Go code..."
 	$(GOCMD) fmt ./...
 
+vet-plugins: ## Run go vet on all plugin modules
+	@for d in plugins/*/; do (cd $$d && $(GOVET) ./... ) || exit 1; done
+
 vet: ## Run go vet
 	@echo "Running go vet..."
 	$(GOCMD) vet ./...
@@ -78,9 +84,13 @@ lint: ## Run linter (requires golangci-lint)
 		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi
 
-test: ## Run tests
-	@echo "Running tests..."
-	$(GOTEST) -v ./...
+test: ## Run tests (root module + all plugin modules)
+	@echo "Running tests (root module)..."
+	$(GOTEST) ./...
+	@echo "Running tests (plugin modules)..."
+	@failed=0; for d in plugins/*/; do \
+		(cd $$d && $(GOTEST) ./... ) || failed=1; \
+	done; exit $$failed
 
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage..."

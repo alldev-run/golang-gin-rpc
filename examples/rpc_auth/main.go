@@ -3,9 +3,9 @@ package main
 
 import (
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	"github.com/alldev-run/golang-gin-rpc/pkg/rpc"
-	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/examples"
-	"github.com/alldev-run/golang-gin-rpc/pkg/rpc/jsonrpc"
+	"github.com/alldev-run/golang-gin-rpc/plugins/rpc"
+	"github.com/alldev-run/golang-gin-rpc/examples/rpc-lib"
+	"github.com/alldev-run/golang-gin-rpc/plugins/rpc/jsonrpc"
 	"context"
 	"log"
 

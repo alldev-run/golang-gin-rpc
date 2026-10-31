@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	
-	"github.com/alldev-run/golang-gin-rpc/pkg/middleware"
+	"github.com/alldev-run/golang-gin-rpc/plugins/middleware"
 )
 
 func TestAuthMiddleware(t *testing.T) {

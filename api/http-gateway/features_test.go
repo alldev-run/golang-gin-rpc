@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 )
 
 func TestHTTPGatewayConfig(t *testing.T) {
