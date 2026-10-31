@@ -26,6 +26,7 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 	"github.com/alldev-run/golang-gin-rpc/plugins/health"
+	"github.com/alldev-run/golang-gin-rpc/pkg/kernel"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/metrics"
 	"github.com/alldev-run/golang-gin-rpc/plugins/rpc"
@@ -80,10 +81,29 @@ type Bootstrap struct {
 	managedServices  map[string]ManagedService
 	serviceOrder     []string
 
+	pluginMu   sync.RWMutex
+	pluginApp  *kernel.App
+	stoppedSet map[string]bool
+
 	depMu        sync.RWMutex
 	dependencies map[string]interface{}
 
 	serviceDBConfigLoaded bool
+}
+
+// pluginStarted 返回内置组件插件是否已随框架启动。
+func (b *Bootstrap) pluginStarted(name string) bool {
+	b.pluginMu.RLock()
+	defer b.pluginMu.RUnlock()
+	return b.pluginApp != nil && b.pluginApp.Started(name)
+}
+
+// pluginStopped 返回内置组件插件是否已被插件机制关闭
+// （用于 Close 时跳过重复的资源释放）。
+func (b *Bootstrap) pluginStopped(name string) bool {
+	b.pluginMu.RLock()
+	defer b.pluginMu.RUnlock()
+	return b.stoppedSet[name]
 }
 
 // NewBootstrap creates a new bootstrap instance
@@ -1321,7 +1341,17 @@ func (b *Bootstrap) GetUploader() *upload.Uploader {
 func (b *Bootstrap) Close() error {
 	var errors []error
 
-	if b.cache != nil {
+	// 组件级资源（cache/rpc/discovery/tracer）优先交给插件应用逆序停止；
+	// 已由插件停止的组件跳过下面的逐项关闭，避免重复 Close。
+	if b.pluginStarted("cache") || b.pluginStarted("rpc") || b.pluginStarted("discovery") || b.pluginStarted("tracing") {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := b.stopPluginApp(ctx); err != nil {
+			errors = append(errors, fmt.Errorf("plugin app stop error: %w", err))
+		}
+		cancel()
+	}
+
+	if b.cache != nil && !b.pluginStopped("cache") {
 		if err := b.cache.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("cache close error: %w", err))
 		}
@@ -1332,7 +1362,7 @@ func (b *Bootstrap) Close() error {
 		// Clients are managed individually
 	}
 
-	if b.rpcManager != nil {
+	if b.rpcManager != nil && !b.pluginStopped("rpc") {
 		if err := b.rpcManager.Stop(); err != nil {
 			errors = append(errors, fmt.Errorf("rpc manager close error: %w", err))
 		}
@@ -1346,7 +1376,7 @@ func (b *Bootstrap) Close() error {
 		cancel()
 	}
 
-	if b.discoveryManager != nil {
+	if b.discoveryManager != nil && !b.pluginStopped("discovery") {
 		if err := b.discoveryManager.Stop(); err != nil {
 			errors = append(errors, fmt.Errorf("discovery manager close error: %w", err))
 		}
@@ -1364,7 +1394,7 @@ func (b *Bootstrap) Close() error {
 		// Auth manager doesn't need explicit close
 	}
 
-	if b.tracer != nil {
+	if b.tracer != nil && !b.pluginStopped("tracing") {
 		ctx := context.Background()
 		if err := b.tracer.Shutdown(ctx); err != nil {
 			errors = append(errors, fmt.Errorf("tracer close error: %w", err))

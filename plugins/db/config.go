@@ -124,29 +124,14 @@ func applyDefaults(cfg *Config) {
 		if cfg.PG.SSLMode == "" {
 			cfg.PG.SSLMode = "disable"
 		}
-	case TypeClickHouse:
-		if len(cfg.CH.Hosts) == 0 {
-			cfg.CH.Hosts = []string{"localhost:9000"}
-		}
-		if cfg.CH.Database == "" {
-			cfg.CH.Database = "default"
-		}
-	case TypeES:
-		if len(cfg.ES.Addresses) == 0 {
-			cfg.ES.Addresses = []string{"http://localhost:9200"}
-		}
 	case TypeMemcache:
 		if len(cfg.Memcache.Hosts) == 0 {
 			cfg.Memcache.Hosts = []string{"localhost:11211"}
 		}
-	case TypeMongoDB:
-		if cfg.MongoDB.URI == "" {
-			cfg.MongoDB.URI = "mongodb://localhost:27017"
-		}
-		if cfg.MongoDB.Database == "" {
-			cfg.MongoDB.Database = "default"
-		}
 	}
+
+	// 重型驱动（clickhouse/elasticsearch/mongodb）的默认值由各驱动子包
+	// 的注册逻辑负责（见 plugins/db/<driver>/register.go）。
 }
 
 // SaveConfigToYAML saves configuration to YAML file.

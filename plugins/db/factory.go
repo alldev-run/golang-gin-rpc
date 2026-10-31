@@ -13,11 +13,8 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/clickhouse"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/mongodb"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
-	"github.com/alldev-run/golang-gin-rpc/plugins/search/elasticsearch"
 )
 
 // Type represents the database type.
@@ -35,14 +32,17 @@ const (
 
 // Config holds configuration for all database types.
 type Config struct {
-	Type     Type                 `yaml:"type" json:"type"`
-	MySQL    mysql.Config         `yaml:"mysql" json:"mysql"`
-	Redis    redis.Config         `yaml:"redis" json:"redis"`
-	PG       postgres.Config      `yaml:"postgres" json:"postgres"`
-	CH       clickhouse.Config    `yaml:"clickhouse" json:"clickhouse"`
-	ES       elasticsearch.Config `yaml:"elasticsearch" json:"elasticsearch"`
-	Memcache memcache.Config      `yaml:"memcache" json:"memcache"`
-	MongoDB  mongodb.Config       `yaml:"mongodb" json:"mongodb"`
+	Type     Type            `yaml:"type" json:"type"`
+	MySQL    mysql.Config    `yaml:"mysql" json:"mysql"`
+	Redis    redis.Config    `yaml:"redis" json:"redis"`
+	PG       postgres.Config `yaml:"postgres" json:"postgres"`
+	Memcache memcache.Config `yaml:"memcache" json:"memcache"`
+
+	// 重型驱动的配置由对应驱动子包解析（见各子包 register.go）：
+	// CH 携带 clickhouse.Config，ES 携带 elasticsearch.Config，MongoDB 携带 mongodb.Config。
+	CH      any `yaml:"clickhouse,omitempty" json:"clickhouse,omitempty"`
+	ES      any `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty"`
+	MongoDB any `yaml:"mongodb,omitempty" json:"mongodb,omitempty"`
 }
 
 // Client is the unified database client interface.
@@ -79,27 +79,47 @@ func NewFactory() *Factory {
 }
 
 // Create creates a new database client from config.
+// 驱动经由注册表分发：未链接的驱动会得到明确错误（import 对应驱动子包即可）。
 func (f *Factory) Create(cfg Config) (Client, error) {
-	switch cfg.Type {
-	case TypeMySQL:
-		return f.createMySQL(cfg.MySQL)
-	case TypeRedis:
-		return f.createRedis(cfg.Redis)
-	case TypePostgres:
-		return f.createPostgres(cfg.PG)
-	case TypeClickHouse:
-		return f.createClickHouse(cfg.CH)
-	case TypeES:
-		return f.createES(cfg.ES)
-	case TypeMemcache:
-		return f.createMemcache(cfg.Memcache)
-	case TypeMongoDB:
-		return f.createMongoDB(cfg.MongoDB)
-	case "":
+	if cfg.Type == "" {
 		return nil, errors.New("database type is required")
-	default:
-		return nil, fmt.Errorf("unsupported database type: %s", cfg.Type)
 	}
+	creator, ok := lookupDriver(cfg.Type)
+	if !ok {
+		return nil, fmt.Errorf("database driver %q not linked: import the corresponding plugins/db/<driver> package", cfg.Type)
+	}
+
+	key := Type(createKey(string(cfg.Type), cfg))
+	v, err, _ := f.sf.Do(string(key), func() (interface{}, error) {
+		f.mu.RLock()
+		if client, exists := f.clients[key]; exists {
+			f.mu.RUnlock()
+			return client, nil
+		}
+		f.mu.RUnlock()
+
+		client, err := creator(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		if existing, exists := f.clients[key]; exists {
+			_ = client.Close()
+			return existing, nil
+		}
+		f.clients[key] = client
+		if _, exists := f.clients[cfg.Type]; !exists {
+			f.clients[cfg.Type] = client
+		}
+		return client, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return v.(Client), nil
 }
 
 // createMySQL creates a MySQL client.
@@ -195,62 +215,6 @@ func (f *Factory) createPostgres(cfg postgres.Config) (Client, error) {
 	return v.(Client), nil
 }
 
-// createClickHouse creates a ClickHouse client.
-func (f *Factory) createClickHouse(cfg clickhouse.Config) (Client, error) {
-	v, err, _ := f.sf.Do(string(TypeClickHouse), func() (interface{}, error) {
-		f.mu.RLock()
-		if client, exists := f.clients[TypeClickHouse]; exists {
-			f.mu.RUnlock()
-			return client, nil
-		}
-		f.mu.RUnlock()
-
-		client, err := clickhouse.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &clickhouseAdapter{client: client}
-
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[TypeClickHouse] = adapter
-		return adapter, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
-
-// createES creates an Elasticsearch client.
-func (f *Factory) createES(cfg elasticsearch.Config) (Client, error) {
-	v, err, _ := f.sf.Do(string(TypeES), func() (interface{}, error) {
-		f.mu.RLock()
-		if client, exists := f.clients[TypeES]; exists {
-			f.mu.RUnlock()
-			return client, nil
-		}
-		f.mu.RUnlock()
-
-		client, err := elasticsearch.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &esAdapter{client: client}
-
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[TypeES] = adapter
-		return adapter, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
-
 // createMemcache creates a Memcached client.
 func (f *Factory) createMemcache(cfg memcache.Config) (Client, error) {
 	v, err, _ := f.sf.Do(string(TypeMemcache), func() (interface{}, error) {
@@ -270,34 +234,6 @@ func (f *Factory) createMemcache(cfg memcache.Config) (Client, error) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.clients[TypeMemcache] = adapter
-		return adapter, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
-
-// createMongoDB creates a MongoDB client.
-func (f *Factory) createMongoDB(cfg mongodb.Config) (Client, error) {
-	v, err, _ := f.sf.Do(string(TypeMongoDB), func() (interface{}, error) {
-		f.mu.RLock()
-		if client, exists := f.clients[TypeMongoDB]; exists {
-			f.mu.RUnlock()
-			return client, nil
-		}
-		f.mu.RUnlock()
-
-		client, err := mongodb.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &mongodbAdapter{client: client}
-
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[TypeMongoDB] = adapter
 		return adapter, nil
 	})
 
@@ -396,34 +332,6 @@ func (a *postgresAdapter) Transaction(ctx context.Context, fn func(*sql.Tx) erro
 	return a.client.Transaction(ctx, fn)
 }
 
-// clickhouseAdapter adapts clickhouse.Client to db.Client.
-type clickhouseAdapter struct {
-	client *clickhouse.Client
-}
-
-func (a *clickhouseAdapter) Ping(ctx context.Context) error {
-	return a.client.Ping(ctx)
-}
-
-func (a *clickhouseAdapter) Close() error {
-	return a.client.Close()
-}
-
-// esAdapter adapts elasticsearch.Client to db.Client.
-type esAdapter struct {
-	client *elasticsearch.Client
-}
-
-func (a *esAdapter) Ping(ctx context.Context) error {
-	_, err := a.client.Info(ctx)
-	return err
-}
-
-func (a *esAdapter) Close() error {
-	// ES client doesn't need explicit close
-	return nil
-}
-
 // memcacheAdapter adapts memcache.Client to db.Client.
 type memcacheAdapter struct {
 	client *memcache.Client
@@ -437,25 +345,12 @@ func (a *memcacheAdapter) Close() error {
 	return a.client.Close()
 }
 
-// mongodbAdapter adapts mongodb.Client to db.Client.
-type mongodbAdapter struct {
-	client *mongodb.Client
-}
-
-func (a *mongodbAdapter) Ping(ctx context.Context) error {
-	return a.client.Ping(ctx)
-}
-
-func (a *mongodbAdapter) Close() error {
-	return a.client.Close(nil)
-}
-
 // GetMySQL returns the MySQL client from the factory.
 func (f *Factory) GetMySQL() (*mysql.Client, error) {
 	f.mu.RLock()
 	client, exists := f.clients[TypeMySQL]
 	f.mu.RUnlock()
-	
+
 	if !exists {
 		return nil, fmt.Errorf("MySQL client not found")
 	}
@@ -473,7 +368,7 @@ func (f *Factory) GetMySQLSQLClient() (SQLClient, error) {
 	f.mu.RLock()
 	client, exists := f.clients[TypeMySQL]
 	f.mu.RUnlock()
-	
+
 	if exists {
 		if sqlClient, ok := client.(SQLClient); ok {
 			return sqlClient, nil
@@ -487,7 +382,7 @@ func (f *Factory) GetRedis() (*redis.Client, error) {
 	f.mu.RLock()
 	client, exists := f.clients[TypeRedis]
 	f.mu.RUnlock()
-	
+
 	if exists {
 		if adapter, ok := client.(*redisAdapter); ok {
 			return adapter.client, nil
@@ -501,7 +396,7 @@ func (f *Factory) GetPostgres() (*postgres.Client, error) {
 	f.mu.RLock()
 	client, exists := f.clients[TypePostgres]
 	f.mu.RUnlock()
-	
+
 	if exists {
 		if adapter, ok := client.(*postgresAdapter); ok {
 			return adapter.client, nil
@@ -510,40 +405,12 @@ func (f *Factory) GetPostgres() (*postgres.Client, error) {
 	return nil, fmt.Errorf("PostgreSQL client not found")
 }
 
-// GetMongoDB returns the MongoDB client from the factory.
-func (f *Factory) GetMongoDB() (*mongodb.Client, error) {
-	f.mu.RLock()
-	client, exists := f.clients[TypeMongoDB]
-	f.mu.RUnlock()
-	
-	if exists {
-		if adapter, ok := client.(*mongodbAdapter); ok {
-			return adapter.client, nil
-		}
-	}
-	return nil, fmt.Errorf("MongoDB client not found")
-}
-
-// GetClickHouse returns the ClickHouse client from the factory.
-func (f *Factory) GetClickHouse() (*clickhouse.Client, error) {
-	f.mu.RLock()
-	client, exists := f.clients[TypeClickHouse]
-	f.mu.RUnlock()
-	
-	if exists {
-		if adapter, ok := client.(*clickhouseAdapter); ok {
-			return adapter.client, nil
-		}
-	}
-	return nil, fmt.Errorf("ClickHouse client not found")
-}
-
 // GetClient returns a client by type.
 func (f *Factory) GetClient(dbType Type) (Client, error) {
 	f.mu.RLock()
 	client, exists := f.clients[dbType]
 	f.mu.RUnlock()
-	
+
 	if exists {
 		return client, nil
 	}
@@ -565,20 +432,20 @@ func (f *Factory) GetMySQLWithConfig(cfg mysql.Config) (Client, error) {
 // GetRedisWithConfig creates or returns a Redis client with specific config
 func (f *Factory) GetRedisWithConfig(cfg redis.Config) (Client, error) {
 	key := createKey("redis", cfg)
-	
+
 	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
 		client, err := redis.New(cfg)
 		if err != nil {
 			return nil, err
 		}
 		adapter := &redisAdapter{client: client}
-		
+
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.clients[Type(key)] = adapter
 		return adapter, nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -588,66 +455,20 @@ func (f *Factory) GetRedisWithConfig(cfg redis.Config) (Client, error) {
 // GetPostgresWithConfig creates or returns a PostgreSQL client with specific config
 func (f *Factory) GetPostgresWithConfig(cfg postgres.Config) (Client, error) {
 	key := createKey("postgres", cfg)
-	
+
 	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
 		client, err := postgres.New(cfg)
 		if err != nil {
 			return nil, err
 		}
 		adapter := &postgresAdapter{client: client}
-		
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[Type(key)] = adapter
-		return adapter, nil
-	})
-	
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
 
-// GetClickHouseWithConfig creates or returns a ClickHouse client with specific config
-func (f *Factory) GetClickHouseWithConfig(cfg clickhouse.Config) (Client, error) {
-	key := createKey("clickhouse", cfg)
-	
-	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
-		client, err := clickhouse.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &clickhouseAdapter{client: client}
-		
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.clients[Type(key)] = adapter
 		return adapter, nil
 	})
-	
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
 
-// GetESWithConfig creates or returns an Elasticsearch client with specific config
-func (f *Factory) GetESWithConfig(cfg elasticsearch.Config) (Client, error) {
-	key := createKey("es", cfg)
-	
-	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
-		client, err := elasticsearch.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &esAdapter{client: client}
-		
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[Type(key)] = adapter
-		return adapter, nil
-	})
-	
 	if err != nil {
 		return nil, err
 	}
@@ -657,43 +478,20 @@ func (f *Factory) GetESWithConfig(cfg elasticsearch.Config) (Client, error) {
 // GetMemcacheWithConfig creates or returns a Memcached client with specific config
 func (f *Factory) GetMemcacheWithConfig(cfg memcache.Config) (Client, error) {
 	key := createKey("memcache", cfg)
-	
+
 	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
 		client, err := memcache.New(cfg)
 		if err != nil {
 			return nil, err
 		}
 		adapter := &memcacheAdapter{client: client}
-		
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[Type(key)] = adapter
-		return adapter, nil
-	})
-	
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
 
-// GetMongoDBWithConfig creates or returns a MongoDB client with specific config
-func (f *Factory) GetMongoDBWithConfig(cfg mongodb.Config) (Client, error) {
-	key := createKey("mongodb", cfg)
-	
-	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
-		client, err := mongodb.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &mongodbAdapter{client: client}
-		
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.clients[Type(key)] = adapter
 		return adapter, nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}

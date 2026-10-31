@@ -10,8 +10,6 @@ import (
 	"sync"
 
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/clickhouse"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/mongodb"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
@@ -261,24 +259,8 @@ func Postgres() (SQLClient, error) {
 	return factory.GetPostgres()
 }
 
-// MongoDB returns the global MongoDB client.
-func MongoDB() (*mongodb.Client, error) {
-	factory := GetGlobalFactory()
-	if factory == nil {
-		return nil, ErrFactoryNotInitialized
-	}
-	return factory.GetMongoDB()
-}
-
-// ClickHouse returns the global ClickHouse client.
-func ClickHouse() (*clickhouse.Client, error) {
-	factory := GetGlobalFactory()
-	if factory == nil {
-		return nil, ErrFactoryNotInitialized
-	}
-	return factory.GetClickHouse()
-}
-
+// MongoDB/ClickHouse 等重型驱动的便捷取用已随驱动注册表化移除：
+// 通过 GetGlobalFactory().GetClient(db.TypeMongoDB) 获取，并在驱动子包中做类型断言。
 // Redis returns the global Redis client.
 func Redis() (*redis.Client, error) {
 	factory := GetGlobalFactory()

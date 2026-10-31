@@ -233,6 +233,18 @@ func (a *App) Plugins() []Plugin {
 	return out
 }
 
+// Started 返回指定插件当前是否处于已启动状态。
+func (a *App) Started(name string) bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	for _, n := range a.started {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
 // Plugin 按名称查找已启动集合中的插件。
 func (a *App) Plugin(name string) (Plugin, bool) {
 	p, ok := findPlugin(a.plugins, name)
