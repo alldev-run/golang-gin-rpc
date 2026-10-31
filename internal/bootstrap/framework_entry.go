@@ -13,14 +13,22 @@ import (
 // plugins.<name>.enabled（新），也兼容 framework.init_*（旧，由适配器翻译）。
 type FrameworkOptions struct {
 	// Deprecated: 组件启停由 plugins.<name>.enabled / framework.init_* 配置驱动。
+	// 计划于 v0.2 移除对应 framework.init_* 配置键与翻译层，届时仅保留 plugins 段。
 	InitDatabases bool
-	InitCache     bool
+	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
+	InitCache bool
+	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
 	InitDiscovery bool
-	InitTracing   bool
-	InitAuth      bool
-	InitMetrics   bool
-	InitHealth    bool
-	InitErrors    bool
+	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
+	InitTracing bool
+	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
+	InitAuth bool
+	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
+	InitMetrics bool
+	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
+	InitHealth bool
+	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
+	InitErrors bool
 
 	ValidateDependencyCoverage bool
 

@@ -33,6 +33,24 @@ plugins/<name>/       功能插件，每个子目录一个独立 Go 模块
 > 子包；`plugins/db` 的重型驱动（clickhouse/mongodb）与
 > `plugins/search/elasticsearch` 通过**驱动注册表**自注册。
 
+## 插件成熟度分级
+
+每个插件按 API 稳定性、测试覆盖、生产验证程度划分为三个等级，便于使用者评估接入风险。
+
+| 等级 | 含义 | 承诺 |
+|---|---|---|
+| **GA** | 生产就绪 | 接口稳定（遵循 semver）、测试覆盖完整、已在生产环境验证 |
+| **Beta** | 功能完整但尚未广泛验证 | 接口基本稳定，允许小幅调整；测试覆盖中等 |
+| **Experimental** | 占位 / 原型 / 接口不稳定 | 允许破坏性变更，可能缺少实现或测试 |
+
+### 当前分级
+
+- **GA**：`db`、`cache`、`gateway`、`rpc`、`discovery`、`auth`、`health`、`metrics`、`tracing`、`middleware`、`websocket`、`messaging`
+- **Beta**：`actor`、`audit`、`bloomfilter`、`circuitbreaker`、`loadbalancer`、`push`、`ratelimit`、`rbac`、`upload`、`configcenter`、`scheduler`、`alert`、`geoip`
+- **Experimental**：`search`（当前为空壳占位，接口未定义）
+
+> 分级随版本演进调整；升级至 GA 的硬性门槛：至少 1 个生产案例 + 完整 README + 关键路径测试覆盖。
+
 ## Plugin 契约（pkg/kernel）
 
 ```go
