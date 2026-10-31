@@ -23,14 +23,15 @@ plugins/<name>/       功能插件，每个子目录一个独立 Go 模块
                       （自带 go.mod；搬去独立仓库时只需改模块名）
 ```
 
-当前 26 个插件模块：`actor` `alert` `audit` `auth` `bloomfilter` `cache`
-`circuitbreaker` `configcenter` `db` `discovery` `gateway` `geoip` `health`
-`loadbalancer` `messaging` `metrics` `middleware` `push` `ratelimit` `rbac`
-`rpc` `scheduler` `search` `tracing` `upload` `websocket`
+当前 27 个插件模块：`actor` `alert` `audit` `auth` `bloomfilter` `cache`
+`circuitbreaker` `configcenter` `db` `discovery` `gameserver` `gateway`
+`geoip` `health` `loadbalancer` `messaging` `metrics` `middleware` `push`
+`ratelimit` `rbac` `rpc` `scheduler` `search` `tracing` `upload` `websocket`
 
 > 特殊布局：`plugins/gateway` 内含 `middleware/gin`、`middleware/nethttp`、
 > `router`、`httplog`（网关家族）；`plugins/ratelimit` 内含 `ratelimiter`
-> 子包；`plugins/db` 的重型驱动（clickhouse/mongodb）与
+> 子包；`plugins/gameserver` 内含 `aoi`（九宫格空间索引）；
+> `plugins/db` 的重型驱动（clickhouse/mongodb）与
 > `plugins/search/elasticsearch` 通过**驱动注册表**自注册。
 
 ## 插件成熟度分级
@@ -46,7 +47,7 @@ plugins/<name>/       功能插件，每个子目录一个独立 Go 模块
 ### 当前分级
 
 - **GA**：`db`、`cache`、`gateway`、`rpc`、`discovery`、`auth`、`health`、`metrics`、`tracing`、`middleware`、`websocket`、`messaging`
-- **Beta**：`actor`、`audit`、`bloomfilter`、`circuitbreaker`、`loadbalancer`、`push`、`ratelimit`、`rbac`、`upload`、`configcenter`、`scheduler`、`alert`、`geoip`
+- **Beta**：`actor`、`audit`、`bloomfilter`、`circuitbreaker`、`loadbalancer`、`push`、`ratelimit`、`rbac`、`upload`、`configcenter`、`scheduler`、`alert`、`geoip`、`gameserver`
 - **Experimental**：`search`（当前为空壳占位，接口未定义）
 
 > 分级随版本演进调整；升级至 GA 的硬性门槛：至少 1 个生产案例 + 完整 README + 关键路径测试覆盖。
@@ -120,9 +121,12 @@ kernel.Plugin 注册（实例通过适配器绑定 Bootstrap）：
 | `health` | *(soft)* db, cache | 健康检查（db/cache 禁用时少注册 checker） |
 | `errors` | — | 错误处理初始化 |
 | `upload` | — | 文件上传（由 upload 配置段决定） |
+| `actor` | — | Actor 系统（由 actor 配置段决定：`enabled`/`mailbox_size`/`restart_always`/`max_restarts`） |
 
 托管服务（`api-gateway` / `rpc` / `websocket`）不走插件机制，仍由
 `ManagedService`/`ServiceFactory` 按 `framework.services` 清单启停。
+websocket 服务可通过 `WebSocketServiceOptions` 挂载 `Router`（envelope 路由）
+与 `Rooms`（房间生命周期），工厂自动做连接注册、Manager 装配与停止排空。
 
 ## 配置示例
 

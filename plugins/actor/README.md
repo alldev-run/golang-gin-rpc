@@ -12,6 +12,10 @@
 - **超时发送**：`SendWithContext` 支持 context 超时控制。
 - **死信回调**：通过 `Options.OnDeadLetter` 监听无法送达的消息。
 - **工厂创建**：通过 `FromProducer` 支持每次重启创建新实例。
+- **请求-应答**：`System.Ask` 创建轻量 future,收到首条回复或超时即返回(热路径请用 Send)。
+- **定时消息**:`System.SendAfter`(延时一次)与 `System.SendEvery`(周期投递,可取消,目标消失自动停)。
+- **监督重启**:`Supervision` 策略(RestartNever/RestartAlways/RestartBackoff),panic 后按 Producer 重建实例、重置行为并重跑 PreStart;连续失败计数成功即清零,超限触发 OnGiveUp。
+- **框架接入**:内置 kernel 插件 `actor`(配置段 `plugins.actor`:`enabled`/`mailbox_size`/`restart_always`/`max_restarts`),`bootstrap.GetActorSystem()` 取用。
 
 ## 目录结构
 
@@ -24,6 +28,9 @@ plugins/actor/
 ├── context.go        # Context 接口的实现
 ├── props.go          # Props：描述如何创建一个 Actor
 ├── options.go        # 系统级配置 Options
+├── future.go         # Ask 请求-应答(future actor)
+├── scheduler.go      # SendAfter / SendEvery 定时消息
+├── supervision.go    # 监督策略(RestartAlways/Backoff/Never)
 ├── errors.go         # 哨兵错误
 ├── discovery/        # 服务注册与发现桥接（见 ./discovery/README.md）
 └── nats/             # Actor 与 NATS/消息系统的桥接（见 ./nats/README.md）

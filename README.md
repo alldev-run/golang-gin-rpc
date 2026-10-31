@@ -12,10 +12,10 @@
   - `pkg/requestid`、`pkg/cors`、`pkg/utils`、`pkg/version`：通用辅助
   - `pkg/bootstrap`：应用组合根门面（内部由 kernel 驱动）
 - **插件模块（`plugins/<name>`，各自独立 go.mod，按需引入）**
-  - 服务通信：`rpc`（gRPC/JSON-RPC）、`gateway`（网关 + HTTP 中间件 + router）、`websocket`、`messaging`（Kafka/NATS/RabbitMQ）
+  - 服务通信：`rpc`（gRPC/JSON-RPC）、`gateway`（网关 + HTTP 中间件 + router）、`websocket`（游戏协议层：envelope 路由/会话恢复/房间/发送背压）、`messaging`（Kafka/NATS/RabbitMQ + 请求-应答）
   - 数据与状态：`db`（驱动注册表：mysql/postgres/clickhouse/mongodb/elasticsearch…）、`cache`（redis/memcache/failover）、`search`
   - 治理与可观测：`discovery`、`health`、`metrics`、`tracing`、`circuitbreaker`、`loadbalancer`、`ratelimit`
-  - 安全与业务：`auth`、`rbac`、`audit`、`upload`、`push`、`geoip`、`configcenter`、`actor`（+ NATS 桥接/发现）
+  - 安全与业务：`auth`、`rbac`、`audit`、`upload`、`push`、`geoip`、`configcenter`、`actor`（Ask/定时消息/监督重启）
   - 中间件库：`middleware`（独立 net/http 中间件：audit/auth/apikey/cors/ip_filter/rate_limiter/recovery 等）
   - 游戏服：`gameserver`（九宫格 AOI 空间管理，供实时游戏房间/大世界邻居查询）
   - 工具类：`alert`、`bloomfilter`、`scheduler`
@@ -35,7 +35,7 @@
 ├── plugins/                  # 功能插件（每个子目录一个独立 Go 模块）
 │   ├── db/                   #   例：数据库（驱动注册表 + mysql/postgres/... 子包）
 │   ├── gateway/              #   例：网关（含 middleware/gin|nethttp、router、httplog）
-│   └── ...                   #   其余 24 个插件模块
+│   └── ...                   #   其余 25 个插件模块
 ├── tests/dbintegration/      # 端到端 db 集成测试（//go:build integration，需真实 MySQL）
 ├── examples/                 # 各组件示例（每个示例独立子目录）
 ├── main.go                   # 主入口
