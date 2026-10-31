@@ -9,14 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/upload"
 	"gopkg.in/yaml.v3"
 )
 
-// Loader handles configuration loading from multiple sources
+// Loader handles configuration loading from multiple sources.
+// 它同时满足 kernel.ConfigSource（UnmarshalSection），供插件读取各自原始配置段。
 type Loader struct {
 	mu       sync.RWMutex
 	config   *GlobalConfig
+	raw      *yaml.Node // 原始 yaml 文档，供插件按段反序列化
 	watchers []func(*GlobalConfig)
 }
 
@@ -54,15 +55,6 @@ type GlobalConfig struct {
 
 	// Security
 	Security SecurityConfig `yaml:"security" json:"security"`
-
-	// Upload service configuration
-	Upload UploadConfig `yaml:"upload" json:"upload"`
-}
-
-// UploadConfig wraps upload configuration with enabled flag
-type UploadConfig struct {
-	Enabled bool          `yaml:"enabled" json:"enabled"`
-	Config  upload.Config `yaml:",inline" json:",inline"`
 }
 
 // AppConfig application basic configuration
@@ -430,6 +422,13 @@ func (l *Loader) Load(path string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// 保留原始文档，供 UnmarshalSection 按段读取（插件自带配置结构体）。
+	var raw yaml.Node
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("failed to parse config: %w", err)
+	}
+	l.raw = &raw
+
 	if err := yaml.Unmarshal(data, l.config); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -443,6 +442,29 @@ func (l *Loader) Load(path string) error {
 	}
 
 	return nil
+}
+
+// UnmarshalSection 将顶层 yaml 段 name 反序列化到 out。
+// 段不存在时返回 (false, nil)。满足 kernel.ConfigSource 接口。
+func (l *Loader) UnmarshalSection(name string, out any) (bool, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	if l.raw == nil || l.raw.Kind != yaml.DocumentNode || len(l.raw.Content) == 0 {
+		return false, nil
+	}
+	root := l.raw.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return false, nil
+	}
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		if root.Content[i].Value == name {
+			if err := root.Content[i+1].Decode(out); err != nil {
+				return true, fmt.Errorf("failed to decode config section %q: %w", name, err)
+			}
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Get returns the current configuration

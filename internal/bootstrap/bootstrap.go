@@ -37,6 +37,13 @@ import (
 
 // LoadConfig loads configuration from file using pkg/config
 func LoadConfig(configPath string) (*config.GlobalConfig, error) {
+	_, cfg, err := loadConfigWithLoader(configPath)
+	return cfg, err
+}
+
+// loadConfigWithLoader 返回 loader 与解析后的配置；loader 保留原始 yaml 段，
+// 供插件式组件按需反序列化自己的配置。
+func loadConfigWithLoader(configPath string) (*config.Loader, *config.GlobalConfig, error) {
 	loader := config.NewLoader()
 
 	// Set defaults first
@@ -45,16 +52,17 @@ func LoadConfig(configPath string) (*config.GlobalConfig, error) {
 	// Load from file if exists
 	if configPath != "" {
 		if err := loader.Load(configPath); err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
+			return nil, nil, fmt.Errorf("failed to load config: %w", err)
 		}
 	}
 
-	return loader.Get(), nil
+	return loader, loader.Get(), nil
 }
 
 // Bootstrap handles application initialization
 type Bootstrap struct {
 	config           *config.GlobalConfig
+	loader           *config.Loader
 	db               *db.Factory
 	cache            cache.Cache
 	rpcManager       *rpc.Manager
@@ -81,7 +89,7 @@ type Bootstrap struct {
 // NewBootstrap creates a new bootstrap instance
 func NewBootstrap(configPath string) (*Bootstrap, error) {
 	// Load configuration
-	cfg, err := LoadConfig(configPath)
+	loader, cfg, err := loadConfigWithLoader(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
@@ -131,6 +139,7 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 
 	boot := &Bootstrap{
 		config:           cfg,
+		loader:           loader,
 		serviceFactories: make(map[string]ServiceFactory),
 		managedServices:  make(map[string]ManagedService),
 		dependencies:     make(map[string]interface{}),
@@ -1050,20 +1059,29 @@ func (b *Bootstrap) InitializeTracing() error {
 	return nil
 }
 
-// InitializeUpload initializes upload service if enabled
+// InitializeUpload initializes upload service if enabled.
+// upload 配置由本组件自行解析（配置结构不再挂在全局 GlobalConfig 上）。
 func (b *Bootstrap) InitializeUpload() error {
-	if !b.config.Upload.Enabled {
+	var uploadCfg struct {
+		Enabled bool          `yaml:"enabled"`
+		Config  upload.Config `yaml:",inline"`
+	}
+	found, err := b.loader.UnmarshalSection("upload", &uploadCfg)
+	if err != nil {
+		return fmt.Errorf("failed to parse upload config: %w", err)
+	}
+	if !found || !uploadCfg.Enabled {
 		logger.Info("Upload service disabled, skipping initialization")
 		return nil
 	}
 
-	uploader := upload.NewUploader(&b.config.Upload.Config)
+	uploader := upload.NewUploader(&uploadCfg.Config)
 	b.uploader = uploader
 	b.setDependency("upload.uploader", uploader)
 
 	logger.Info("Upload service initialized successfully",
-		logger.String("upload_dir", b.config.Upload.Config.UploadDir),
-		logger.Bool("auto_create_dir", b.config.Upload.Config.AutoCreateDir))
+		logger.String("upload_dir", uploadCfg.Config.UploadDir),
+		logger.Bool("auto_create_dir", uploadCfg.Config.AutoCreateDir))
 	return nil
 }
 
