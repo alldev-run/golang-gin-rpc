@@ -7,3 +7,5 @@
 **/*.exe
 /.trunk
 /gateway
+# ZCode 会话本地数据
+.zcode/
