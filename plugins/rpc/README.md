@@ -29,8 +29,12 @@
   - 独立 gRPC 客户端工具封装
 - `jsonrpc/`
   - 独立 JSON-RPC 客户端工具封装
-- `examples/`
-  - `calculator` / `echo` / `user` 示例 service
+- `auth.go`
+  - RPC 认证（API Key / JWT 验证中间件）
+- `observer.go`
+  - RPC 观测器接口与分发
+
+示例 service（如 `calculator`）见根模块 `examples/rpc` / `examples/rpc-lib`。
 
 ## 核心概念
 

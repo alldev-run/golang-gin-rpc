@@ -161,7 +161,7 @@ Gin 中间件现在使用与 http 中间件完全相同的日志格式：
 这确保了：
 - **统一的日志格式**: 无论使用 Gin 还是 http 中间件，日志格式完全一致
 - **相同的日志字段**: method, path, client_ip, status, latency, request_id, user_agent
-- **统一的日志系统**: 都使用 `pkg/httplog` 包进行日志输出
+- **统一的日志系统**: 都使用 `plugins/gateway/httplog` 包进行日志输出
 - **一致的日志分析**: 日志聚合和分析工具可以统一处理
 
 ### 中间件配置

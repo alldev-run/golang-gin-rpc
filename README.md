@@ -16,6 +16,7 @@
   - 数据与状态：`db`（驱动注册表：mysql/postgres/clickhouse/mongodb/elasticsearch…）、`cache`（redis/memcache/failover）、`search`
   - 治理与可观测：`discovery`、`health`、`metrics`、`tracing`、`circuitbreaker`、`loadbalancer`、`ratelimit`
   - 安全与业务：`auth`、`rbac`、`audit`、`upload`、`push`、`geoip`、`configcenter`、`actor`（+ NATS 桥接/发现）
+  - 中间件库：`middleware`（独立 net/http 中间件：audit/auth/apikey/cors/ip_filter/rate_limiter/recovery 等）
   - 工具类：`alert`、`bloomfilter`、`scheduler`
 
 > 插件机制详见 [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md)。
@@ -291,6 +292,7 @@ scaffold create-api --name my-gateway --template http-gateway
 Makefile：
 
 ```bash
+make init NAME=<app-name> [COMPONENTS=api-gateway,db,cache] [PORT=8080]   # 一条命令生成应用,交互选择组件
 make create-api NAME=<new-api> [TEMPLATE=http-gateway]
 make export-template NAME=<api-name> [TEMPLATE=http-gateway]
 ```
@@ -327,6 +329,7 @@ docker-compose down     # 停止服务
  - `consul`
  - `etcd`
  - `zookeeper`
+ - `nacos`
  - `static`
  
  ### Zookeeper 支持
@@ -566,7 +569,7 @@ Apache License 2.0 - See `LICENSE` file for details.
 - `docs/production-deployment.md` - 生产环境部署指南
 
 ### 📖 其他文档
-- `docs/README.md` - 文档总览
+- `docs/README.md` - Database 插件文档（plugins/db）
 - `plugins/discovery/README.md` - 服务发现包文档
  
  ## 总结
