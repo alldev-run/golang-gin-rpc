@@ -48,7 +48,14 @@ type Plugin interface {
 	Stop(ctx *Context) error
 }
 
-// ConfigSource 由配置层实现，供插件读取自己的原始配置段，
+// SoftDepender 是插件的可选接口：声明软依赖。
+// 软依赖的目标插件被禁用或未注册时，本插件仍正常加载（降级运行）；
+// 目标存在时则保证先于本插件启动。典型用法：可选的增强依赖。
+type SoftDepender interface {
+	SoftDepends() []string
+}
+
+// ConfigSource 由配置层实现，供插件读取各自原始配置段，
 // 使核心配置结构不必感知任何插件的配置结构体。
 type ConfigSource interface {
 	// UnmarshalSection 将顶层 yaml 段 name 反序列化到 out。

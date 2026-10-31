@@ -85,7 +85,7 @@ func (l *Loader) Build() (*App, error) {
 		configured[p.Name()] = p
 	}
 
-	// 3. 依赖校验：所有已启用插件的依赖必须同样已启用。
+	// 3. 依赖校验：所有已启用插件的依赖必须同样已启用（软依赖除外）。
 	for name, p := range configured {
 		for _, dep := range p.Depends() {
 			if _, ok := configured[dep]; !ok {
@@ -109,6 +109,14 @@ func (l *Loader) Build() (*App, error) {
 		zap.Int("plugins", len(plugins)),
 		zap.String("order", strings.Join(order, " -> ")))
 	return &App{plugins: plugins, context: shared, log: l.log, services: services}, nil
+}
+
+// softDepends 返回插件的软依赖列表（未实现 SoftDepender 则为空）。
+func softDepends(p Plugin) []string {
+	if sd, ok := p.(SoftDepender); ok {
+		return sd.SoftDepends()
+	}
+	return nil
 }
 
 // isEnabled 读取 plugins.<name>.enabled，未配置时默认 true。
@@ -141,7 +149,13 @@ func topoSort(configured map[string]Plugin) ([]string, error) {
 	indegree := make(map[string]int, len(configured))
 	dependents := make(map[string][]string, len(configured))
 	for name, p := range configured {
+		// 硬依赖已在上面校验过必然存在；软依赖仅在目标参与构建时计入顺序。
 		deps := dedupe(p.Depends())
+		for _, dep := range dedupe(softDepends(p)) {
+			if _, ok := configured[dep]; ok && !contains(deps, dep) {
+				deps = append(deps, dep)
+			}
+		}
 		indegree[name] = len(deps)
 		for _, dep := range deps {
 			dependents[dep] = append(dependents[dep], name)

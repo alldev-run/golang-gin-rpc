@@ -252,3 +252,55 @@ func TestPluginLookup(t *testing.T) {
 	_, ok = app.Plugin("absent")
 	assert.False(t, ok)
 }
+
+type softPlugin struct {
+	fakePlugin
+}
+
+// 覆写内嵌的 Depends：软依赖场景不声明硬依赖。
+func (p *softPlugin) Depends() []string     { return nil }
+func (p *softPlugin) SoftDepends() []string { return p.depends }
+
+func TestSoftDependencyDegradation(t *testing.T) {
+	Reset()
+	defer Reset()
+	var actions []string
+
+	// base 被 db 场景禁用，enhancer 声明对它的软依赖 → 降级继续。
+	base := &fakePlugin{name: "base"}
+	enhancer := &softPlugin{fakePlugin{name: "enhancer", depends: []string{"base"}, actions: &actions}}
+	MustRegister(base)
+	MustRegister(enhancer)
+
+	src := &fakeConfig{sections: map[string]string{
+		"plugins": "base:\n  enabled: false",
+	}}
+	app := buildApp(t, src)
+	var names []string
+	for _, p := range app.Plugins() {
+		names = append(names, p.Name())
+	}
+	assert.Equal(t, []string{"enhancer"}, names)
+	require.NoError(t, app.Start(stdctx.Background()))
+}
+
+func TestSoftDependencyOrdering(t *testing.T) {
+	Reset()
+	defer Reset()
+	var actions []string
+
+	base := &fakePlugin{name: "base", actions: &actions}
+	enhancer := &softPlugin{fakePlugin{name: "enhancer", depends: []string{"base"}, actions: &actions}}
+	MustRegister(enhancer)
+	MustRegister(base)
+
+	// 软依赖存在时保证顺序：base 先于 enhancer 启动。
+	app := buildApp(t, &fakeConfig{})
+	require.NoError(t, app.Start(stdctx.Background()))
+	require.NoError(t, app.Stop(stdctx.Background()))
+	assert.Equal(t, []string{
+		"configure:enhancer", "configure:base",
+		"start:base", "start:enhancer",
+		"stop:enhancer", "stop:base",
+	}, actions)
+}

@@ -224,6 +224,16 @@ func QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, er
 	return client.Query(ctx, query, args...)
 }
 
+// QueryRowContext executes a single-row SELECT with context-aware database selection.
+// 工厂未初始化时返回 nil。
+func QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	client, err := MySQL()
+	if err != nil {
+		return nil
+	}
+	return client.QueryRow(ctx, query, args...)
+}
+
 // ExecContext executes a non-SELECT query with context-aware database selection.
 func ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	client, err := MySQL()

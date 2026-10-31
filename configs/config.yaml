@@ -6,6 +6,19 @@ app:
   debug: true
 
 # Framework Runtime Configuration
+# 框架插件开关（新机制）：控制内置组件插件是否启用，默认全部启用。
+# 与下方 framework.init_* 等价，二者其一即可。
+plugins:
+  db:        { enabled: false }
+  cache:     { enabled: false }
+  discovery: { enabled: false }
+  tracing:   { enabled: false }
+  auth:      { enabled: false }
+  metrics:   { enabled: true }
+  health:    { enabled: true }
+  errors:    { enabled: true }
+  upload:    { enabled: false }
+
 framework:
   init_databases: false
   init_cache: false

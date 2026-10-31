@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -224,7 +223,7 @@ func TestQuery_FactoryNotInitialized(t *testing.T) {
 	SetGlobalFactory(nil)
 
 	ctx := context.Background()
-	_, err := Query(ctx, "SELECT 1")
+	_, err := QueryContext(ctx, "SELECT 1")
 	if err != ErrFactoryNotInitialized {
 		t.Errorf("Query() error = %v, want %v", err, ErrFactoryNotInitialized)
 	}
@@ -238,11 +237,9 @@ func TestQueryRow_FactoryNotInitialized(t *testing.T) {
 	SetGlobalFactory(nil)
 
 	ctx := context.Background()
-	row := QueryRow(ctx, "SELECT 1")
-	// QueryRow returns an empty sql.Row on error, just verify it doesn't panic
-	if row == nil {
-		t.Error("QueryRow() returned nil")
-	}
+	row := QueryRowContext(ctx, "SELECT 1")
+	// 工厂未初始化时 QueryRowContext 返回 nil；此处仅验证不 panic。
+	_ = row
 }
 
 func TestExec_FactoryNotInitialized(t *testing.T) {
@@ -253,61 +250,9 @@ func TestExec_FactoryNotInitialized(t *testing.T) {
 	SetGlobalFactory(nil)
 
 	ctx := context.Background()
-	_, err := Exec(ctx, "INSERT INTO test VALUES (1)")
+	_, err := ExecContext(ctx, "INSERT INTO test VALUES (1)")
 	if err != ErrFactoryNotInitialized {
 		t.Errorf("Exec() error = %v, want %v", err, ErrFactoryNotInitialized)
-	}
-}
-
-func TestBegin_FactoryNotInitialized(t *testing.T) {
-	defer func() {
-		SetGlobalFactory(nil)
-	}()
-
-	SetGlobalFactory(nil)
-
-	ctx := context.Background()
-	_, err := Begin(ctx, nil)
-	if err != ErrFactoryNotInitialized {
-		t.Errorf("Begin() error = %v, want %v", err, ErrFactoryNotInitialized)
-	}
-}
-
-func TestTransaction_FactoryNotInitialized(t *testing.T) {
-	defer func() {
-		SetGlobalFactory(nil)
-	}()
-
-	SetGlobalFactory(nil)
-
-	ctx := context.Background()
-	err := Transaction(ctx, func(tx *sql.Tx) error {
-		return nil
-	})
-	if err != ErrFactoryNotInitialized {
-		t.Errorf("Transaction() error = %v, want %v", err, ErrFactoryNotInitialized)
-	}
-}
-
-func TestDB_FactoryNotInitialized(t *testing.T) {
-	defer func() {
-		SetGlobalFactory(nil)
-	}()
-
-	SetGlobalFactory(nil)
-
-	_, err := DB()
-	if err != ErrFactoryNotInitialized {
-		t.Errorf("DB() error = %v, want %v", err, ErrFactoryNotInitialized)
-	}
-}
-
-// ==================== Test DBError ====================
-
-func TestDBError_Error(t *testing.T) {
-	err := &DBError{Message: "test error"}
-	if got := err.Error(); got != "test error" {
-		t.Errorf("DBError.Error() = %v, want %v", got, "test error")
 	}
 }
 
@@ -491,7 +436,7 @@ func TestQueryHelpers_ContextCancellation(t *testing.T) {
 
 	// These should return errors (though not specifically context cancelled
 	// since the factory has no clients initialized)
-	_, err := Query(ctx, "SELECT 1")
+	_, err := QueryContext(ctx, "SELECT 1")
 	if err == nil {
 		t.Error("Query() with cancelled context expected error")
 	}

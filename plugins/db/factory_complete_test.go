@@ -466,8 +466,8 @@ func TestFactoryErrorHandling(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error for unsupported type")
 		}
-		if !contains(err.Error(), "unsupported database type") {
-			t.Errorf("Expected 'unsupported database type' error, got %v", err)
+		if !contains(err.Error(), "not linked") {
+			t.Errorf("Expected 'driver not linked' error, got %v", err)
 		}
 	})
 

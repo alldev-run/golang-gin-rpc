@@ -20,13 +20,15 @@ type builtinPlugin struct {
 
 	name      string
 	depends   []string
+	softDeps  []string
 	enabledFn func(b *Bootstrap) bool
 	startFn   func(b *Bootstrap) error
 	stopFn    func(b *Bootstrap, ctx stdctx.Context) error
 }
 
-func (p *builtinPlugin) Name() string      { return p.name }
-func (p *builtinPlugin) Depends() []string { return p.depends }
+func (p *builtinPlugin) Name() string          { return p.name }
+func (p *builtinPlugin) Depends() []string     { return p.depends }
+func (p *builtinPlugin) SoftDepends() []string { return p.softDeps }
 
 func (p *builtinPlugin) Configure(_ *kernel.Context) error {
 	if p.enabledFn != nil && !p.enabledFn(p.boot) {
@@ -100,8 +102,9 @@ func registerBuiltinPlugins(boot *Bootstrap) {
 		{
 			name:      "health",
 			enabledFn: func(b *Bootstrap) bool { return b.config.Framework.InitHealth },
-			depends:   []string{"db", "cache"},
 			startFn:   func(b *Bootstrap) error { return b.InitializeHealth() },
+			// db/cache 为软依赖：目标禁用时 health 降级（少注册对应 checker）。
+			softDeps: []string{"db", "cache"},
 		},
 		{
 			name:      "errors",
