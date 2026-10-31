@@ -11,12 +11,16 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/config"
+	"github.com/alldev-run/golang-gin-rpc/pkg/kernel"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/pkg/version"
+	"github.com/alldev-run/golang-gin-rpc/plugins/actor"
 	"github.com/alldev-run/golang-gin-rpc/plugins/auth"
 	"github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	cacheredis "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	mysqlpkg "github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
@@ -25,13 +29,10 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 	"github.com/alldev-run/golang-gin-rpc/plugins/health"
-	"github.com/alldev-run/golang-gin-rpc/pkg/kernel"
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/metrics"
 	"github.com/alldev-run/golang-gin-rpc/plugins/rpc"
 	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 	"github.com/alldev-run/golang-gin-rpc/plugins/upload"
-	"github.com/alldev-run/golang-gin-rpc/pkg/version"
 	"github.com/alldev-run/golang-gin-rpc/plugins/websocket"
 )
 
@@ -68,6 +69,7 @@ type Bootstrap struct {
 	rpcManager       *rpc.Manager
 	websocketServer  *websocket.Server
 	websocketManager *websocket.Manager
+	actorSystem      *actor.System
 	discoveryManager *discovery.ServiceDiscoveryManager
 	healthManager    *health.HealthManager
 	metricsCollector *metrics.MetricsCollector
@@ -430,7 +432,6 @@ func (b *Bootstrap) InitializeDatabases() error {
 	return nil
 }
 
-
 // InitializeCache initializes cache
 func (b *Bootstrap) InitializeCache() error {
 	if b.config.Redis.Host == "" {
@@ -743,6 +744,43 @@ func (b *Bootstrap) InitializeUpload() error {
 	return nil
 }
 
+// InitializeActor initializes the actor system if enabled.
+// actor 配置由本组件自行解析(plugins.actor 段)。
+func (b *Bootstrap) InitializeActor() error {
+	var actorCfg struct {
+		Enabled       bool `yaml:"enabled"`
+		MailboxSize   int  `yaml:"mailbox_size"`
+		MaxRestarts   int  `yaml:"max_restarts"`
+		RestartAlways bool `yaml:"restart_always"`
+	}
+	found, err := b.loader.UnmarshalSection("actor", &actorCfg)
+	if err != nil {
+		return fmt.Errorf("failed to parse actor config: %w", err)
+	}
+	if !found || !actorCfg.Enabled {
+		logger.Info("Actor system disabled, skipping initialization")
+		return nil
+	}
+
+	opts := actor.DefaultOptions()
+	if actorCfg.MailboxSize > 0 {
+		opts.DefaultMailboxSize = actorCfg.MailboxSize
+	}
+	if actorCfg.RestartAlways {
+		opts.DefaultSupervision = &actor.Supervision{
+			Strategy:               actor.RestartAlways,
+			MaxConsecutiveRestarts: actorCfg.MaxRestarts,
+		}
+	}
+	b.actorSystem = actor.NewWithOptions(opts)
+	b.setDependency("actor.system", b.actorSystem)
+
+	logger.Info("Actor system initialized",
+		logger.Int("mailbox_size", opts.DefaultMailboxSize),
+		logger.Bool("restart_always", actorCfg.RestartAlways))
+	return nil
+}
+
 // InitializeGateway initializes the HTTP gateway
 func (b *Bootstrap) InitializeGateway() error {
 	gatewayConfig := gateway.DefaultConfig()
@@ -923,6 +961,11 @@ func (b *Bootstrap) GetWebSocketManager() *websocket.Manager {
 	return b.websocketManager
 }
 
+// GetActorSystem returns the actor system (nil until the actor plugin starts).
+func (b *Bootstrap) GetActorSystem() *actor.System {
+	return b.actorSystem
+}
+
 // GetDependency returns a dependency by key.
 func (b *Bootstrap) GetDependency(key string) (interface{}, bool) {
 	b.depMu.RLock()
@@ -1048,6 +1091,12 @@ func (b *Bootstrap) Close() error {
 	if b.gateway != nil {
 		if err := b.gateway.Stop(); err != nil {
 			errors = append(errors, fmt.Errorf("gateway close error: %w", err))
+		}
+	}
+
+	if b.actorSystem != nil && !b.pluginStopped("actor") {
+		if err := b.actorSystem.Shutdown(); err != nil {
+			errors = append(errors, fmt.Errorf("actor system shutdown error: %w", err))
 		}
 	}
 

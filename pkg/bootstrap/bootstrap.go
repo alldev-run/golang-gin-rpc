@@ -11,12 +11,13 @@ import (
 	"gopkg.in/yaml.v3"
 
 	internalbootstrap "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/actor"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/upload"
 )
 
@@ -248,4 +249,12 @@ func GetUploader(boot *Bootstrap) (*upload.Uploader, error) {
 		return nil, fmt.Errorf("bootstrap instance is nil")
 	}
 	return boot.GetUploader(), nil
+}
+
+// GetActorSystem returns the actor system from bootstrap (nil until enabled).
+func GetActorSystem(boot *Bootstrap) *actor.System {
+	if boot == nil {
+		return nil
+	}
+	return boot.GetActorSystem()
 }

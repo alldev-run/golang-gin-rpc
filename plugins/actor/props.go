@@ -15,6 +15,9 @@ type Props struct {
 
 	// MailboxSize 是邮箱缓冲区大小，<=0 时使用 System 默认值。
 	MailboxSize int
+
+	// supervision 覆盖系统默认监督策略(见 supervision.go)。
+	supervision *Supervision
 }
 
 // actor 返回要创建的 Actor 实例。
@@ -59,5 +62,11 @@ func (p *Props) WithName(name string) *Props {
 // WithMailboxSize 设置邮箱大小，返回 Props 自身以便链式调用。
 func (p *Props) WithMailboxSize(size int) *Props {
 	p.MailboxSize = size
+	return p
+}
+
+// WithSupervision 设置该 Actor 的监督策略,覆盖系统默认,返回 Props 自身。
+func (p *Props) WithSupervision(sv *Supervision) *Props {
+	p.supervision = sv
 	return p
 }

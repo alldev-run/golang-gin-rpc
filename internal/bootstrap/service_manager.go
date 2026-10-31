@@ -155,6 +155,12 @@ type WebSocketServiceOptions struct {
 	Config  websocket.ServerConfig
 	Path    string
 	Handler websocket.Handler
+	// Router, when set and Handler is nil, becomes the service handler
+	// (envelope dispatch by action).
+	Router *websocket.Router
+	// Rooms, when set, is kept in sync with connection lifecycles
+	// (rooms.Observer composed into the server observer) and closed on stop.
+	Rooms *websocket.RoomManager
 	// Manager, when provided, is used for connection tracking and broadcast
 	// instead of an internally created one. The factory registers every
 	// connection on entry and closes all live connections before the HTTP
@@ -259,6 +265,9 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 		path = "/ws"
 	}
 	handler := options.Handler
+	if handler == nil && options.Router != nil {
+		handler = options.Router.Handler()
+	}
 	if handler == nil {
 		handler = func(ctx context.Context, conn *websocket.Conn) {
 			for {
@@ -274,6 +283,10 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 				}
 			}
 		}
+	}
+	// 房间与连接生命周期同步:Observer 链上追加 rooms.Observer。
+	if options.Rooms != nil {
+		cfg.Observer = websocket.NewCompositeObserver(cfg.Observer, options.Rooms.Observer())
 	}
 
 	return b.RegisterServiceFactory(name, func(boot *Bootstrap) (ManagedService, error) {
@@ -302,6 +315,10 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 			stopFn: func(ctx context.Context) error {
 				if boot.websocketServer == nil {
 					return nil
+				}
+				// 房间管理器随服务停止(空房回收 janitor)。
+				if options.Rooms != nil {
+					options.Rooms.Close()
 				}
 				// Drain live websocket connections first: http.Server.Shutdown
 				// cannot close hijacked websocket connections by itself.
@@ -417,4 +434,3 @@ func (b *Bootstrap) getManagedService(name string) (ManagedService, bool) {
 	svc, exists := b.managedServices[name]
 	return svc, exists
 }
-

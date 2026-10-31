@@ -115,6 +115,16 @@ func registerBuiltinPlugins(boot *Bootstrap) {
 			name:    "upload",
 			startFn: func(b *Bootstrap) error { return b.InitializeUpload() }, // 由 upload 配置段自身决定
 		},
+		{
+			name:    "actor",
+			startFn: func(b *Bootstrap) error { return b.InitializeActor() }, // 由 actor 配置段自身决定
+			stopFn: func(b *Bootstrap, _ stdctx.Context) error {
+				if b.actorSystem != nil {
+					return b.actorSystem.Shutdown()
+				}
+				return nil
+			},
+		},
 	}
 
 	for _, def := range builtin {

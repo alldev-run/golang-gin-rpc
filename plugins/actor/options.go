@@ -7,6 +7,10 @@ type Options struct {
 
 	// OnDeadLetter 在消息无法送达时被调用（例如目标 Actor 不存在）。
 	OnDeadLetter func(pid PID, msg Message, err error)
+
+	// DefaultSupervision 是系统级监督策略默认值;
+	// Props.WithSupervision 可按 Actor 覆盖。nil 等价于 RestartNever。
+	DefaultSupervision *Supervision
 }
 
 // DefaultOptions 返回默认配置。
