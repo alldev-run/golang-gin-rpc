@@ -11,30 +11,30 @@ import (
 
 	apperrors "github.com/alldev-run/golang-gin-rpc/pkg/errors"
 	pkgtracing "github.com/alldev-run/golang-gin-rpc/plugins/tracing"
-	"google.golang.org/protobuf/proto"
+	nws "github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	nws "nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+	"google.golang.org/protobuf/proto"
 )
 
 type Config struct {
-	URL                  string            `yaml:"url" json:"url"`
-	Origin               string            `yaml:"origin" json:"origin"`
-	MessageFormat        string            `yaml:"message_format" json:"message_format"`
-	Headers              map[string]string `yaml:"headers" json:"headers"`
-	HandshakeTimeout     time.Duration     `yaml:"handshake_timeout" json:"handshake_timeout"`
-	ReadTimeout          time.Duration     `yaml:"read_timeout" json:"read_timeout"`
-	WriteTimeout         time.Duration     `yaml:"write_timeout" json:"write_timeout"`
-	AutoReconnect        bool              `yaml:"auto_reconnect" json:"auto_reconnect"`
-	ReconnectInterval    time.Duration     `yaml:"reconnect_interval" json:"reconnect_interval"`
-	MaxReconnectAttempts int               `yaml:"max_reconnect_attempts" json:"max_reconnect_attempts"`
-	MaxReconnectInterval time.Duration     `yaml:"max_reconnect_interval" json:"max_reconnect_interval"`
-	ReconnectMultiplier  float64           `yaml:"reconnect_multiplier" json:"reconnect_multiplier"`
-	ReconnectJitter      float64           `yaml:"reconnect_jitter" json:"reconnect_jitter"`
-	HeartbeatInterval    time.Duration     `yaml:"heartbeat_interval" json:"heartbeat_interval"`
-	HeartbeatMessage     string            `yaml:"heartbeat_message" json:"heartbeat_message"`
-	Observer             Observer          `yaml:"-" json:"-"`
+	URL                  string                     `yaml:"url" json:"url"`
+	Origin               string                     `yaml:"origin" json:"origin"`
+	MessageFormat        string                     `yaml:"message_format" json:"message_format"`
+	Headers              map[string]string          `yaml:"headers" json:"headers"`
+	HandshakeTimeout     time.Duration              `yaml:"handshake_timeout" json:"handshake_timeout"`
+	ReadTimeout          time.Duration              `yaml:"read_timeout" json:"read_timeout"`
+	WriteTimeout         time.Duration              `yaml:"write_timeout" json:"write_timeout"`
+	AutoReconnect        bool                       `yaml:"auto_reconnect" json:"auto_reconnect"`
+	ReconnectInterval    time.Duration              `yaml:"reconnect_interval" json:"reconnect_interval"`
+	MaxReconnectAttempts int                        `yaml:"max_reconnect_attempts" json:"max_reconnect_attempts"`
+	MaxReconnectInterval time.Duration              `yaml:"max_reconnect_interval" json:"max_reconnect_interval"`
+	ReconnectMultiplier  float64                    `yaml:"reconnect_multiplier" json:"reconnect_multiplier"`
+	ReconnectJitter      float64                    `yaml:"reconnect_jitter" json:"reconnect_jitter"`
+	HeartbeatInterval    time.Duration              `yaml:"heartbeat_interval" json:"heartbeat_interval"`
+	HeartbeatMessage     string                     `yaml:"heartbeat_message" json:"heartbeat_message"`
+	Observer             Observer                   `yaml:"-" json:"-"`
 	Tracer               *pkgtracing.TracerProvider `yaml:"-" json:"-"`
 }
 

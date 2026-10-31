@@ -12,25 +12,14 @@ import (
 )
 
 type Manager struct {
-	mu            sync.RWMutex
-	conns         map[string]*Conn
-	clusterMu     sync.RWMutex
-	clusterConfig ClusterConfig
-	clusterCtx    context.Context
-	clusterCancel context.CancelFunc
-	workerPool    *broadcastWorkerPool
-	heartbeatCtx   context.Context
+	mu              sync.RWMutex
+	conns           map[string]*Conn
+	clusterMu       sync.RWMutex
+	clusterConfig   ClusterConfig
+	clusterCtx      context.Context
+	clusterCancel   context.CancelFunc
+	heartbeatCtx    context.Context
 	heartbeatCancel context.CancelFunc
-}
-
-type broadcastWorkerPool struct {
-	tasks chan broadcastTask
-	wg    sync.WaitGroup
-}
-
-type broadcastTask struct {
-	conn *Conn
-	fn   func(*Conn) error
 }
 
 type BroadcastErrors struct {
@@ -82,8 +71,7 @@ func (be *BroadcastErrors) All() []error {
 
 func NewManager() *Manager {
 	m := &Manager{
-		conns:      make(map[string]*Conn),
-		workerPool: newBroadcastWorkerPool(100),
+		conns: make(map[string]*Conn),
 	}
 	m.startGlobalHeartbeat()
 	return m
@@ -149,33 +137,6 @@ func (m *Manager) checkAllConnections() {
 			continue
 		}
 	}
-}
-
-func newBroadcastWorkerPool(workerCount int) *broadcastWorkerPool {
-	p := &broadcastWorkerPool{
-		tasks: make(chan broadcastTask, workerCount*2),
-	}
-	p.wg.Add(workerCount)
-	for i := 0; i < workerCount; i++ {
-		go p.worker()
-	}
-	return p
-}
-
-func (p *broadcastWorkerPool) worker() {
-	defer p.wg.Done()
-	for task := range p.tasks {
-		_ = task.fn(task.conn)
-	}
-}
-
-func (p *broadcastWorkerPool) submit(conn *Conn, fn func(*Conn) error) {
-	p.tasks <- broadcastTask{conn: conn, fn: fn}
-}
-
-func (p *broadcastWorkerPool) close() {
-	close(p.tasks)
-	p.wg.Wait()
 }
 
 func (m *Manager) EnableCluster(ctx context.Context, config ClusterConfig) error {
@@ -430,12 +391,16 @@ func (m *Manager) CloseAll() error {
 	}
 	m.conns = make(map[string]*Conn)
 	m.mu.Unlock()
+	// Close in parallel: each close drains its outbound queue (bounded wait).
+	var wg sync.WaitGroup
 	for _, conn := range conns {
-		_ = conn.CloseWithCode(CloseCodeServerShutdown, nil)
+		wg.Add(1)
+		go func(c *Conn) {
+			defer wg.Done()
+			_ = c.CloseWithCode(CloseCodeServerShutdown, nil)
+		}(conn)
 	}
-	if m.workerPool != nil {
-		m.workerPool.close()
-	}
+	wg.Wait()
 	if m.heartbeatCancel != nil {
 		m.heartbeatCancel()
 	}
@@ -449,22 +414,20 @@ func (m *Manager) broadcast(ctx context.Context, fn func(*Conn) error) error {
 	return m.broadcastSnapshot(ctx, m.snapshotConnections(), fn)
 }
 
+// broadcastSnapshot enqueues the frame on every connection sequentially.
+// Enqueueing is non-blocking (per-connection queues + writer goroutines), so
+// no fan-out goroutines are needed; slow consumers are kicked by the
+// backpressure policy inside Conn.send instead.
 func (m *Manager) broadcastSnapshot(ctx context.Context, conns []*Conn, fn func(*Conn) error) error {
 	if len(conns) == 0 {
 		return nil
 	}
 	broadcastErrs := &BroadcastErrors{}
-	var wg sync.WaitGroup
 	for _, conn := range conns {
-		wg.Add(1)
-		go func(c *Conn) {
-			defer wg.Done()
-			if err := fn(c); err != nil {
-				broadcastErrs.Add(err)
-			}
-		}(conn)
+		if err := fn(conn); err != nil {
+			broadcastErrs.Add(err)
+		}
 	}
-	wg.Wait()
 	return broadcastErrs.First()
 }
 

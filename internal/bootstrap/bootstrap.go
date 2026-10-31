@@ -67,6 +67,7 @@ type Bootstrap struct {
 	cache            cache.Cache
 	rpcManager       *rpc.Manager
 	websocketServer  *websocket.Server
+	websocketManager *websocket.Manager
 	discoveryManager *discovery.ServiceDiscoveryManager
 	healthManager    *health.HealthManager
 	metricsCollector *metrics.MetricsCollector
@@ -914,6 +915,12 @@ func (b *Bootstrap) GetRPCManager() *rpc.Manager {
 // GetWebSocketServer returns the websocket server.
 func (b *Bootstrap) GetWebSocketServer() *websocket.Server {
 	return b.websocketServer
+}
+
+// GetWebSocketManager returns the websocket connection manager wired by the
+// websocket service factory (nil until the service has started).
+func (b *Bootstrap) GetWebSocketManager() *websocket.Manager {
+	return b.websocketManager
 }
 
 // GetDependency returns a dependency by key.

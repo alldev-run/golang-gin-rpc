@@ -11,6 +11,11 @@
 - tracing
 - 多节点广播与定向投递
 - 节点 / 集群配置文件
+- 游戏协议层:envelope 信封 + action 路由 + 请求-响应关联 + 按连接有序 Seq
+- 会话恢复:断线重连按 Seq 补发错过的下行消息
+- 房间系统:成员索引广播、生命周期、空房回收
+- 保护性控制:每连接限流、连接数上限、消息大小、origin 校验、permessage-deflate
+- 发送队列背压:慢客户端不阻塞广播,队列满自动踢线
 
 它适合作为业务项目中的基础 WebSocket 能力层，用于快速接入实时消息、通知推送、轻量会话通道等场景。
 
@@ -31,6 +36,86 @@
 - `client_test.go`
 - `server_test.go`
 - `enhanced_test.go`
+
+## 游戏协议层(envelope / 路由 / 房间 / 会话恢复)
+
+面向实时游戏场景的完整消息层,推荐用 `Router` 替代裸 read-loop。
+
+### 消息信封 Envelope
+
+```json
+{"seq": 42, "action": "chat.say", "req_id": "r1", "code": 0, "data": {...}}
+```
+
+- `action`:路由键,服务端 Router 按它分发
+- `req_id`:请求-响应关联,服务端通过 `conn.Reply` 原样回填
+- `seq`:服务端为该连接分配的单调递增序号(含广播),配合会话重放实现重连补发
+- `code`/`err`:业务结果码
+
+### action 路由
+
+```go
+router := websocket.NewRouter()
+router.Handle("room.join", func(ctx context.Context, conn *websocket.Conn, env *websocket.Envelope) {
+    var roomID string
+    _ = json.Unmarshal(env.Data, &roomID)
+    if _, err := rooms.Join(roomID, conn); err != nil {
+        _ = conn.Reply(ctx, env, nil, err)
+        return
+    }
+    _ = conn.Reply(ctx, env, map[string]string{"joined": roomID}, nil)
+})
+router.HandleDefault(func(ctx context.Context, conn *websocket.Conn, env *websocket.Envelope) {
+    _ = conn.Reply(ctx, env, nil, fmt.Errorf("unknown action %q", env.Action))
+})
+
+server.Handle("/ws", router.Handler())
+```
+
+`Router.Handler()` 内部按连接逐条串行分发(保持消息顺序);耗时逻辑请自行开 goroutine。
+
+### 房间系统
+
+```go
+rooms := websocket.NewRoomManager(websocket.RoomOptions{
+    MaxMembers: 100,
+    OnEmpty:    func(roomID string) { /* 空房回收通知 */ },
+})
+defer rooms.Close()
+
+n, _ := rooms.Join("room-1", conn)           // 成员索引 O(成员数),并打上 "room:<id>" group 标签
+rooms.Get("room-1").Broadcast(ctx, env)      // 每个成员独立 Seq + 进入各自会话重放缓冲
+rooms.RemoveConnection(conn.Identity().ConnectionID) // 或用 rooms.Observer() 挂到 Observer 链
+```
+
+### 会话恢复(断线补发)
+
+服务端开启后,下行消息按连接(含房间广播)记录进有界重放缓冲:
+
+```yaml
+session_resume:
+  buffer_capacity: 1024   # 每会话重放缓冲条数
+  ttl: 60s                # 断线后可恢复时长
+  max_sessions: 0
+```
+
+客户端首次连接可带 `?session_id=<uuid>`;断线重连带 `?session_id=<同 id>&last_seq=<已收最大 seq>`,
+服务端按序补发 seq > last_seq 的消息后再进入正常处理。同一 session 的旧连接会被关闭。
+
+### 保护性控制
+
+- `rate_limit: {rate: 50, burst: 100}`:每连接入站令牌桶,超限报错并由 read-loop 关闭连接
+- `max_connections: 10000`:超限握手直接返回 503
+- `origin_patterns: ["*.example.com"]`:开启跨域校验(默认沿用旧的任意 origin 行为,公网部署务必配置)
+- `read_limit: 65536`:单条消息上限
+- `compression: true`:permessage-deflate(无上下文接管,内存友好)
+
+### 发送模型(背压)
+
+每连接一个有界发送队列 + 单写 goroutine:慢客户端不会阻塞广播调用方;队列满时该连接被以
+`send_queue_full` 关闭(踢慢消费者)。`Close()` 会先排空队列(有界等待)再关连接,
+因此"先发最后一条状态再 Close"的语义仍然成立。写错误通过 `OnDisconnect` 与
+`close_code=write_error` 暴露,不再阻塞在 `Send*` 返回值上。
 
 ## Client
 
@@ -122,6 +207,13 @@
 - `RequireAuth`
 - `HeartbeatTimeout`
 - `IdleTimeout`
+- `MaxConnections`(连接数上限,0 不限)
+- `SendQueueSize`(每连接发送队列容量,默认 256)
+- `ReadLimit`(单条消息大小上限,0=32KiB,-1 不限)
+- `OriginPatterns`(origin 校验模式,空=沿用任意 origin)
+- `Compression`(permessage-deflate)
+- `RateLimit`(每连接入站限流:`rate` 每秒消息数 + `burst` 突发容量)
+- `SessionResume`(会话恢复:`buffer_capacity` 重放缓冲 / `ttl` 会话存活 / `max_sessions`)
 - `Tracer`
 
 ### 服务端连接 `Conn`

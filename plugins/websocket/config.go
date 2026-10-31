@@ -31,17 +31,17 @@ func validateMessageFormat(format string) error {
 }
 
 type NodeConfig struct {
-	Enabled            bool          `yaml:"enabled" json:"enabled"`
-	NodeID             string        `yaml:"node_id" json:"node_id"`
-	Name               string        `yaml:"name" json:"name"`
-	Host               string        `yaml:"host" json:"host"`
-	Port               int           `yaml:"port" json:"port"`
-	Path               string        `yaml:"path" json:"path"`
-	ReadTimeout        time.Duration `yaml:"read_timeout" json:"read_timeout"`
-	WriteTimeout       time.Duration `yaml:"write_timeout" json:"write_timeout"`
-	HeartbeatTimeout   time.Duration `yaml:"heartbeat_timeout" json:"heartbeat_timeout"`
-	IdleTimeout        time.Duration `yaml:"idle_timeout" json:"idle_timeout"`
-	RequireAuth        bool          `yaml:"require_auth" json:"require_auth"`
+	Enabled          bool          `yaml:"enabled" json:"enabled"`
+	NodeID           string        `yaml:"node_id" json:"node_id"`
+	Name             string        `yaml:"name" json:"name"`
+	Host             string        `yaml:"host" json:"host"`
+	Port             int           `yaml:"port" json:"port"`
+	Path             string        `yaml:"path" json:"path"`
+	ReadTimeout      time.Duration `yaml:"read_timeout" json:"read_timeout"`
+	WriteTimeout     time.Duration `yaml:"write_timeout" json:"write_timeout"`
+	HeartbeatTimeout time.Duration `yaml:"heartbeat_timeout" json:"heartbeat_timeout"`
+	IdleTimeout      time.Duration `yaml:"idle_timeout" json:"idle_timeout"`
+	RequireAuth      bool          `yaml:"require_auth" json:"require_auth"`
 }
 
 type ClusterOptions struct {
@@ -94,15 +94,15 @@ func DefaultClusterTransportConfig() ClusterTransportConfig {
 		Topic:   DefaultClusterConfig().Topic,
 		Enabled: false,
 		Messaging: messaging.Config{
-			Type:      messaging.MessageTypeRabbitMQ,
-			Host:      "localhost",
-			Port:      5672,
-			Username:  "guest",
-			Password:  "guest",
-			Database:  "/",
-			Timeout:   30 * time.Second,
-			Options:   map[string]interface{}{},
-			Enabled:   true,
+			Type:     messaging.MessageTypeRabbitMQ,
+			Host:     "localhost",
+			Port:     5672,
+			Username: "guest",
+			Password: "guest",
+			Database: "/",
+			Timeout:  30 * time.Second,
+			Options:  map[string]interface{}{},
+			Enabled:  true,
 		},
 		Options: map[string]interface{}{},
 	}
@@ -110,8 +110,8 @@ func DefaultClusterTransportConfig() ClusterTransportConfig {
 
 func DefaultClusterRuntimeConfig() ClusterRuntimeConfig {
 	return ClusterRuntimeConfig{
-		Enabled: false,
-		Topic:   DefaultClusterConfig().Topic,
+		Enabled:   false,
+		Topic:     DefaultClusterConfig().Topic,
 		Transport: DefaultClusterTransportConfig(),
 		Options: ClusterOptions{
 			GroupBroadcast:      true,

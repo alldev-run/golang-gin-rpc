@@ -18,8 +18,8 @@ type ClusterTransport interface {
 }
 
 type ClusterConfig struct {
-	NodeID   string
-	Topic    string
+	NodeID    string
+	Topic     string
 	Transport ClusterTransport
 }
 
@@ -31,12 +31,12 @@ func DefaultClusterConfig() ClusterConfig {
 }
 
 type clusterEnvelope struct {
-	ID        string    `json:"id"`
-	SourceNode string   `json:"source_node"`
-	Type      string    `json:"type"`
-	Target    string    `json:"target"`
-	Payload   []byte    `json:"payload,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         string    `json:"id"`
+	SourceNode string    `json:"source_node"`
+	Type       string    `json:"type"`
+	Target     string    `json:"target"`
+	Payload    []byte    `json:"payload,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type MessagingClusterTransport struct {

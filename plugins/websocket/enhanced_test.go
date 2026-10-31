@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	nws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
-	nws "nhooyr.io/websocket"
 )
 
 func waitForCondition(t *testing.T, timeout time.Duration, fn func() bool) {
@@ -233,9 +233,9 @@ func TestManager_ClusterBroadcastAndTargetedDelivery(t *testing.T) {
 	defer serverB.Stop(context.Background())
 
 	clientA := NewClient(Config{
-		URL:         "ws://" + lnA.Addr().String() + "/ws",
-		Origin:      "http://" + lnA.Addr().String(),
-		ReadTimeout: 5 * time.Second,
+		URL:          "ws://" + lnA.Addr().String() + "/ws",
+		Origin:       "http://" + lnA.Addr().String(),
+		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		Headers: map[string]string{
 			"X-Client-ID": "client-a",
@@ -247,9 +247,9 @@ func TestManager_ClusterBroadcastAndTargetedDelivery(t *testing.T) {
 	defer clientA.Close()
 
 	clientB := NewClient(Config{
-		URL:         "ws://" + lnB.Addr().String() + "/ws",
-		Origin:      "http://" + lnB.Addr().String(),
-		ReadTimeout: 5 * time.Second,
+		URL:          "ws://" + lnB.Addr().String() + "/ws",
+		Origin:       "http://" + lnB.Addr().String(),
+		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		Headers: map[string]string{
 			"X-Client-ID": "client-b",
@@ -306,29 +306,29 @@ func TestManager_ClusterBroadcastAndTargetedDelivery(t *testing.T) {
 
 func TestBroadcastErrors(t *testing.T) {
 	errs := &BroadcastErrors{}
-	
+
 	if errs.Count() != 0 {
 		t.Fatalf("expected 0 errors, got %d", errs.Count())
 	}
-	
+
 	errs.Add(nil)
 	if errs.Count() != 0 {
 		t.Fatalf("expected 0 errors after adding nil, got %d", errs.Count())
 	}
-	
+
 	err1 := errors.New("error 1")
 	err2 := errors.New("error 2")
 	errs.Add(err1)
 	errs.Add(err2)
-	
+
 	if errs.Count() != 2 {
 		t.Fatalf("expected 2 errors, got %d", errs.Count())
 	}
-	
+
 	if errs.First() != err1 {
 		t.Fatalf("expected first error to be err1, got %v", errs.First())
 	}
-	
+
 	all := errs.All()
 	if len(all) != 2 {
 		t.Fatalf("expected 2 errors in All(), got %d", len(all))
@@ -358,8 +358,8 @@ func TestManager_ConcurrentBroadcast(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		clients[i] = NewClient(Config{
-			URL:         "ws://" + ln.Addr().String() + "/ws",
-			Origin:      "http://" + ln.Addr().String(),
+			URL:          "ws://" + ln.Addr().String() + "/ws",
+			Origin:       "http://" + ln.Addr().String(),
 			ReadTimeout:  5 * time.Second,
 			WriteTimeout: 5 * time.Second,
 		})
@@ -411,8 +411,8 @@ func TestManager_GlobalHeartbeat(t *testing.T) {
 	defer server.Stop(context.Background())
 
 	client := NewClient(Config{
-		URL:         "ws://" + ln.Addr().String() + "/ws",
-		Origin:      "http://" + ln.Addr().String(),
+		URL:          "ws://" + ln.Addr().String() + "/ws",
+		Origin:       "http://" + ln.Addr().String(),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 	})
@@ -451,14 +451,14 @@ func TestManager_IDIndexSafety(t *testing.T) {
 	defer server.Stop(context.Background())
 
 	client1 := NewClient(Config{
-		URL:         "ws://" + ln.Addr().String() + "/ws",
-		Origin:      "http://" + ln.Addr().String(),
+		URL:          "ws://" + ln.Addr().String() + "/ws",
+		Origin:       "http://" + ln.Addr().String(),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 	})
 	client2 := NewClient(Config{
-		URL:         "ws://" + ln.Addr().String() + "/ws",
-		Origin:      "http://" + ln.Addr().String(),
+		URL:          "ws://" + ln.Addr().String() + "/ws",
+		Origin:       "http://" + ln.Addr().String(),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 	})

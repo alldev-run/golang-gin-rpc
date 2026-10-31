@@ -9,7 +9,7 @@ import (
 	"time"
 
 	userpb "github.com/alldev-run/golang-gin-rpc/proto"
-	nws "nhooyr.io/websocket"
+	nws "github.com/coder/websocket"
 )
 
 func newTestWebsocketServer(t *testing.T) *httptest.Server {

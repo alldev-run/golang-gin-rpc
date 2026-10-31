@@ -6,13 +6,13 @@ require (
 	github.com/alldev-run/golang-gin-rpc v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/messaging v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/tracing v0.0.0
+	github.com/coder/websocket v1.8.15
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	go.opentelemetry.io/otel v1.42.0
 	go.opentelemetry.io/otel/trace v1.42.0
 	go.uber.org/zap v1.27.1
 	google.golang.org/protobuf v1.36.11
-	nhooyr.io/websocket v1.8.17
 )
 
 require (

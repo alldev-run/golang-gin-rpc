@@ -155,6 +155,11 @@ type WebSocketServiceOptions struct {
 	Config  websocket.ServerConfig
 	Path    string
 	Handler websocket.Handler
+	// Manager, when provided, is used for connection tracking and broadcast
+	// instead of an internally created one. The factory registers every
+	// connection on entry and closes all live connections before the HTTP
+	// listener stops.
+	Manager *websocket.Manager
 }
 
 // APIGatewayServiceOptions controls api-gateway service registration.
@@ -272,15 +277,25 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 	}
 
 	return b.RegisterServiceFactory(name, func(boot *Bootstrap) (ManagedService, error) {
+		mgr := options.Manager
+		if mgr == nil {
+			mgr = websocket.NewManager()
+		}
 		return &managedServiceAdapter{
 			name: name,
 			startFn: func(ctx context.Context) error {
 				_ = ctx
 				if boot.websocketServer == nil {
 					server := websocket.NewServer(cfg)
-					server.Handle(path, handler)
+					server.Handle(path, func(hctx context.Context, conn *websocket.Conn) {
+						mgr.Register(conn)
+						defer mgr.Unregister(conn)
+						handler(hctx, conn)
+					})
 					boot.websocketServer = server
 					boot.setDependency("websocket.server", server)
+					boot.websocketManager = mgr
+					boot.setDependency("websocket.manager", mgr)
 				}
 				return boot.websocketServer.Start()
 			},
@@ -288,6 +303,9 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 				if boot.websocketServer == nil {
 					return nil
 				}
+				// Drain live websocket connections first: http.Server.Shutdown
+				// cannot close hijacked websocket connections by itself.
+				_ = mgr.CloseAll()
 				if ctx == nil {
 					stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
