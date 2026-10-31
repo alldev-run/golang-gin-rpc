@@ -13,6 +13,7 @@ use (
 	./plugins/db
 	./plugins/discovery
 	./plugins/gateway
+	./plugins/gameserver
 	./plugins/geoip
 	./plugins/health
 	./plugins/loadbalancer

@@ -12,7 +12,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-
 // Client wraps redis.Client with additional functionality and multi-instance support.
 type Client struct {
 	config  Config
@@ -208,7 +207,7 @@ func (c *Client) getNodeForKey(key string) int {
 	}
 
 	strategy := c.config.Multi.ShardingStrategy
-	
+
 	// Check key prefix routes first
 	if len(c.config.Multi.KeyPrefixRoutes) > 0 {
 		for prefix, nodeIdx := range c.config.Multi.KeyPrefixRoutes {
@@ -224,7 +223,7 @@ func (c *Client) getNodeForKey(key string) int {
 			}
 		}
 	}
-	
+
 	// Use sharding strategy
 	switch strategy {
 	case "hash":

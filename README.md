@@ -17,6 +17,7 @@
   - 治理与可观测：`discovery`、`health`、`metrics`、`tracing`、`circuitbreaker`、`loadbalancer`、`ratelimit`
   - 安全与业务：`auth`、`rbac`、`audit`、`upload`、`push`、`geoip`、`configcenter`、`actor`（+ NATS 桥接/发现）
   - 中间件库：`middleware`（独立 net/http 中间件：audit/auth/apikey/cors/ip_filter/rate_limiter/recovery 等）
+  - 游戏服：`gameserver`（九宫格 AOI 空间管理，供实时游戏房间/大世界邻居查询）
   - 工具类：`alert`、`bloomfilter`、`scheduler`
 
 > 插件机制详见 [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md)。

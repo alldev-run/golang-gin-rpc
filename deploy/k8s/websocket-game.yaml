@@ -1,0 +1,61 @@
+# WebSocket 游戏服 Deployment 示例:一个进程 = websocket 服务(+ 可选 rpc)。
+# 会话恢复依赖同 session_id 路由到同一节点:Service 用 sessionAffinity,
+# 或在网关层按 cookie/header 做粘性路由。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: game-ws
+  labels: { app: game-ws }
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0        # 滚动更新不主动杀连接,靠 preStop 排空
+  template:
+    metadata:
+      labels: { app: game-ws }
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: game-ws
+          image: ggr:latest
+          args: ["./configs/config.yaml"]
+          ports:
+            - containerPort: 8090   # server.http(健康检查/管理面)
+              name: http
+            - containerPort: 8091   # websocket
+              name: ws
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "10"]  # 给发现层摘除/连接排空留时间
+          resources:
+            requests: { cpu: 250m, memory: 256Mi }
+            limits:   { cpu: "1",  memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: game-ws
+spec:
+  selector: { app: game-ws }
+  # 粘性会话:同一客户端 IP 固定到同一 Pod,保证 ws 会话恢复命中同节点。
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  ports:
+    - name: ws
+      port: 8091
+      targetPort: ws
+    - name: http
+      port: 8090
+      targetPort: http
