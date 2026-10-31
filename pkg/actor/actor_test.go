@@ -72,8 +72,11 @@ func TestSystem_SendWithContextTimeout(t *testing.T) {
 	pid, err := s.Spawn(FromActor(slow).WithName("slow").WithMailboxSize(1))
 	assert.NoError(t, err)
 
-	// 占满邮箱，并让 Actor 一直持有
+	// 让 Actor 取走 "block" 并一直阻塞在 Receive 内。
 	assert.NoError(t, s.Send(pid, "block"))
+	// Actor 取走消息后邮箱（容量 1）已空，再投一条将其占满，
+	// 之后的发送才会真正阻塞并触发超时。
+	assert.NoError(t, s.Send(pid, "fill"))
 
 	ctx, cancel := stdctx.WithTimeout(stdctx.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -198,6 +201,25 @@ func (b *becomeActor) pinged(ctx Context, msg Message) {
 	}
 }
 
+func TestSystem_SendNoSender(t *testing.T) {
+	s := New()
+	defer s.Shutdown()
+
+	pid, err := s.SpawnNamed("echo", &echoActor{})
+	assert.NoError(t, err)
+
+	// 系统级 Send 没有发送方，Sender 应返回空 PID（未知发送方）。
+	reply := make(chan PID, 1)
+	assert.NoError(t, s.Send(pid, &tell{reply: reply}))
+
+	select {
+	case sender := <-reply:
+		assert.Empty(t, sender)
+	case <-time.After(time.Second):
+		t.Fatal("timeout")
+	}
+}
+
 func TestSystem_PreStartPostStop(t *testing.T) {
 	s := New()
 
@@ -225,19 +247,20 @@ func TestSystem_PreStartPostStop(t *testing.T) {
 }
 
 type lifecycleActor struct {
-	started chan struct{}
-	stopped chan struct{}
-	once    sync.Once
+	started   chan struct{}
+	stopped   chan struct{}
+	startOnce sync.Once
+	stopOnce  sync.Once
 }
 
 func (l *lifecycleActor) PreStart(ctx Context) {
-	l.once.Do(func() { close(l.started) })
+	l.startOnce.Do(func() { close(l.started) })
 }
 
 func (l *lifecycleActor) Receive(ctx Context, msg Message) {}
 
 func (l *lifecycleActor) PostStop(ctx Context) {
-	l.once.Do(func() { close(l.stopped) })
+	l.stopOnce.Do(func() { close(l.stopped) })
 }
 
 func TestSystem_DuplicateName(t *testing.T) {
@@ -270,16 +293,18 @@ func TestContext_Send(t *testing.T) {
 	s := New()
 	defer s.Shutdown()
 
-	echo := &echoActor{}
-	pid, err := s.SpawnNamed("echo", echo)
+	echoPID, err := s.SpawnNamed("echo", &echoActor{})
 	assert.NoError(t, err)
 
+	// driver 在 PreStart 中通过 ctx.Send 向 echo 发送消息，
+	// echo 回复其收到的发送方，验证 ctx.Send 自动携带当前 Actor 的 PID。
 	reply := make(chan PID, 1)
-	assert.NoError(t, s.Send(pid, &tell{reply: reply}))
+	driverPID, err := s.SpawnNamed("driver", &senderActor{target: echoPID, reply: reply})
+	assert.NoError(t, err)
 
 	select {
 	case sender := <-reply:
-		assert.Equal(t, pid, sender)
+		assert.Equal(t, driverPID, sender)
 	case <-time.After(time.Second):
 		t.Fatal("timeout")
 	}
@@ -296,3 +321,14 @@ func (e *echoActor) Receive(ctx Context, msg Message) {
 		m.reply <- ctx.Sender()
 	}
 }
+
+type senderActor struct {
+	target PID
+	reply  chan PID
+}
+
+func (a *senderActor) PreStart(ctx Context) {
+	_ = ctx.Send(a.target, &tell{reply: a.reply})
+}
+
+func (a *senderActor) Receive(ctx Context, msg Message) {}

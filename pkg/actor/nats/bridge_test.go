@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/actor"
 	"github.com/alldev-run/golang-gin-rpc/pkg/messaging"
@@ -129,7 +130,7 @@ func TestBridge_SubscribeAndForward(t *testing.T) {
 		assert.Equal(t, "orders", nm.Subject)
 		assert.Equal(t, []byte("world"), nm.Payload)
 		assert.Equal(t, "2", nm.Headers["id"])
-	default:
+	case <-time.After(time.Second):
 		t.Fatal("actor did not receive NATS message")
 	}
 }
