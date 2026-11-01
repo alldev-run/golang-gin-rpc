@@ -27,11 +27,10 @@ plugins/rpc/
 │   └── (gRPC 实现文件)
 ├── jsonrpc/               # JSON-RPC 相关
 │   └── (JSON-RPC 实现文件)
-├── clients/               # 客户端实现 (目录预留)
-├── servers/               # 服务器实现 (目录预留)
-├── logs/                  # 日志相关 (目录预留)
-└── examples/              # 示例代码
-    └── (示例文件)
+└── logs/                  # 日志输出 (目录预留)
+
+示例 service(calculator/user)位于仓库根 `examples/rpc-lib/`,
+完整可运行示例见 `examples/rpc/`。
 ```
 
 ### RPC 配置 (configs/config.yaml)
@@ -72,7 +71,7 @@ package main
 import (
     "context"
     "github.com/alldev-run/golang-gin-rpc/plugins/rpc"
-    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/examples"
+    "github.com/alldev-run/golang-gin-rpc/examples/rpc-lib" // 包名 examples,示例 service
 )
 
 // 创建自定义服务
@@ -107,7 +106,7 @@ package main
 import (
     "log"
     "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/examples"
+    "github.com/alldev-run/golang-gin-rpc/examples/rpc-lib" // 包名 examples,示例 service
 )
 
 func main() {
@@ -185,7 +184,7 @@ import (
     "context"
     "log"
     "github.com/alldev-run/golang-gin-rpc/plugins/rpc/jsonrpc"
-    "github.com/alldev-run/golang-gin-rpc/plugins/rpc/examples"
+    "github.com/alldev-run/golang-gin-rpc/examples/rpc-lib" // 包名 examples,示例 service
 )
 
 func main() {
@@ -435,8 +434,8 @@ rpcManager.RegisterService(myService)
 查看 `examples/` 目录下的完整示例：
 
 - `examples/rpc/main.go` - RPC 框架使用示例
-- `plugins/rpc/examples/user_service.go` - 用户管理服务示例
-- `plugins/rpc/examples/calculator_service.go` - 计算器服务示例
+- `examples/rpc-lib/user_service.go` - 用户管理服务示例
+- `examples/rpc-lib/calculator_service.go` - 计算器服务示例
 
 ---
 

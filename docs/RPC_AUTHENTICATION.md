@@ -56,7 +56,7 @@ cfg.APIKeys = map[string]string{
     "frontend-key": "frontend",
 }
 
-jsonServer, _ := rpc.NewJSONRPCServer(rpc.DefaultConfig())
+jsonServer := rpc.NewJSONRPCServer(rpc.DefaultConfig()) // 单返回值
 jsonServer.SetAuthConfig(cfg)
 ```
 

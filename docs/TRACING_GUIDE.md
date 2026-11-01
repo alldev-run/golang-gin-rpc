@@ -26,7 +26,9 @@ docker-compose -f deploy/docker-compose.zipkin.yml up -d
 
 ### 2. 配置追踪
 
-编辑 `configs/tracing.yaml`：
+在 `configs/config.yaml` 的 `observability.tracing` 节配置(由
+`InitializeTracing` 读取,受 `plugins.tracing.enabled` 开关控制;
+`configs/tracing.yaml` 仅为字段参考模板,框架不会自动加载它)：
 
 ```yaml
 tracing:
@@ -55,7 +57,7 @@ tracing:
 go run main.go
 
 # HTTP Gateway
-cd api/http-gateway/cmd
+cd api/http-gateway
 go run main.go
 ```
 
@@ -73,7 +75,7 @@ go run main.go
 | `service_version` | 服务版本 | `1.0.0` |
 | `environment` | 环境 | `development` |
 | `enabled` | 是否启用追踪 | `false` |
-| `zipkin_url` | Zipkin 端点 | `http://localhost:9411/api/v2/spans` |
+| `host` / `port` / `endpoint` | Zipkin 上报地址由三者拼接 | `localhost` / `9411` / `/api/v2/spans` |
 | `sample_rate` | 采样率 (0.0-1.0) | `1.0` |
 | `batch_timeout` | 批处理超时 | `5s` |
 | `max_export_batch_size` | 最大批处理大小 | `512` |
@@ -101,7 +103,7 @@ tracing:
 
 ### HTTP 追踪
 
-HTTP 请求会自动被追踪，包括：
+HTTP 请求经 `tracing.GinMiddleware` / `NewHTTPMiddleware` 接入后自动追踪，包括：
 
 - 请求路径、方法、状态码
 - 请求/响应时间
@@ -250,7 +252,7 @@ tracing.SetSpanOK(span)
 
 1. **追踪数据未出现在 Zipkin**
    - 检查 Zipkin 是否正常运行
-   - 验证 `zipkin_url` 配置
+   - 验证 `observability.tracing` 的 host/port/endpoint 配置
    - 确认 `enabled: true`
 
 2. **性能影响**

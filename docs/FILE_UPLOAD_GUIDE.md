@@ -166,7 +166,7 @@ import (
 )
 
 // Initialize bootstrap
-boot := bootstrap.New()
+boot := pkgbootstrap.NewBootstrap("./configs/config.yaml")
 err := boot.InitializeAll()
 if err != nil {
     log.Fatal(err)

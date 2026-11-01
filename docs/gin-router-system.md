@@ -8,30 +8,30 @@
 
 ### 核心组件
 
-1. **`pkg/router/interfaces.go`** - 路由接口定义
+1. **`plugins/gateway/router/interfaces.go`** - 路由接口定义
    - `IRouterBuilder`: 路由构建器接口
    - `RouterFactory`: 路由工厂接口
    - 支持路由实现的灵活替换
 
-2. **`pkg/router/registry.go`** - 路由注册器和配置
+2. **`plugins/gateway/router/registry.go`** - 路由注册器和配置
    - `RouteRegistry`: 路由注册器实现
    - `RouteGroup`: 路由组管理
    - `RouteConfig`: 路由配置定义
    - 中间件链式组合
 
-3. **`pkg/router/builder.go`** - 路由构建器实现
+3. **`plugins/gateway/router/builder.go`** - 路由构建器实现
    - 实现 `IRouterBuilder` 接口
    - 集成 Gin 引擎和中间件配置
    - 调试路由和业务路由管理
 
-4. **`plugins/middleware/gin/gin_middleware.go`** - Gin 中间件集合
+4. **`plugins/gateway/middleware.go(gin 中间件装配)`** - Gin 中间件集合
    - 完全基于 Gin 的中间件实现
    - 支持请求ID、CORS、限流、日志等
    - 兼容 Gateway 配置系统
 
 5. **`api/http-gateway/internal/httpapi/router.go`** - 主路由器
    - 使用路由工厂创建路由构建器
-   - 完全依赖 pkg 下的路由系统
+   - 路由系统位于 plugins/gateway/router
    - 便于后期统一更换
 
 6. **`api/http-gateway/internal/routes/`** - 业务路由
@@ -41,7 +41,7 @@
 ## 主要特性
 
 ### ✅ 解决的问题
-- **循环导入**: 通过 `pkg/route` 包打破循环依赖
+- **循环导入**: 路由类型定义集中于 `plugins/gateway/router` 包
 - **路由管理**: 提供更强大的路由组和中间件管理
 - **性能提升**: Gin 框架的高性能路由匹配
 - **中间件统一**: 完全基于 Gin 的中间件系统
@@ -86,7 +86,7 @@ newRouter := httpapi.NewRouter(cfg) // 现在使用自定义实现
 ```
 
 ### 更换示例
-参考 `examples/router-switching-demo.go` 查看完整的更换示例。
+参考 `examples/router_switching/main.go` 查看完整的更换示例。
 
 ## 中间件系统
 
@@ -236,7 +236,7 @@ func authMiddleware() gin.HandlerFunc {
 
 运行测试服务器：
 ```bash
-go run examples/gin-router-test.go
+go run ./examples/gin_router_test
 ```
 
 测试 API：

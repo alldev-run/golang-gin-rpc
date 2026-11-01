@@ -253,7 +253,7 @@ bizHandler := httpapi.NewRouter(mergedGwCfg, routeServices).Handler()
 ```
 
 ```go
-// internal/routes/registry.go
+// api/http-gateway/internal/routes/registry.go
 type Services struct {
     HelloService *service.HelloService
 }
@@ -477,6 +477,7 @@ result, err := orm.NewDeleteBuilder(client, "users").Where("status = ?", "inacti
 
 ## Connection Pooling
 
+```go
 // Load configuration
 cfg := poolcb.Config{
     PoolConfig: pool.Config{
@@ -765,7 +766,7 @@ go run ./cmd/scaffold run-migration \
 import "github.com/alldev-run/golang-gin-rpc/plugins/db/migration"
 
 // Create migrator
-m := migration.New(db)
+m := migration.New(mysqlClient.DB()) // 参数为 *sql.DB,经 client.DB() 取得
 
 // Add migrations
 m.Add(1, "create_users",
@@ -850,7 +851,7 @@ go test ./plugins/db/poolcb/... -v
 
 # Integration tests (requires Docker)
 docker-compose -f deploy/docker-compose.integration.yml up -d
-go test ./pkg/... -tags=integration
+go test ./tests/dbintegration/... -tags=integration
 ```
 
 ## Troubleshooting

@@ -67,7 +67,7 @@ config := orm.TransactionConfig{
     MaxRetryDelay:      10 * time.Second,
     
     // Transaction configuration
-    IsolationLevel: orm.LevelReadCommitted,
+    IsolationLevel: sql.LevelReadCommitted,
     ReadOnly:       false,
     Timeout:        30 * time.Second,
     
@@ -95,7 +95,7 @@ highThroughputConfig := orm.TransactionConfig{
     RetryDelay:         25 * time.Millisecond,
     RetryBackoffFactor: 1.5,
     MaxRetryDelay:      2 * time.Second,
-    IsolationLevel:     orm.LevelReadCommitted,
+    IsolationLevel:     sql.LevelReadCommitted,
     Timeout:            10 * time.Second,
     EnableMetrics:      true,
     LogSlowQueries:     true,
@@ -115,7 +115,7 @@ distributedConfig := orm.TransactionConfig{
     RetryDelay:         100 * time.Millisecond,
     RetryBackoffFactor: 2.0,
     MaxRetryDelay:      5 * time.Second,
-    IsolationLevel:     orm.LevelSerializable,
+    IsolationLevel:     sql.LevelSerializable,
     Timeout:            60 * time.Second,
     EnableDistributed:  true,
     CoordinatorURL:     "http://tx-coordinator:8080",
@@ -132,13 +132,17 @@ distributedConfig := orm.TransactionConfig{
 tm := orm.NewDefaultTransactionManager()
 defer tm.Close()
 
-result, err := tm.WithTransaction(ctx, db, func(txORM *orm.ORM) error {
-    // Your transaction logic here
-    user := &User{Name: "John", Email: "john@example.com"}
-    if err := txORM.Create(user); err != nil {
+// 注意:第二参数须为 orm.DB 接口实现(如 orm.NewDBWrapper(sqlDB) 或已有 ORM 的 o.DB());
+// 传入裸 *sql.DB 会在运行时断言失败。
+result, err := tm.WithTransaction(ctx, ormDB, func(txORM *orm.ORM) error {
+    // ORM 是 SQL 构建器(无 model 式 Create/Update/Delete),用 builder 风格:
+    if err := txORM.Insert("users").Sets(map[string]interface{}{
+        "name":  "John",
+        "email": "john@example.com",
+    }).Exec(ctx); err != nil {
         return err
     }
-    
+
     // More operations...
     return nil
 })
@@ -155,16 +159,20 @@ if err != nil {
 
 ```go
 err := tm.WithNestedTransaction(ctx, orm, "user_update_sp", func(nestedORM *orm.ORM) error {
-    // Update user
-    user := &User{ID: 123, Name: "Updated Name"}
-    if err := nestedORM.Update(user); err != nil {
+    // Update user(builder 风格)
+    if err := nestedORM.Update("users").
+        Set("name", "Updated Name").
+        Eq("id", 123).
+        Exec(ctx); err != nil {
         return err
     }
-    
+
     // Nested savepoint for audit
     err = tm.WithNestedTransaction(ctx, nestedORM, "audit_sp", func(auditORM *orm.ORM) error {
-        audit := &AuditLog{UserID: 123, Action: "update"}
-        return auditORM.Create(audit)
+        return auditORM.Insert("audit_logs").Sets(map[string]interface{}{
+            "user_id": 123,
+            "action":  "update",
+        }).Exec(ctx)
     })
     
     if err != nil {
@@ -332,7 +340,7 @@ func getTransactionConfig(env string) orm.TransactionConfig {
         return orm.TransactionConfig{
             MaxRetries:         3,
             RetryDelay:         100 * time.Millisecond,
-            IsolationLevel:     orm.LevelReadCommitted,
+            IsolationLevel:     sql.LevelReadCommitted,
             Timeout:            30 * time.Second,
             EnableMetrics:      true,
             EnableTracing:      true,
@@ -345,7 +353,7 @@ func getTransactionConfig(env string) orm.TransactionConfig {
         return orm.TransactionConfig{
             MaxRetries:         1,
             RetryDelay:         50 * time.Millisecond,
-            IsolationLevel:     orm.LevelReadCommitted,
+            IsolationLevel:     sql.LevelReadCommitted,
             Timeout:            10 * time.Second,
             EnableMetrics:      true,
             LogSlowQueries:     true,
@@ -377,8 +385,9 @@ result, err := tm.WithTransaction(ctx, db, func(txORM *orm.ORM) error {
 })
 
 if err != nil {
-    // Check error classification
-    if isRetryableError(err) {
+    // Check error classification(DefaultErrorClassifier 可独立构造)
+    classifier := orm.NewDefaultErrorClassifier()
+    if classifier.IsRetryable(err) {
         log.Printf("Retryable error: %v", err)
     } else {
         log.Printf("Non-retryable error: %v", err)
@@ -408,8 +417,8 @@ func monitorConnectionPool(tm *orm.TransactionManager) {
     
     for range ticker.C {
         metrics := tm.GetMetrics()
-        if metrics.ActiveTransactions > 100 {
-            log.Warn("High number of active transactions", "count", metrics.ActiveTransactions)
+        if active := tm.GetActiveTransactionCount(); active > 100 {
+            log.Warn("High number of active transactions", "count", active)
         }
         
         avgDuration := metrics.AvgDuration
@@ -455,8 +464,9 @@ func executeDistributedTransaction(ctx context.Context, tm *orm.TransactionManag
 
 1. **High Retry Rates**
    ```go
-   // Check error classification
-   classification := tm.errorClassifier.ClassifyError(err)
+   // Check error classification(errorClassifier 为非导出字段,包外自行构造)
+   classifier := orm.NewDefaultErrorClassifier()
+   classification := classifier.ClassifyError(err)
    log.Printf("Error type: %s, retryable: %v", classification.Type, classification.Retryable)
    
    // Consider adjusting retry strategy
@@ -506,12 +516,8 @@ config := orm.TransactionConfig{
 }
 
 tm := orm.NewTransactionManager(config)
-
-// Add custom monitoring
-tm.monitor = &CustomMonitor{
-    logLevel: "debug",
-    detailedMetrics: true,
-}
+// monitor/errorClassifier 为非导出字段,包外无法注入自定义实现;
+// 调试观测通过 EnableMetrics/EnableTracing/LogSlowQueries 配置项开启。
 ```
 
 ## Integration Examples
@@ -532,23 +538,18 @@ func (s *UserService) CreateUser(ctx context.Context, req *CreateUserRequest) (*
             return err
         }
         
-        // Create user
-        user = &User{
-            Name:  req.Name,
-            Email: req.Email,
-        }
-        
-        if err := txORM.Create(user); err != nil {
+        // Create user(builder 风格)
+        if err := txORM.Insert("users").Sets(map[string]interface{}{
+            "name":  req.Name,
+            "email": req.Email,
+        }).Exec(ctx); err != nil {
             return err
         }
-        
+
         // Create audit log
-        audit := &AuditLog{
-            UserID: user.ID,
-            Action: "create_user",
-        }
-        
-        return txORM.Create(audit)
+        return txORM.Insert("audit_logs").Sets(map[string]interface{}{
+            "action": "create_user",
+        }).Exec(ctx)
     })
     
     if err != nil {
@@ -569,42 +570,50 @@ type OrderService struct {
 }
 
 func (s *OrderService) CreateOrder(ctx context.Context, req *CreateOrderRequest) (*Order, error) {
-    return s.tm.WithTransaction(ctx, s.db, func(txORM *orm.ORM) (*Order, error) {
+    // WithTransaction 的 fn 签名固定为 func(*orm.ORM) error;需要的结果
+    // (如 *Order)通过外部变量捕获。
+    var order *Order
+
+    err := s.tm.WithTransaction(ctx, s.db, func(txORM *orm.ORM) error {
         // Reserve inventory
         if err := s.inventoryClient.Reserve(ctx, req.Items); err != nil {
-            return nil, err
+            return err
         }
-        
-        // Create order
-        order := &Order{
-            UserID: req.UserID,
-            Items:  req.Items,
-            Status: "pending",
-        }
-        
-        if err := txORM.Create(order); err != nil {
+
+        // Create order(builder 风格;ORM 无 model 式 Create/Delete)
+        if err := txORM.Insert("orders").Sets(map[string]interface{}{
+            "user_id": req.UserID,
+            "items":   req.Items,
+            "status":  "pending",
+        }).Exec(ctx); err != nil {
             s.inventoryClient.Release(ctx, req.Items)
-            return nil, err
+            return err
         }
-        
+
         // Process payment
         payment, err := s.paymentClient.Process(ctx, &PaymentRequest{
             OrderID: order.ID,
-            Amount:  order.Total(),
+            Amount:  req.Total(),
         })
-        
+
         if err != nil {
-            txORM.Delete(order) // Rollback order creation
+            // fn 返回 error 即整体回滚,无需手工"删除已插入的行"
             s.inventoryClient.Release(ctx, req.Items)
-            return nil, err
+            return err
         }
-        
+
         // Update order status
-        order.Status = "paid"
-        order.PaymentID = payment.ID
-        
-        return order, txORM.Update(order)
+        return txORM.Update("orders").
+            Set("status", "paid").
+            Set("payment_id", payment.ID).
+            Eq("id", order.ID).
+            Exec(ctx)
     })
+    if err != nil {
+        return nil, err
+    }
+    return order, nil
+}
 }
 ```
 

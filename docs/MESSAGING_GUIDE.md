@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-This guide covers the messaging system that provides unified support for multiple messaging systems in the github.com/alldev-run/golang-gin-rpc framework, including **RabbitMQ**, **Apache Kafka**, and future support for additional systems.
+This guide covers the messaging system that provides unified support for multiple messaging systems in the github.com/alldev-run/golang-gin-rpc framework, including **RabbitMQ**, **Apache Kafka**, and **NATS**.
 
 ## 🏗️ Architecture
 
@@ -11,7 +11,9 @@ This guide covers the messaging system that provides unified support for multipl
 - **Interface Layer**: `messaging.go` - Defines unified interfaces for messaging operations
 - **Type System**: `types.go` - Comprehensive type system with enums and capabilities
 - **RabbitMQ Implementation**: `rabbitmq.go` - RabbitMQ client and operations
-- **Kafka Implementation**: `kafka.go` - Kafka client and operations  
+- **Kafka Implementation**: `kafka.go` - Kafka client and operations
+- **NATS Implementation**: `nats.go` - NATS client and operations
+- **Request-Reply**: `reply.go` - RPC-style request/reply over any transport
 - **Factory Pattern**: `factory.go` - Creates appropriate client based on configuration
 
 ### Supported Messaging Types
@@ -19,17 +21,13 @@ This guide covers the messaging system that provides unified support for multipl
 The framework supports multiple messaging types through a comprehensive type system:
 
 #### **Currently Implemented**
-- **RabbitMQ** (`messaging.RabbitMQ`) - Traditional message broker with exchange/queue patterns
-- **Apache Kafka** (`messaging.Kafka`) - Distributed streaming platform
+- **RabbitMQ** (`messaging.MessageTypeRabbitMQ`) - Traditional message broker with exchange/queue patterns
+- **Apache Kafka** (`messaging.MessageTypeKafka`) - Distributed streaming platform
+- **NATS** (`messaging.MessageTypeNATS`) - Lightweight messaging system
 
-#### **Planned for Future Implementation**
-- **Redis Streams** (`messaging.RedisStreams`) - Redis-based streaming
-- **NATS** (`messaging.NATS`) - Lightweight messaging system
-- **ActiveMQ** (`messaging.ActiveMQ`) - Enterprise message broker
-- **Amazon SQS** (`messaging.AmazonSQS`) - Cloud-based queue service
-- **Google Pub/Sub** (`messaging.GooglePubSub`) - Cloud messaging service
-- **Azure Service Bus** (`messaging.AzureServiceBus`) - Cloud enterprise messaging
-- **Apache Pulsar** (`messaging.Pulsar`) - Cloud-native messaging platform
+#### **Reserved Types (not yet implemented)**
+- **Redis** (`messaging.MessageTypeRedis`) - Redis-based streaming
+- **Memory** (`messaging.MessageTypeMemory`) - In-memory bus (testing)
 
 ### Type System Features
 
@@ -38,15 +36,11 @@ The framework supports multiple messaging types through a comprehensive type sys
 type MessageType string
 
 const (
-    RabbitMQ        MessageType = "rabbitmq"
-    Kafka           MessageType = "kafka"
-    RedisStreams    MessageType = "redis_streams"
-    NATS            MessageType = "nats"
-    ActiveMQ        MessageType = "activemq"
-    AmazonSQS       MessageType = "sqs"
-    GooglePubSub    MessageType = "pubsub"
-    AzureServiceBus MessageType = "servicebus"
-    Pulsar          MessageType = "pulsar"
+    MessageTypeRabbitMQ MessageType = "rabbitmq"
+    MessageTypeKafka    MessageType = "kafka"
+    MessageTypeNATS     MessageType = "nats"
+    MessageTypeRedis    MessageType = "redis"
+    MessageTypeMemory   MessageType = "memory"
 )
 
 // Type capabilities and metadata
@@ -135,9 +129,9 @@ import (
 func main() {
     // Create RabbitMQ configuration using type constants
     config := messaging.Config{
-        Type:     messaging.RabbitMQ.String(),
+        Type:     messaging.MessageTypeRabbitMQ.String(),
         Host:     "localhost",
-        Port:     messaging.RabbitMQ.DefaultPort(),
+        Port:     messaging.MessageTypeRabbitMQ.DefaultPort(),
         Username: "guest",
         Password: "guest",
         Database: "/",
@@ -149,14 +143,14 @@ func main() {
     }
     
     // Create client using factory pattern
-    client, err := messaging.CreateClientByType(messaging.RabbitMQ, config)
+    client, err := messaging.CreateClientByType(messaging.MessageTypeRabbitMQ, config)
     if err != nil {
         log.Fatal(err)
     }
     defer client.Close()
     
     // Show capabilities
-    capabilities := messaging.GetClientCapabilities(messaging.RabbitMQ)
+    capabilities := messaging.GetClientCapabilities(messaging.MessageTypeRabbitMQ)
     log.Printf("RabbitMQ capabilities: %+v", capabilities)
     
     ctx := context.Background()
@@ -202,9 +196,9 @@ import (
 func main() {
     // Create Kafka configuration using type constants
     config := messaging.Config{
-        Type: messaging.Kafka.String(),
+        Type: messaging.MessageTypeKafka.String(),
         Host: "localhost",
-        Port: messaging.Kafka.DefaultPort(),
+        Port: messaging.MessageTypeKafka.DefaultPort(),
     }
     
     // Validate configuration
@@ -213,14 +207,14 @@ func main() {
     }
     
     // Create client using factory pattern
-    client, err := messaging.CreateClientByType(messaging.Kafka, config)
+    client, err := messaging.CreateClientByType(messaging.MessageTypeKafka, config)
     if err != nil {
         log.Fatal(err)
     }
     defer client.Close()
     
     // Show capabilities
-    capabilities := messaging.GetClientCapabilities(messaging.Kafka)
+    capabilities := messaging.GetClientCapabilities(messaging.MessageTypeKafka)
     log.Printf("Kafka capabilities: %+v", capabilities)
     
     ctx := context.Background()
@@ -254,7 +248,7 @@ func main() {
 
 ```go
 // Create client using factory with type validation
-func createMessagingClient(msgType messaging.MessagingType) (messaging.Client, error) {
+func createMessagingClient(msgType messaging.MessageType) (messaging.Client, error) {
     // Check if type is valid
     if !msgType.IsValid() {
         return nil, fmt.Errorf("invalid messaging type: %s", msgType)
@@ -283,7 +277,7 @@ func createMessagingClient(msgType messaging.MessagingType) (messaging.Client, e
 }
 
 // Usage
-client, err := createMessagingClient(messaging.RabbitMQ)
+client, err := createMessagingClient(messaging.MessageTypeRabbitMQ)
 if err != nil {
     log.Fatal(err)
 }
@@ -475,6 +469,47 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 ```
+
+## 🔁 Request-Reply（请求-应答）
+
+`reply.go` 在通用 `Client` 接口之上提供 RPC 风格的请求-应答:请求方把 payload
+封进 `ReplyEnvelope`（携带 `correlation_id` 与 `reply_to` 临时主题）发布到目标
+主题,并订阅 `reply_to` 等待响应;应答方由 `HandleRequests` 包装业务函数。
+
+### 应答方
+
+```go
+// 把业务函数包装成 MessageHandler 挂到请求主题
+_ = client.Subscribe(ctx, "calc.double", messaging.HandleRequests(client,
+    func(ctx context.Context, payload []byte) ([]byte, error) {
+        var req CalcRequest
+        if err := json.Unmarshal(payload, &req); err != nil {
+            return nil, err
+        }
+        return json.Marshal(CalcReply{N: req.N * 2})
+    }))
+```
+
+### 请求方
+
+```go
+out, err := messaging.RequestJSON(ctx, client, "calc.double",
+    CalcRequest{N: 21}, 3*time.Second)
+if errors.Is(err, messaging.ErrRequestTimeout) {
+    // 超时
+}
+var rerr *messaging.ReplyError
+if errors.As(err, &rerr) {
+    // 远端业务错误: rerr.Error() 携带远端返回的错误信息
+}
+```
+
+### 传输适配说明
+
+- **NATS / RabbitMQ**:reply 临时主题开箱即用。
+- **Kafka**:reply 主题通常需要预创建或允许自动建题,请按部署环境配置。
+- 请求方每次 `Request` 会临时订阅 `reply.<correlation_id>` 主题并在收到
+  响应或超时后取消订阅。
 
 ## 🔄 Migration Guide
 

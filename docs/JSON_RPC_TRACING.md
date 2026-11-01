@@ -251,7 +251,7 @@ func main() {
 ```go
 func main() {
     // 创建 gRPC 服务器（带追踪）
-    grpcServer := rpc.NewGRPCServer(grpcConfig)
+    grpcServer, err := rpc.NewGRPCServer(grpcConfig) // 双返回值
     
     // 创建 JSON-RPC 服务器（带追踪）
     jsonrpcServer := rpc.NewJSONRPCServer(jsonrpcConfig)

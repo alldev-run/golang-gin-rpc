@@ -161,15 +161,18 @@ users, err := db.Select("users").
     Columns("id", "name").
     Query(ctx)
 
-// PostgreSQL（显式指定）
-orders, err := db.Using(db.DBTypePostgres).Select("orders").
-    Columns("id", "amount").
-    Query(ctx)
+// PostgreSQL:db.Postgres() 返回 (SQLClient, error),用原生 SQL 查询
+pg, err := db.Postgres()
+if err != nil {
+    log.Fatal(err)
+}
+orders, err := pg.Query(ctx,
+    "SELECT id, amount FROM orders WHERE status = $1", "pending")
 
-// 或使用专用函数
-orders, err := db.PostgresSelect("orders").
-    Eq("status", "pending").
-    Query(ctx)
+// PostgreSQL 插入可用构建器:db.InsertOn(驱动类型, 表名)
+res, err := db.InsertOn(db.TypePostgres, "orders").
+    Sets(map[string]interface{}{"user_id": 1, "amount": 99}).
+    Exec(ctx)
 ```
 
 ### 同一 MySQL 实例多数据库访问
@@ -199,51 +202,9 @@ ctx := db.WithDBContext(r.Context(), "orderdb")
 // 后续查询会自动使用该数据库（需要配合支持 context 的方法）
 ```
 
-#### ⚠️ 旧版 Use() / UseDefault()（极不推荐用于并发环境）
-
-```go
-// 🚨 极度危险：以下方式在并发环境下（HTTP handlers、goroutines）会有严重竞态条件！
-// 仅适用于单协程脚本或初始化流程，绝对不要在生产环境使用！
-
-// 切换到 orderdb（影响全局状态）
-db.Use("orderdb")
-orders, err := db.Select("orders").Query(ctx)  // 可能查询到错误的数据库！
-
-// 写日志到 logdb
-db.Use("logdb")
-_, err = db.Insert("logs").Sets(...).Exec(ctx)
-
-// 恢复默认库
-db.UseDefault()  // 或 db.Use("")
-users, err = db.Select("users").Query(ctx)  // 可能查询到错误的数据库！
-```
-
-**为什么 `Use()` 在并发下极度危险？**
-
-`db.Use()` 修改全局变量 `currentDB`，所有 goroutine 共享这个状态：
-
-```go
-// 🚨 严重竞态条件示例：
-// Goroutine A: db.Use("orderdb")
-// Goroutine B: db.Use("userdb")  // 覆盖了 A 的设置！
-// Goroutine A: db.Select("orders") // 实际查询的是 userdb.orders ❌ 数据错乱！
-// Goroutine C: db.Select("users")  // 可能查询到 orderdb.users ❌ 数据错乱！
-
-// 🔴 生产环境后果：
-// - 用户数据错乱
-// - 订单查询到错误数据
-// - 财务数据不一致
-// - 无法复现的间歇性错误
-```
-
-**并发风险等级评估：**
-
-| API | 风险等级 | 后果 | 适用场景 |
-|-----|---------|------|----------|
-| `Use()` + `Select()` | 🔴 极高 | 数据错乱，生产事故 | 仅单协程脚本 |
-| `GetDB()` | 🟡 中等 | 数据不一致 | 调试用途 |
-| `SelectDB()` | 🟢 低 | 无问题 | 生产推荐 |
-| `On()` | 🟢 低 | 无问题 | 生产推荐 |
+> **历史说明**:早期版本曾提供修改全局状态的 `Use()`/`UseDefault()` API,
+> 因并发竞态已从代码中移除。多库切换请统一使用 `SelectDB/InsertDB/UpdateDB/
+> DeleteDB`、`On()` 或 `WithDBContext`(均 goroutine-safe)。
 
 ### Repository 模式中的多库切换
 
@@ -294,19 +255,6 @@ func (r *ProductRepository) Create(ctx context.Context, p *Product) error {
 }
 ```
 
-**旧版不推荐的方式（Use/UseDefault）**
-
-```go
-// ⚠️ 警告：以下方式在并发环境中有竞态条件，不推荐在 Repository 中使用
-func (r *UserRepository) FindByIDUnsafe(ctx context.Context, id int64) (*User, error) {
-    db.Use("userdb")        // ❌ 修改全局状态
-    defer db.UseDefault()   // ❌ defer 在并发下不能解决问题
-    
-    rows, err := db.Select("users").Eq("id", id).Query(ctx)
-    // ...
-}
-```
-
 ### 跨库 JOIN（MySQL 原生支持）
 
 **注意**: 跨库 JOIN 是 **MySQL 原生支持**的特性，只要表在同一 MySQL 实例内，就可以用 `database.table` 语法跨库关联：
@@ -327,27 +275,20 @@ rows, err := db.Select("userdb.users AS u").
     Columns("u.name", "o.amount").
     Query(ctx)
 
-// 方式2: Use 一个库，另一个写完整名
-db.Use("userdb")
-rows, err := db.Select("users AS u").
+// 方式2: On() 指定主库，另一张表写完整名
+rows, err := db.On("userdb").Select("users AS u").
     Join("orderdb.orders AS o", "u.id = o.user_id").
     Query(ctx)
 ```
 
 **限制**: 跨库 JOIN 只能在**同一 MySQL 实例**内进行。如果 `userdb` 和 `orderdb` 在不同 MySQL 服务器上，则无法直接 JOIN，需要通过应用层关联或使用分布式查询方案。
 
-### 多数据库使用注意事项（并发安全 - 极重要）
+### 多数据库使用注意事项（并发安全）
 
-在并发环境（HTTP handlers、goroutines）中，**绝对避免使用 `Use()/UseDefault()` 模式**，因为它会导致严重的数据错乱和竞态条件。
+多库切换 API(`SelectDB`/`InsertDB`/`UpdateDB`/`DeleteDB`/`On()`/`WithDBContext`)
+均为 goroutine-safe,按请求显式指定数据库即可:
 
 ```go
-// ❌ 极度危险：Use() 在并发环境下会导致生产事故
-func Handler(w http.ResponseWriter, r *http.Request) {
-    db.Use("orderdb")  // 会干扰所有其他正在处理的请求！
-    defer db.UseDefault()  // defer 完全不能解决并发问题
-    // ... 可能查询到错误的数据库
-}
-
 // ✅ 安全：使用 goroutine-safe 的 API
 func Handler(w http.ResponseWriter, r *http.Request) {
     // 方式1：显式指定数据库
@@ -363,32 +304,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-**⚠️ 关键警告：**
-
-1. **`defer db.UseDefault()` 无法解决并发问题** - defer 只在当前函数结束时执行，期间其他 goroutine 已经修改了全局状态
-2. **竞态条件难以测试** - 在低负载下可能正常，高负载下必然出错
-3. **数据错乱后果严重** - 可能导致用户数据泄露、订单错乱、财务数据不一致
-4. **难以调试** - 间歇性错误，难以复现和定位
-
 ### 多数据库查询函数对照表
 
-| 场景 | 用法 | 示例 | 并发安全 |
-|------|------|------|----------|
-| 默认库（配置中的 database）| 直接使用 | `db.Select("users")` | ✅ 是 |
-| 切换到其他库（推荐） | `SelectDB()` / `On()` | `db.SelectDB("orderdb", "orders")` | ✅ 是 |
-| 切换到其他库（旧版） | `Use()` + 查询 | `db.Use("orderdb"); db.Select("orders")` | ❌ 否 |
-| 跨库 JOIN | 完整表名 | `db.Select("db1.table1 AS t1").Join(...)` | ✅ 是 |
-| 恢复默认 | `UseDefault()` | `db.UseDefault()` | ❌ 否（仅单协程） |
-
-### 新版 goroutine-safe API 汇总
-
-| 操作 | 旧方式（不推荐并发） | 新方式（goroutine-safe） |
-|------|---------------------|------------------------|
-| SELECT | `db.Use("db"); db.Select("table")` | `db.SelectDB("db", "table")` 或 `db.On("db").Select("table")` |
-| INSERT | `db.Use("db"); db.Insert("table")` | `db.InsertDB("db", "table")` 或 `db.On("db").Insert("table")` |
-| UPDATE | `db.Use("db"); db.Update("table")` | `db.UpdateDB("db", "table")` 或 `db.On("db").Update("table")` |
-| DELETE | `db.Use("db"); db.Delete("table")` | `db.DeleteDB("db", "table")` 或 `db.On("db").Delete("table")` |
-| Context 设置 | - | `ctx := db.WithDBContext(ctx, "db")` |
+| 场景 | 用法 | 示例 |
+|------|------|------|
+| 默认库（配置中的 database）| 直接使用 | `db.Select("users")` |
+| 切换到其他库 | `SelectDB()` / `On()` | `db.SelectDB("orderdb", "orders")` |
+| 跨库 JOIN | 完整表名 | `db.Select("db1.table1 AS t1").Join(...)` |
+| Context 设置 | middleware 中预设 | `ctx := db.WithDBContext(ctx, "db")` |
 
 ### 多数据库 Repository 模式示例
 
@@ -431,17 +354,19 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 type OrderRepository struct{}
 
 func (r *OrderRepository) FindByID(ctx context.Context, id int64) (*Order, error) {
-    // PostgreSQL 使用 Using 链式调用
-    rows, err := db.Using(db.DBTypePostgres).Select("orders").
-        Columns("id", "user_id", "amount", "status").
-        Eq("id", id).
-        Limit(1).
-        Query(ctx)
+    // PostgreSQL:通过 db.Postgres() 取 SQLClient 后执行原生 SQL
+    pg, err := db.Postgres()
+    if err != nil {
+        return nil, err
+    }
+    rows, err := pg.Query(ctx,
+        "SELECT id, user_id, amount, status FROM orders WHERE id = $1 LIMIT 1", id)
     // ...
 }
 
 func (r *OrderRepository) Create(ctx context.Context, order *Order) error {
-    _, err := db.PostgresInsert("orders").Sets(map[string]interface{}{
+    // PostgreSQL 插入用构建器:InsertOn(驱动类型, 表名)
+    _, err := db.InsertOn(db.TypePostgres, "orders").Sets(map[string]interface{}{
         "user_id": order.UserID,
         "amount":  order.Amount,
         "status":  order.Status,
@@ -465,19 +390,6 @@ func (r *ProductRepository) FindByID(ctx context.Context, id int64) (*Product, e
         Eq("id", id).
         Limit(1).
         Query(ctx)
-    // ...
-}
-```
-
-**不推荐：旧版 Use/UseDefault 方式（有并发风险）**
-
-```go
-// ⚠️ 警告：以下方式在并发环境中有竞态条件，仅适用于单协程脚本
-func (r *UserRepository) FindByIDUnsafe(ctx context.Context, id int64) (*User, error) {
-    db.Use("userdb")        // ❌ 修改全局状态
-    defer db.UseDefault()   // ❌ defer 在并发下不能解决问题
-    
-    rows, err := db.Select("users").Eq("id", id).Query(ctx)
     // ...
 }
 ```
@@ -547,10 +459,10 @@ postgres_primary:
 
 ```go
 // ❌ 错误：不能在同一个事务中操作两个数据库
-err := db.Transaction(ctx, func(tx *sql.Tx) error {
-    // 这是 MySQL 事务
-    tx.Exec("UPDATE users SET ...") 
-    
+mysqlClient, _ := db.MySQL() // SQLClient
+err := mysqlClient.Transaction(ctx, func(tx *sql.Tx) error {
+    tx.Exec("UPDATE users SET ...")
+
     // ❌ PostgreSQL 操作不能在这个事务中！
     // 下面的代码不会工作，因为它属于不同数据库
     return nil
@@ -595,23 +507,23 @@ internal/
 
 | 操作 | MySQL (默认) | PostgreSQL (显式) |
 |------|-------------|------------------|
-| 查询 | `db.Select("table")` | `db.Using(db.DBTypePostgres).Select("table")` |
-| 插入 | `db.Insert("table")` | `db.PostgresInsert("table")` |
-| 更新 | `db.Update("table")` | `db.PostgresUpdate("table")` |
-| 删除 | `db.Delete("table")` | `db.PostgresDelete("table")` |
-| 原始SQL | `db.Query(ctx, sql)` | `db.Postgres().Query(ctx, sql)` |
+| 查询 | `db.Select("table")` | `pg, _ := db.Postgres()` 后 `pg.Query(ctx, sql)` |
+| 插入 | `db.Insert("table")` | `db.InsertOn(db.TypePostgres, "table")` |
+| 更新/删除 | `db.Update/Delete("table")` | `pg.Exec(ctx, sql)`(原生 SQL) |
+| 原始SQL | `db.QueryContext(ctx, sql)` | `pg.Query(ctx, sql)` |
 
 ### 原始 SQL 查询
 
 ```go
-// 直接执行 SQL
-rows, err := db.Query(ctx, "SELECT * FROM users WHERE id = ?", 1)
+// 直接执行 SQL(默认 MySQL)
+rows, err := db.QueryContext(ctx, "SELECT * FROM users WHERE id = ?", 1)
 
 // 执行 INSERT/UPDATE/DELETE
-result, err := db.Exec(ctx, "UPDATE users SET name = ? WHERE id = ?", "John", 1)
+result, err := db.ExecContext(ctx, "UPDATE users SET name = ? WHERE id = ?", "John", 1)
 
-// 事务
-err := db.Transaction(ctx, func(tx *sql.Tx) error {
+// 事务(SQLClient 方法;db 包级无 Transaction 函数)
+mysqlClient, _ := db.MySQL()
+err := mysqlClient.Transaction(ctx, func(tx *sql.Tx) error {
     _, err := tx.Exec("INSERT INTO accounts ...")
     if err != nil {
         return err
@@ -626,11 +538,10 @@ err := db.Transaction(ctx, func(tx *sql.Tx) error {
 | 场景 | 推荐方式 | 说明 |
 |------|---------|------|
 | 快速开发 | `db.Select/Insert/Update/Delete` | 无需初始化，直接调用 |
-| 多数据库（并发安全） | `db.SelectDB/On()` | 推荐的新方式，goroutine-safe |
-| 多数据库（旧版） | `db.Use()` + 查询 | 不推荐，仅适用于单协程脚本 |
-| 不同数据库类型 | `db.Using(dbType)` | MySQL/PostgreSQL 切换 |
+| 多数据库（并发安全） | `db.SelectDB/On()` | goroutine-safe,按请求显式指定 |
+| 不同数据库类型 | `db.Postgres()` / `db.InsertOn(db.TypePostgres, ...)` | MySQL/PostgreSQL 切换 |
 | 复杂查询 | `orm.ORM` | 需要更多控制时使用 |
-| 事务 | 两者都支持 | Helper 用 `db.Transaction`，ORM 用 `o.Transaction` |
+| 事务 | 两者都支持 | Helper 走 `SQLClient.Transaction`(如 `db.MySQL()` 返回值)，ORM 用 `o.Transaction` |
 
 ---
 
@@ -1366,16 +1277,15 @@ if err != nil {
 
 所有完整的示例代码都可以在 `examples/mysql_usage/` 目录下找到：
 
-- **`examples/mysql_usage/orm_crud_operations.go`** - 基础 CRUD 操作完整示例
-- **`examples/mysql_usage/orm_advanced_operations.go`** - 高级操作完整示例  
-- **`examples/mysql_usage/main_fixed.go`** - MySQL 集成完整示例
-- **`examples/mysql_usage/test_examples.sh`** - 编译测试脚本
+- **`examples/mysql_usage/crud_example/orm_crud_operations.go`** - 基础 CRUD 操作完整示例
+- **`examples/mysql_usage/advanced_example/orm_advanced_operations.go`** - 高级操作完整示例
+- **`examples/mysql_usage/fixed_example/main_fixed.go`** - MySQL 集成完整示例
 
 ### 运行示例
 
 ```bash
 # 进入示例目录
-cd examples/mysql_usage
+cd examples/mysql_usage/crud_example
 
 # 运行基础 CRUD 示例
 go run orm_crud_operations.go
@@ -1506,7 +1416,7 @@ err := ormInstance.Transaction(ctx, func(txORM *orm.ORM) error {
 
 ### ⚠️ 注意事项
 
-- 所有示例都已通过编译验证
+- 示例脚本 test_examples.sh 的内部路径尚未随子目录迁移更新,运行前请先修正
 - 示例中的数据库连接配置需要根据实际环境调整（默认：root/q1w2e3r4@localhost:3306/myblog）
 - 建议在测试环境中运行示例
 - 如遇到问题，请检查 MySQL 服务状态和连接配置

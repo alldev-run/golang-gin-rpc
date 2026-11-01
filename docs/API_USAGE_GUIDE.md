@@ -72,7 +72,18 @@ func main() {
 
 ### Creating All Supported Clients
 
+> **驱动注册制**:`factory.Create` 只能创建**已链接**的驱动——必须 import 对应驱动子包
+> (其 `init()` 自注册)。clickhouse/mongodb 在 `plugins/db/{clickhouse,mongodb}`;
+> **Elasticsearch 驱动在 `plugins/search/elasticsearch`**(不在 plugins/db 下)。
+> 未导入时 `Create` 返回 `database driver %q not linked`。
+
 ```go
+import (
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/db/clickhouse"        // 注册 ClickHouse 驱动
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/db/mongodb"           // 注册 MongoDB 驱动
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/search/elasticsearch" // 注册 Elasticsearch 驱动
+)
+
 // MongoDB
 mongoClient, _ := factory.Create(db.Config{
     Type: db.TypeMongoDB,
@@ -469,7 +480,7 @@ logger.LogManual("complex_operation", duration, err,
 import "github.com/alldev-run/golang-gin-rpc/plugins/db/migration"
 
 // Create migrator
-m := migration.New(db)
+m := migration.New(mysqlClient.DB()) // 参数为 *sql.DB
 
 // Migration 1: Create users table
 m.Add(1, "create_users",
@@ -601,14 +612,14 @@ if err != nil {
 ### Connection Pool Metrics
 
 ```go
-// Record pool size
+// Record pool size(p 为 pool.New 返回的 *Pool,Size() 是方法而非包级函数)
 metrics.DBConnectionPoolSize.With(prometheus.Labels{
     "database": "mysql-main",
     "type":     "master",
-}).Set(float64(pool.Size()))
+}).Set(float64(p.Size()))
 
 // Record active connections
-stats := db.Stats()
+stats := sqlClient.Stats() // *mysql.Client 方法,返回 sql.DBStats
 metrics.DBConnectionActive.With(prometheus.Labels{
     "database": "mysql-main",
     "type":     "master",
@@ -670,7 +681,7 @@ func processUser(ctx context.Context, id int) error {
 dbPassword := os.Getenv("DB_PASSWORD")
 
 // Load config from file
-cfg, _ := db.LoadConfigFromYAML("configs/database.yaml")
+cfg, _ := db.LoadConfigFromYAML("configs/database.example.yaml") // 按需自建
 
 // Override with environment
 if password := os.Getenv("DB_PASSWORD"); password != "" {
@@ -700,7 +711,7 @@ type Server struct {
 
 func NewServer() (*Server, error) {
     // Load config
-    cfg, err := db.LoadConfigFromYAML("configs/database.yaml")
+    cfg, err := db.LoadConfigFromYAML("configs/database.example.yaml") // 按需自建
     if err != nil {
         return nil, err
     }

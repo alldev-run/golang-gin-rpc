@@ -2,9 +2,9 @@
 
 ## 🚀 服务发现概述
 
-本项目提供统一的服务发现能力，当前支持 `consul`、`etcd`、`zookeeper`、`static`，具有以下特性：
+本项目提供统一的服务发现能力，当前支持 `consul`、`etcd`、`zookeeper`、`nacos`（`static` 为预留类型,经工厂不可用,静态端点能力由 gateway 插件自身实现），具有以下特性：
 
-- **多注册中心支持**: 支持 Consul、etcd、zookeeper、static
+- **多注册中心支持**: 支持 Consul、etcd、zookeeper、Nacos
 - **负载均衡**: 内置多种负载均衡策略（轮询、随机、最少连接等）
 - **健康检查**: 自动健康检查和服务状态监控
 - **服务监听**: 实时监听服务变化
@@ -27,7 +27,8 @@ plugins/discovery/
 │   ├── etcd.go
 │   ├── balancer.go
 │   └── watcher.go
-└── zookeeper/                 # Zookeeper 实现
+├── zookeeper/                 # Zookeeper 实现
+└── nacos/                     # Nacos 实现（nacos.go）
 
 示例程序位于仓库根目录：`examples/discovery/main.go`
 ```
@@ -39,7 +40,7 @@ plugins/discovery/
 ```yaml
 discovery:
   enabled: true
-  registry_type: "consul"  # consul, etcd, zookeeper, static
+  registry_type: "consul"  # consul, etcd, zookeeper, nacos
   registry_address: "localhost:8500"
   timeout: 30s
   health_check_interval: 30s
@@ -270,29 +271,15 @@ func watchServiceChanges(selector *discovery.ServiceSelector) {
 
 ## 🔍 健康检查
 
-### 健康检查示例
+### 健康检查
+
+服务发现管理器**内置**健康检查循环(`manager.Start()` 后自动运行,
+按配置的 `health_check_interval` 周期检测实例可用性并摘除失联节点),
+无需(也无法)单独构造健康检查器:
 
 ```go
-func checkServiceHealth(manager *discovery.ServiceDiscoveryManager) {
-    // 创建健康检查器
-    healthChecker := discovery.NewHealthChecker(manager)
-    
-    ctx := context.Background()
-    
-    // 简单健康检查
-    err := healthChecker.CheckHealth(ctx)
-    if err != nil {
-        log.Printf("Service unhealthy: %v", err)
-    } else {
-        log.Println("Service is healthy")
-    }
-    
-    // 详细健康信息
-    health, err := healthChecker.GetDetailedHealth(ctx)
-    if err == nil {
-        log.Printf("Health info: %+v", health)
-    }
-}
+manager, _ := discovery.NewServiceDiscoveryManager(cfg)
+_ = manager.Start() // 内部启动 healthCheckLoop,自动维护实例健康状态
 ```
 
 ## 📊 服务注册中心

@@ -60,7 +60,7 @@ router.Use(middleware.Audit(cfg))
 `plugins/gateway.Gateway` now wires `middleware.Audit(...)` in `SetupRoutes(...)`.
 
 ```go
-gw := bootstrap.GetGateway()
+gw := boot.GetGateway() // *Bootstrap 方法
 
 auditCfg := middleware.DefaultAuditConfig()
 auditCfg.Sink = audit.NewMultiSink(audit.LogSink{}, KafkaAuditSink{})

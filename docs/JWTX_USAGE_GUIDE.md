@@ -68,6 +68,10 @@ func main() {
 
 刷新令牌有效期默认为访问令牌的 7 倍。
 
+> 注意:该"7 倍"规则仅在经 Bootstrap(`InitializeAuth`)初始化时成立;
+> 直接使用 jwtx 包(`jwtx.Init`)时,`RefreshTokenTTL` 默认为固定 7 天,
+> 可在 Config 中显式覆盖。
+
 ## 存储后端
 
 ### Store 接口
@@ -106,9 +110,11 @@ func main() {
         panic(err)
     }
 
-    // 获取 Redis 客户端
-    redisCache := bs.GetCache()
-    redisClient := redisCache.(*redis.RedisCache).Client()
+    // Redis 客户端:直接构造(cache.Cache 接口的具体类型未导出,无法断言)
+    redisClient, err := redis.New(redisConfig) // plugins/cache/redis
+    if err != nil {
+        panic(err)
+    }
 
     // 创建 Redis Store 适配器
     redisStore := &RedisStoreAdapter{client: redisClient}
@@ -406,8 +412,10 @@ router.GET("/data", func(c *gin.Context) {
 ```go
 import "github.com/alldev-run/golang-gin-rpc/plugins/rbac"
 
-// 创建 RBAC 策略
-policy := rbac.NewPolicy()
+// 创建 RBAC 策略(参数为角色→权限绑定,可为 nil 表示先建空策略)
+policy := rbac.NewPolicy(map[string][]string{
+    "admin": {"user:read", "user:write"},
+})
 
 // 受权限保护的路由
 adminGroup := router.Group("/admin")
@@ -602,21 +610,18 @@ if err != nil {
     return err
 }
 
-// 解码令牌以修改 payload
-claims, err := jwtx.DefaultManager().decodeClaims(pair.AccessToken)
-if err != nil {
-    return err
+// 自定义 payload:通过导出的 SignAccessClaims 直接构造并签发
+// (decodeClaims/encodeClaims 为未导出方法,包外不可用)
+claims := jwtx.Claims{
+    UserID:   userID,
+    Username: username,
+    DeviceID: deviceID,
+    Payload: map[string]string{
+        "role":        "admin",
+        "permissions": "read,write,delete",
+    },
 }
-
-// 添加自定义信息
-if claims.Payload == nil {
-    claims.Payload = make(map[string]string)
-}
-claims.Payload["role"] = "admin"
-claims.Payload["permissions"] = "read,write,delete"
-
-// 重新编码令牌
-newToken, err := jwtx.DefaultManager().encodeClaims(*claims)
+newToken, err := jwtx.DefaultManager().SignAccessClaims(claims)
 if err != nil {
     return err
 }

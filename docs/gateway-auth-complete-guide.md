@@ -86,9 +86,9 @@ curl http://localhost:8080/api/users
 也可使用仓库示例脚本修改配置文件：
 
 ```bash
-go run examples/config-manager.go add <key> <description>
-go run examples/config-manager.go list
-go run examples/config-manager.go enable
+go run ./examples/config_manager add <key> <description>
+go run ./examples/config_manager list
+go run ./examples/config_manager enable
 ```
 
 ## 已知限制

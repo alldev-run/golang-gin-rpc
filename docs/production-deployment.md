@@ -24,7 +24,7 @@
 ├─────────────────────────────────────────────────────────────┤
 │  plugins/db/pool (连接池)                                        │
 ├─────────────────────────────────────────────────────────────┤
-│  pkg/mysql, pkg/postgres, pkg/redis, ... (数据库驱动)         │
+│  plugins/db/mysql, plugins/db/postgres, plugins/cache/redis … │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -32,7 +32,7 @@
 
 ### 1. 系统要求
 
-- Go 1.21+
+- Go 1.25+
 - Docker 20.10+ (可选，用于容器化部署)
 - 数据库服务器：MySQL 8.0+ / PostgreSQL 14+ / Redis 7+ / ClickHouse / Elasticsearch 8+
 
@@ -161,15 +161,17 @@ CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/app .
 
 ### 2. 运行数据库迁移
 
-```bash
-# 编译迁移工具
-go build -o bin/migrate ./cmd/migrate
+迁移能力由 `plugins/db/migration` 提供,命令入口在 scaffold(无独立 cmd/migrate):
 
-# 执行迁移
-./bin/migrate up
+```bash
+# 生成迁移文件
+go run ./cmd/scaffold gen-migration --dir migrations --name add_users_table
+
+# 执行迁移(DSN 按环境传入)
+go run ./cmd/scaffold run-migration --dir migrations --driver mysql     --dsn "user:pass@tcp(localhost:3306)/myapp" --action up
 
 # 查看状态
-./bin/migrate status
+go run ./cmd/scaffold run-migration --dir migrations --driver mysql     --dsn "user:pass@tcp(localhost:3306)/myapp" --action status
 ```
 
 ### 3. Docker 部署
@@ -207,6 +209,8 @@ docker run -d \
 ### 4. Kubernetes 部署
 
 ```yaml
+# 参考现成清单:deploy/k8s/(gateway/user/websocket-game);
+# 以下为通用 Deployment 骨架
 # k8s/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -363,27 +367,27 @@ redisClient.Set(ctx, key, data, 5*time.Minute)
 4. **网络隔离**: 数据库服务器应在私有子网
 5. **审计日志**: 启用数据库审计功能
 
+## 压测与验证
+
+```bash
+# WebSocket 机器人压测(连接数/速率/时长可调,输出 RTT 分位与吞吐)
+go run ./cmd/loadbot --url ws://localhost:8091/ws --bots 100 --rate 10 --duration 30s
+```
+
 ## 附录
 
 ### 常用命令
 
 ```bash
-# 查看连接池状态
-curl http://localhost:8080/debug/pool
-
-# 查看断路器状态
-curl http://localhost:8080/debug/breaker
-
-# 手动开启断路器
-curl -X POST http://localhost:8080/debug/breaker/open
-
-# 手动关闭断路器
-curl -X POST http://localhost:8080/debug/breaker/close
+# 注意:框架默认不提供 /debug/pool、/debug/breaker 路由,以下为
+# Prometheus 指标端点(启用 metrics 插件后可用):
+curl http://localhost:9090/metrics
+# 连接池/断路器状态可从 db_connection_pool_size、circuit_breaker_state 等指标读取
 ```
 
 ### 配置文件模板
 
-参考 `configs/database.example.yaml` 和 `configs/database.production.yaml`。
+参考 `configs/database.example.yaml`(生产配置需按该模板自行创建)。
 
 ---
 
