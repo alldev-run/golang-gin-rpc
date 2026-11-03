@@ -101,11 +101,13 @@ func (m *Manager) GenerateTokenPair(userID, username, deviceID string) (*TokenPa
 
 	if cfg.Store != nil {
 
-		cfg.Store.Set(
+		if err := cfg.Store.Set(
 			"refresh:"+refresh.TokenID,
 			userID,
 			cfg.RefreshTokenTTL,
-		)
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	return &TokenPair{

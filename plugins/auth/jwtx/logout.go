@@ -25,21 +25,20 @@ func (m *Manager) Logout(token string) error {
 }
 
 // RevokeUser revokes all tokens for a user by incrementing their version.
-func (m *Manager) RevokeUser(userID string) {
+func (m *Manager) RevokeUser(userID string) error {
 	cfg := m.Config()
 	if cfg.Store == nil {
-		return
+		return nil
 	}
 
 	key := "user:version:" + userID
-
-	cfg.Store.Set(key, "999", 0)
+	return cfg.Store.Set(key, "999", 0)
 }
 
 func Logout(token string) error {
 	return DefaultManager().Logout(token)
 }
 
-func RevokeUser(userID string) {
-	DefaultManager().RevokeUser(userID)
+func RevokeUser(userID string) error {
+	return DefaultManager().RevokeUser(userID)
 }

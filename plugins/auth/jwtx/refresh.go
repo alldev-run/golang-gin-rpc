@@ -32,7 +32,9 @@ func (m *Manager) Refresh(refreshToken string) (*TokenPair, error) {
 			return nil, errors.New("refresh token invalid")
 		}
 
-		cfg.Store.Del(key)
+		if err := cfg.Store.Del(key); err != nil {
+			return nil, err
+		}
 	}
 
 	return m.GenerateTokenPair(
