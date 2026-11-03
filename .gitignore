@@ -9,3 +9,7 @@
 /gateway
 # ZCode 会话本地数据
 .zcode/
+/bin/
+/scaffold
+coverage.out
+coverage.html
