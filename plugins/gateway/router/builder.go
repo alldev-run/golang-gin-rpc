@@ -20,10 +20,10 @@ type RouterBuilder struct {
 func NewRouterBuilder(cfg *gateway.Config) *RouterBuilder {
 	// 设置 Gin 模式（默认为 Release 模式）
 	gin.SetMode(gin.ReleaseMode)
-	
+
 	// 创建 Gin 引擎
 	engine := gin.New()
-	
+
 	// 添加全局中间件
 	engine.Use(
 		middleware.Recovery(),
@@ -32,12 +32,12 @@ func NewRouterBuilder(cfg *gateway.Config) *RouterBuilder {
 		middleware.RateLimitFromGatewayConfig(cfg),
 		middleware.LoggingFromConfig(cfg),
 	)
-	
+
 	// 如果启用了追踪，添加追踪中间件
 	if cfg.Tracing != nil && cfg.Tracing.Enabled {
 		engine.Use(middleware.TracingFromGatewayConfig(cfg))
 	}
-	
+
 	return &RouterBuilder{
 		cfg:      cfg,
 		registry: NewRouteRegistry(),
@@ -53,7 +53,7 @@ func (rb *RouterBuilder) RegisterDebugRoutes() {
 		debug.GET("/request-id", rb.debugRequestID)
 		debug.GET("/tracing", rb.debugTracing)
 	}
-	
+
 	// 根路由
 	rb.engine.GET("/", rb.root)
 }
@@ -70,7 +70,7 @@ func (rb *RouterBuilder) Build() http.Handler {
 	// 注册业务路由到 Gin 引擎
 	businessHandler := rb.registry.Build()
 	rb.engine.Any("/api/*path", gin.WrapH(businessHandler))
-	
+
 	return rb.engine
 }
 
@@ -112,15 +112,15 @@ func (rb *RouterBuilder) debugRequestID(c *gin.Context) {
 func (rb *RouterBuilder) debugTracing(c *gin.Context) {
 	traceInfo := gin.H{
 		"tracing_enabled": rb.cfg.Tracing != nil && rb.cfg.Tracing.Enabled,
-		"trace_id":       c.GetHeader("X-Trace-ID"),
-		"span_id":        c.GetHeader("X-Span-ID"),
+		"trace_id":        c.GetHeader("X-Trace-ID"),
+		"span_id":         c.GetHeader("X-Span-ID"),
 	}
-	
+
 	if rb.cfg.Tracing != nil {
 		traceInfo["tracing_type"] = rb.cfg.Tracing.Type
 		traceInfo["tracing_service"] = rb.cfg.Tracing.ServiceName
 		traceInfo["tracing_sample_rate"] = rb.cfg.Tracing.SampleRate
 	}
-	
+
 	c.JSON(http.StatusOK, traceInfo)
 }

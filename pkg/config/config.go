@@ -499,7 +499,7 @@ func (l *Loader) notifyWatchers() {
 // applyEnvOverrides applies environment variable overrides to config
 func (l *Loader) applyEnvOverrides(config interface{}) {
 	v := reflect.ValueOf(config)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return
 	}
 

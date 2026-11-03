@@ -61,9 +61,7 @@ func (rr *RouteRegistry) Group(name, prefix string) *RouteGroup {
 
 // Use 添加全局中间件
 func (rr *RouteRegistry) Use(middlewares ...gin.HandlerFunc) *RouteRegistry {
-	for _, middleware := range middlewares {
-		rr.middlewares["global"] = append(rr.middlewares["global"], middleware)
-	}
+	rr.middlewares["global"] = append(rr.middlewares["global"], middlewares...)
 	return rr
 }
 

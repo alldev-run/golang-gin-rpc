@@ -8,17 +8,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
-	"go.uber.org/zap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/plugins/ratelimit/ratelimiter"
+	"go.uber.org/zap"
 )
 
 // ManagerConfig holds RPC manager configuration
 type ManagerConfig struct {
-	Servers map[string]Config `yaml:"servers" json:"servers"`
-	Timeout time.Duration    `yaml:"timeout" json:"timeout"`
-	GracefulShutdownTimeout time.Duration `yaml:"graceful_shutdown_timeout" json:"graceful_shutdown_timeout"`
+	Servers                 map[string]Config `yaml:"servers" json:"servers"`
+	Timeout                 time.Duration     `yaml:"timeout" json:"timeout"`
+	GracefulShutdownTimeout time.Duration     `yaml:"graceful_shutdown_timeout" json:"graceful_shutdown_timeout"`
 }
 
 type discoveryRegistrar interface {
@@ -55,42 +55,42 @@ func DefaultManagerConfig() ManagerConfig {
 				Timeout: 30,
 			},
 		},
-		Timeout:                30 * time.Second,
+		Timeout:                 30 * time.Second,
 		GracefulShutdownTimeout: 10 * time.Second,
 	}
 }
 
 // Manager manages multiple RPC servers
 type Manager struct {
-	config             ManagerConfig
-	servers            map[string]Server
-	services           map[string]Service
-	registry           *ServiceRegistry
-	middleware         *MiddlewareChain
-	degradationManager *DegradationManager
-	rateLimiterManager *ratelimiter.Manager
-	discoveryManager   discoveryRegistrar
-	discoveryConfig    DiscoveryRegistrationConfig
+	config              ManagerConfig
+	servers             map[string]Server
+	services            map[string]Service
+	registry            *ServiceRegistry
+	middleware          *MiddlewareChain
+	degradationManager  *DegradationManager
+	rateLimiterManager  *ratelimiter.Manager
+	discoveryManager    discoveryRegistrar
+	discoveryConfig     DiscoveryRegistrationConfig
 	registeredInstances map[string]*discovery.ServiceInstance
-	mu                 sync.RWMutex
-	started            bool
-	startTime          time.Time
+	mu                  sync.RWMutex
+	started             bool
+	startTime           time.Time
 }
 
 // NewManager creates a new RPC manager
 func NewManager(config ManagerConfig) *Manager {
 	manager := &Manager{
-		config:             config,
-		servers:            make(map[string]Server),
-		services:           make(map[string]Service),
-		registry:           NewServiceRegistry(),
-		middleware:         NewMiddlewareChain(),
-		rateLimiterManager: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+		config:              config,
+		servers:             make(map[string]Server),
+		services:            make(map[string]Service),
+		registry:            NewServiceRegistry(),
+		middleware:          NewMiddlewareChain(),
+		rateLimiterManager:  ratelimiter.NewManager(ratelimiter.DefaultConfig()),
 		registeredInstances: make(map[string]*discovery.ServiceInstance),
-		startTime:          time.Now(),
+		startTime:           time.Now(),
 	}
 	_ = manager.rateLimiterManager.AddConfig("default", ratelimiter.DefaultConfig())
-	
+
 	// Initialize servers from config
 	for name, serverConfig := range config.Servers {
 		server, err := NewServer(serverConfig)
@@ -108,7 +108,7 @@ func NewManager(config ManagerConfig) *Manager {
 		}
 		manager.servers[name] = server
 	}
-	
+
 	return manager
 }
 
@@ -116,15 +116,15 @@ func NewManager(config ManagerConfig) *Manager {
 func (m *Manager) AddServer(name string, config Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.started {
 		return fmt.Errorf("cannot add server after manager has started")
 	}
-	
+
 	if _, exists := m.servers[name]; exists {
 		return fmt.Errorf("server %s already exists", name)
 	}
-	
+
 	server, err := NewServer(config)
 	if err != nil {
 		return fmt.Errorf("failed to create server %s: %w", name, err)
@@ -136,12 +136,12 @@ func (m *Manager) AddServer(name string, config Config) error {
 		setter.SetRateLimiterManager(m.rateLimiterManager)
 	}
 	m.servers[name] = server
-	
-	logger.Info("Added RPC server", 
+
+	logger.Info("Added RPC server",
 		zap.String("name", name),
 		zap.String("type", string(config.Type)),
 		zap.String("address", fmt.Sprintf("%s:%d", config.Host, config.Port)))
-	
+
 	return nil
 }
 
@@ -149,19 +149,19 @@ func (m *Manager) AddServer(name string, config Config) error {
 func (m *Manager) RemoveServer(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.started {
 		return fmt.Errorf("cannot remove server after manager has started")
 	}
-	
+
 	if _, exists := m.servers[name]; !exists {
 		return fmt.Errorf("server %s does not exist", name)
 	}
-	
+
 	delete(m.servers, name)
-	
+
 	logger.Info("Removed RPC server", zap.String("name", name))
-	
+
 	return nil
 }
 
@@ -169,21 +169,21 @@ func (m *Manager) RemoveServer(name string) error {
 func (m *Manager) RegisterService(service Service) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.started {
 		return fmt.Errorf("cannot register service after manager has started")
 	}
-	
+
 	serviceName := service.Name()
 	if _, exists := m.services[serviceName]; exists {
 		return fmt.Errorf("service %s already registered", serviceName)
 	}
-	
+
 	m.services[serviceName] = service
 	m.registry.Register(serviceName, service)
-	
+
 	logger.Info("Registered RPC service", zap.String("name", serviceName))
-	
+
 	return nil
 }
 
@@ -191,20 +191,20 @@ func (m *Manager) RegisterService(service Service) error {
 func (m *Manager) UnregisterService(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.started {
 		return fmt.Errorf("cannot unregister service after manager has started")
 	}
-	
+
 	if _, exists := m.services[name]; !exists {
 		return fmt.Errorf("service %s does not exist", name)
 	}
-	
+
 	delete(m.services, name)
 	m.registry.Unregister(name)
-	
+
 	logger.Info("Unregistered RPC service", zap.String("name", name))
-	
+
 	return nil
 }
 
@@ -212,12 +212,12 @@ func (m *Manager) UnregisterService(name string) error {
 func (m *Manager) AddMiddleware(middleware *Middleware) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.started {
 		logger.Warn("Cannot add middleware after manager has started")
 		return
 	}
-	
+
 	m.middleware.Add(middleware)
 	logger.Info("Added RPC middleware", zap.String("name", middleware.Name()))
 }
@@ -269,11 +269,11 @@ func (m *Manager) SetDiscoveryIntegration(dm discoveryRegistrar, config Discover
 func (m *Manager) Start() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.started {
 		return fmt.Errorf("manager already started")
 	}
-	
+
 	for _, service := range m.services {
 		for serverName, server := range m.servers {
 			if err := server.RegisterService(service); err != nil {
@@ -301,7 +301,7 @@ func (m *Manager) Start() error {
 				zap.String("name", serverName),
 				zap.String("type", string(rpcServer.Type())),
 				zap.String("address", rpcServer.Addr()))
-			
+
 			if err := rpcServer.Start(); err != nil {
 				logger.Errorf("Failed to start RPC server",
 					zap.String("name", serverName),
@@ -313,14 +313,14 @@ func (m *Manager) Start() error {
 			}
 		}(name, server)
 	}
-	
+
 	m.started = true
 	m.startTime = time.Now()
-	
+
 	logger.Info("RPC manager started",
 		zap.Int("servers", len(m.servers)),
 		zap.Int("services", len(m.services)))
-	
+
 	return nil
 }
 
@@ -328,20 +328,20 @@ func (m *Manager) Start() error {
 func (m *Manager) Stop() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if !m.started {
 		return fmt.Errorf("manager not started")
 	}
-	
+
 	logger.Info("Stopping RPC manager...")
-	
+
 	shutdownTimeout := m.config.GracefulShutdownTimeout
 	if shutdownTimeout <= 0 {
 		shutdownTimeout = 10 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	
+
 	var (
 		errors []error
 		errMu  sync.Mutex
@@ -352,7 +352,7 @@ func (m *Manager) Stop() error {
 		go func(serverName string, rpcServer Server) {
 			defer wg.Done()
 			logger.Info("Stopping RPC server", zap.String("name", serverName))
-			
+
 			if err := rpcServer.Stop(); err != nil {
 				errMu.Lock()
 				errors = append(errors, fmt.Errorf("server %s stop failed: %w", serverName, err))
@@ -365,13 +365,13 @@ func (m *Manager) Stop() error {
 			}
 		}(name, server)
 	}
-	
+
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		logger.Info("All RPC servers stopped gracefully")
@@ -385,13 +385,13 @@ func (m *Manager) Stop() error {
 	if err := m.deregisterDiscoveryLocked(); err != nil {
 		errors = append(errors, err)
 	}
-	
+
 	m.started = false
-	
+
 	if len(errors) > 0 {
 		return fmt.Errorf("errors during shutdown: %v", errors)
 	}
-	
+
 	return nil
 }
 
@@ -514,7 +514,7 @@ func (m *Manager) GetService(name string) (Service, bool) {
 func (m *Manager) ListServers() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	names := make([]string, 0, len(m.servers))
 	for name := range m.servers {
 		names = append(names, name)
@@ -526,7 +526,7 @@ func (m *Manager) ListServers() []string {
 func (m *Manager) ListServices() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	names := make([]string, 0, len(m.services))
 	for name := range m.services {
 		names = append(names, name)
@@ -538,7 +538,7 @@ func (m *Manager) ListServices() []string {
 func (m *Manager) GetStatus() map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	status := map[string]interface{}{
 		"started":    m.started,
 		"start_time": m.startTime,
@@ -546,17 +546,17 @@ func (m *Manager) GetStatus() map[string]interface{} {
 		"servers":    make(map[string]interface{}),
 		"services":   make(map[string]interface{}),
 	}
-	
+
 	// Server status
 	servers := status["servers"].(map[string]interface{})
 	for name, server := range m.servers {
 		servers[name] = map[string]interface{}{
-			"type":    string(server.Type()),
-			"address": server.Addr(),
+			"type":     string(server.Type()),
+			"address":  server.Addr(),
 			"services": GetServiceInfo(server),
 		}
 	}
-	
+
 	// Service status
 	services := status["services"].(map[string]interface{})
 	for name, service := range m.services {
@@ -568,7 +568,7 @@ func (m *Manager) GetStatus() map[string]interface{} {
 			}
 		}
 	}
-	
+
 	return status
 }
 
@@ -591,7 +591,7 @@ func (m *Manager) Restart() error {
 	if err := m.Stop(); err != nil {
 		return fmt.Errorf("failed to stop manager: %w", err)
 	}
-	
+
 	return m.Start()
 }
 
@@ -610,7 +610,7 @@ func (h *HealthChecker) CheckHealth(ctx context.Context) error {
 	if !h.manager.IsStarted() {
 		return fmt.Errorf("RPC manager is not started")
 	}
-	
+
 	// Check all servers
 	for _, name := range h.manager.ListServers() {
 		if rpcServer, exists := h.manager.GetServer(name); exists {
@@ -620,17 +620,17 @@ func (h *HealthChecker) CheckHealth(ctx context.Context) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 // GetDetailedHealth returns detailed health information
 func (h *HealthChecker) GetDetailedHealth(ctx context.Context) (map[string]interface{}, error) {
 	status := h.manager.GetStatus()
-	
+
 	// Add health check timestamp
 	status["health_check_time"] = time.Now()
 	status["healthy"] = h.CheckHealth(ctx) == nil
-	
+
 	return status, nil
 }

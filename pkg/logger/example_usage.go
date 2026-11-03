@@ -14,7 +14,7 @@ func ExampleUsage() {
 
 	// Example 1: Simple service logger with default configuration
 	apiLogger := GetServiceLogger("api-gateway")
-	apiLogger.Info("API Gateway started", 
+	apiLogger.Info("API Gateway started",
 		zap.String("version", "1.0.0"),
 		zap.Int("port", 8080))
 
@@ -38,16 +38,16 @@ func ExampleUsage() {
 		zap.String("component", "connection-manager"),
 		zap.Int("connection_id", 12345),
 	)
-	
+
 	wsLoggerWithFields.Info("WebSocket connection established")
 	wsLoggerWithFields.Warn("Connection idle timeout")
 
 	// Example 4: Multiple services with different configurations
 	services := []string{"api-gateway", "rpc", "websocket", "auth-service", "metrics"}
-	
+
 	for _, serviceName := range services {
 		config := DefaultServiceLoggerConfig(serviceName)
-		
+
 		// Custom configuration per service
 		switch serviceName {
 		case "api-gateway":
@@ -57,7 +57,7 @@ func ExampleUsage() {
 		case "websocket":
 			config.EnableDateFolder = false // Single directory for WebSocket logs
 		}
-		
+
 		serviceLogger := GetServiceLoggerInstance(serviceName, config)
 		serviceLogger.Info("Service started",
 			zap.String("service", serviceName),
@@ -86,7 +86,7 @@ func NewExampleService(serviceName string) *ExampleService {
 	config := DefaultServiceLoggerConfig(serviceName)
 	config.EnableDateFolder = true
 	config.SeparateByLevel = false
-	
+
 	return &ExampleService{
 		logger: GetServiceLoggerInstance(serviceName, config),
 	}
@@ -96,18 +96,18 @@ func (s *ExampleService) Start() error {
 	s.logger.Info("Service starting",
 		zap.String("service", "example-service"),
 		zap.Time("start_time", time.Now()))
-	
+
 	// Service startup logic here
-	
+
 	s.logger.Info("Service started successfully")
 	return nil
 }
 
 func (s *ExampleService) Stop() error {
 	s.logger.Info("Service stopping")
-	
+
 	// Service shutdown logic here
-	
+
 	s.logger.Info("Service stopped")
 	return nil
 }
@@ -117,12 +117,12 @@ func (s *ExampleService) ProcessRequest(requestID string) error {
 		zap.String("request_id", requestID),
 		zap.String("method", "process"),
 	)
-	
+
 	requestLogger.Info("Processing request started")
-	
+
 	// Simulate processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	requestLogger.Info("Processing request completed")
 	return nil
 }
@@ -153,13 +153,13 @@ services:
     enable_date_folder: true
     separate_by_level: true
     inherit_global_config: true
-    
+
   rpc:
     base_dir: "/var/log/rpc"
     enable_date_folder: true
     separate_by_level: false
     inherit_global_config: true
-    
+
   websocket:
     base_dir: "/var/log/websocket"
     enable_date_folder: false

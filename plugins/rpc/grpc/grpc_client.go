@@ -16,12 +16,12 @@ import (
 
 // ClientConfig holds gRPC client configuration
 type ClientConfig struct {
-	Address    string        `yaml:"address" json:"address"`
-	Timeout    time.Duration `yaml:"timeout" json:"timeout"`
-	EnableTLS  bool          `yaml:"enable_tls" json:"enable_tls"`
-	CertFile   string        `yaml:"cert_file" json:"cert_file"`
-	ServerName string        `yaml:"server_name" json:"server_name"`
-	MaxMsgSize int           `yaml:"max_msg_size" json:"max_msg_size"`
+	Address    string           `yaml:"address" json:"address"`
+	Timeout    time.Duration    `yaml:"timeout" json:"timeout"`
+	EnableTLS  bool             `yaml:"enable_tls" json:"enable_tls"`
+	CertFile   string           `yaml:"cert_file" json:"cert_file"`
+	ServerName string           `yaml:"server_name" json:"server_name"`
+	MaxMsgSize int              `yaml:"max_msg_size" json:"max_msg_size"`
 	KeepAlive  *KeepAliveConfig `yaml:"keep_alive" json:"keep_alive"`
 }
 
@@ -56,8 +56,6 @@ type Client struct {
 // NewClient creates a new gRPC client
 func NewClient(config ClientConfig) (*Client, error) {
 	opts := []grpc.DialOption{
-		grpc.WithBlock(),
-		grpc.WithTimeout(config.Timeout),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(config.MaxMsgSize),
 			grpc.MaxCallSendMsgSize(config.MaxMsgSize),
@@ -85,15 +83,32 @@ func NewClient(config ClientConfig) (*Client, error) {
 		opts = append(opts, grpc.WithKeepaliveParams(kp))
 	}
 
-	conn, err := grpc.Dial(config.Address, opts...)
+	conn, err := grpc.NewClient(config.Address, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to gRPC server at %s: %w", config.Address, err)
 	}
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	conn.Connect()
+	for {
+		state := conn.GetState()
+		switch state {
+		case connectivity.Ready:
+			return &Client{conn: conn, config: config}, nil
+		case connectivity.Shutdown:
+			_ = conn.Close()
+			return nil, fmt.Errorf("gRPC client for %s shut down during connection", config.Address)
+		}
+		if !conn.WaitForStateChange(ctx, state) {
+			_ = conn.Close()
+			return nil, fmt.Errorf("timed out connecting to gRPC server at %s: %w", config.Address, ctx.Err())
+		}
+	}
 
-	return &Client{
-		conn:   conn,
-		config: config,
-	}, nil
 }
 
 // NewClientWithConn creates a client with an existing connection
@@ -135,12 +150,12 @@ func (c *Client) WaitForReady(ctx context.Context) error {
 	if currentState == connectivity.Ready {
 		return nil
 	}
-	
+
 	changed := c.conn.WaitForStateChange(ctx, currentState)
 	if !changed {
 		return ctx.Err()
 	}
-	
+
 	finalState := c.conn.GetState()
 	if finalState == connectivity.Ready {
 		return nil
@@ -170,7 +185,7 @@ func (p *ClientPool) Get(address string) (*Client, error) {
 
 	config := p.config
 	config.Address = address
-	
+
 	client, err := NewClient(config)
 	if err != nil {
 		return nil, err
@@ -183,17 +198,17 @@ func (p *ClientPool) Get(address string) (*Client, error) {
 // Close closes all clients in the pool
 func (p *ClientPool) Close() error {
 	var errors []error
-	
+
 	for addr, client := range p.clients {
 		if err := client.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("failed to close client %s: %w", addr, err))
 		}
 	}
-	
+
 	if len(errors) > 0 {
 		return fmt.Errorf("errors closing clients: %v", errors)
 	}
-	
+
 	return nil
 }
 
@@ -234,7 +249,7 @@ func NewHealthChecker(client *Client) *HealthChecker {
 func (h *HealthChecker) CheckHealth(ctx context.Context) error {
 	// Simple health check - try to get connection state
 	state := h.client.GetState()
-	
+
 	switch state {
 	case connectivity.Ready, connectivity.Idle:
 		return nil

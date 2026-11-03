@@ -207,8 +207,11 @@ func (a *App) Start(lifecycle stdctx.Context) error {
 		pctx := a.context.clone(lifecycle, p.Name())
 		a.log.Info("kernel: starting plugin", zap.String("plugin", p.Name()))
 		if err := p.Start(pctx); err != nil {
-			a.rollbackLocked(pctx)
-			return fmt.Errorf("kernel: start plugin %q: %w", p.Name(), err)
+			startErr := fmt.Errorf("kernel: start plugin %q: %w", p.Name(), err)
+			if rollbackErr := a.rollbackLocked(pctx); rollbackErr != nil {
+				return errors.Join(startErr, fmt.Errorf("kernel: rollback plugins: %w", rollbackErr))
+			}
+			return startErr
 		}
 		a.started = append(a.started, p.Name())
 	}

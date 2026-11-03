@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
@@ -25,9 +24,9 @@ type MetricsCollector struct {
 	httpResponseSize    *prometheus.HistogramVec
 
 	// RPC metrics
-	rpcRequestsTotal   *prometheus.CounterVec
-	rpcRequestDuration *prometheus.HistogramVec
-	rpcErrorsTotal     *prometheus.CounterVec
+	rpcRequestsTotal           *prometheus.CounterVec
+	rpcRequestDuration         *prometheus.HistogramVec
+	rpcErrorsTotal             *prometheus.CounterVec
 	rpcRequestsDetailedTotal   *prometheus.CounterVec
 	rpcRequestDetailedDuration *prometheus.HistogramVec
 	rpcGovernanceEventsTotal   *prometheus.CounterVec
@@ -56,27 +55,26 @@ type MetricsCollector struct {
 
 	// Business metrics
 	businessRevenue     *prometheus.CounterVec
-	businessOrdersTotal  *prometheus.CounterVec
-	businessUsersActive  *prometheus.GaugeVec
+	businessOrdersTotal *prometheus.CounterVec
+	businessUsersActive *prometheus.GaugeVec
 
 	// Error metrics
-	errorTotal          *prometheus.CounterVec
-	errorRate           *prometheus.GaugeVec
-	panicTotal          *prometheus.CounterVec
+	errorTotal *prometheus.CounterVec
+	errorRate  *prometheus.GaugeVec
+	panicTotal *prometheus.CounterVec
 
 	// Security metrics
-	authAttemptsTotal   *prometheus.CounterVec
-	authFailuresTotal   *prometheus.CounterVec
-	rateLimitHitsTotal  *prometheus.CounterVec
+	authAttemptsTotal  *prometheus.CounterVec
+	authFailuresTotal  *prometheus.CounterVec
+	rateLimitHitsTotal *prometheus.CounterVec
 
 	// Audit metrics
-	auditWritesTotal    *prometheus.CounterVec
-	auditWriteDuration  *prometheus.HistogramVec
-	auditDroppedTotal   *prometheus.CounterVec
+	auditWritesTotal   *prometheus.CounterVec
+	auditWriteDuration *prometheus.HistogramVec
+	auditDroppedTotal  *prometheus.CounterVec
 
 	// Custom metrics registry
 	customMetrics map[string]prometheus.Metric
-	customMetricsMu sync.RWMutex
 }
 
 // NewMetricsCollector creates a new metrics collector
@@ -299,15 +297,6 @@ func NewMetricsCollector() *MetricsCollector {
 	return collector
 }
 
-func registerCollector(collector prometheus.Collector) {
-	if err := prometheus.Register(collector); err != nil {
-		if _, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			return
-		}
-		panic(err)
-	}
-}
-
 func registerCounterVec(collector *prometheus.CounterVec) *prometheus.CounterVec {
 	if err := prometheus.Register(collector); err != nil {
 		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
@@ -470,7 +459,9 @@ func (m *MetricsCollector) StartMetricsServerWithContext(ctx context.Context, ad
 	go func() {
 		<-ctx.Done()
 		logger.Info("Shutting down metrics server")
-		server.Shutdown(ctx)
+		if err := server.Shutdown(ctx); err != nil {
+			logger.Errorf("Failed to shut down metrics server", logger.Error(fmt.Errorf("shutdown: %w", err)))
+		}
 	}()
 
 	return server.ListenAndServe()

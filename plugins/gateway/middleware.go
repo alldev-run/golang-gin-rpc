@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/pkg/cors"
-	"github.com/alldev-run/golang-gin-rpc/plugins/gateway/httplog"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	"github.com/alldev-run/golang-gin-rpc/plugins/ratelimit"
 	"github.com/alldev-run/golang-gin-rpc/pkg/requestid"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway/httplog"
+	"github.com/alldev-run/golang-gin-rpc/plugins/ratelimit"
+	"github.com/gin-gonic/gin"
 )
 
 // GatewayAuth provides gateway authentication middleware
@@ -64,7 +64,7 @@ func (a *GatewayAuth) Execute() gin.HandlerFunc {
 				logger.String("method", c.Request.Method),
 				logger.String("client_ip", c.ClientIP()),
 				logger.Error(err))
-			
+
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "API key required",
 				"code":  "AUTH_REQUIRED",
@@ -80,7 +80,7 @@ func (a *GatewayAuth) Execute() gin.HandlerFunc {
 				logger.String("method", c.Request.Method),
 				logger.String("client_ip", c.ClientIP()),
 				logger.String("api_key", apiKey[:min(len(apiKey), 8)]+"..."))
-			
+
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid API key",
 				"code":  "AUTH_INVALID",
@@ -108,7 +108,7 @@ func (a *GatewayAuth) isRPCRoute(c *gin.Context) bool {
 	// 从上下文获取路由信息
 	routePath := c.Request.URL.Path
 	routeMethod := c.Request.Method
-	
+
 	// 检查是否有路由协议信息
 	if protocol, exists := c.Get("protocol"); exists {
 		protocolStr, ok := protocol.(string)
@@ -116,14 +116,14 @@ func (a *GatewayAuth) isRPCRoute(c *gin.Context) bool {
 			return protocolStr == "grpc" || protocolStr == "jsonrpc"
 		}
 	}
-	
+
 	// 通过路径模式判断 RPC 路由
 	// gRPC 路由通常以 /grpc/ 或包含 rpc 关键词
 	// JSON-RPC 路由通常以 /rpc/ 或包含 rpc 关键词
 	if a.isGRPCRoute(routePath, routeMethod) || a.isJSONRPCRoute(routePath, routeMethod) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -133,22 +133,22 @@ func (a *GatewayAuth) isGRPCRoute(path, method string) bool {
 	grpcPatterns := []string{
 		"/grpc/",
 		"/api/grpc/",
-		"/v1/",  // 通常 gRPC API 使用 /v1/ 前缀
-		"/v2/",  // 通常 gRPC API 使用 /v2/ 前缀
+		"/v1/", // 通常 gRPC API 使用 /v1/ 前缀
+		"/v2/", // 通常 gRPC API 使用 /v2/ 前缀
 	}
-	
+
 	for _, pattern := range grpcPatterns {
 		if strings.HasPrefix(path, pattern) {
 			return true
 		}
 	}
-	
+
 	// 检查路径中是否包含 gRPC 相关关键词，但要避免过度匹配
 	// 只检查明确的关键词
 	if strings.Contains(path, "grpc") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -161,7 +161,7 @@ func (a *GatewayAuth) isJSONRPCRoute(path, method string) bool {
 		"/jsonrpc/",
 		"/api/jsonrpc/",
 	}
-	
+
 	hasPattern := false
 	for _, pattern := range jsonrpcPatterns {
 		if strings.HasPrefix(path, pattern) {
@@ -169,17 +169,17 @@ func (a *GatewayAuth) isJSONRPCRoute(path, method string) bool {
 			break
 		}
 	}
-	
+
 	// 如果路径不匹配 JSON-RPC 模式，返回 false
 	if !hasPattern {
 		return false
 	}
-	
+
 	// JSON-RPC 通常使用 POST 方法
 	if method != "POST" {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -208,13 +208,13 @@ func (a *GatewayAuth) matchPath(path, pattern string) bool {
 	if pattern == path {
 		return true
 	}
-	
+
 	// Support wildcard patterns
 	if strings.HasSuffix(pattern, "/*") {
 		prefix := strings.TrimSuffix(pattern, "/*")
 		return strings.HasPrefix(path, prefix)
 	}
-	
+
 	return false
 }
 
@@ -296,57 +296,13 @@ func (a *GatewayAuth) IsRPCRoutePublic(path, method, protocol string) bool {
 	if protocol == "grpc" || protocol == "jsonrpc" {
 		return true
 	}
-	
+
 	// 检查路径模式
 	if a.isGRPCRoute(path, method) || a.isJSONRPCRoute(path, method) {
 		return true
 	}
-	
+
 	return false
-}
-
-// mockContext 模拟 gin.Context for testing
-type mockContext struct {
-	path     string
-	method   string
-	protocol string
-}
-
-func (m *mockContext) Request() interface{} {
-	return &mockRequest{
-		path:   m.path,
-		method: m.method,
-	}
-}
-
-func (m *mockContext) Get(key string) (interface{}, bool) {
-	if key == "protocol" {
-		return m.protocol, true
-	}
-	return nil, false
-}
-
-// mockRequest 模拟 HTTP 请求
-type mockRequest struct {
-	path   string
-	method string
-}
-
-func (m *mockRequest) URL() interface{} {
-	return &mockURL{path: m.path}
-}
-
-func (m *mockRequest) Method() string {
-	return m.method
-}
-
-// mockURL 模拟 URL
-type mockURL struct {
-	path string
-}
-
-func (m *mockURL) Path() string {
-	return m.path
 }
 
 // GetAPIUserFromContext gets the API user from gin context
@@ -361,12 +317,12 @@ func GetAPIUserFromContext(c *gin.Context) (string, bool) {
 // corsMiddleware provides CORS middleware
 func corsMiddleware(config CORSConfig) gin.HandlerFunc {
 	cc := cors.Config{
-		AllowedOrigins:   config.AllowedOrigins,
-		AllowedMethods:   config.AllowedMethods,
-		AllowedHeaders:   config.AllowedHeaders,
-		ExposedHeaders:   config.ExposedHeaders,
-		AllowCredentials: config.AllowCredentials,
-		MaxAge:           config.MaxAge,
+		AllowedOrigins:     config.AllowedOrigins,
+		AllowedMethods:     config.AllowedMethods,
+		AllowedHeaders:     config.AllowedHeaders,
+		ExposedHeaders:     config.ExposedHeaders,
+		AllowCredentials:   config.AllowCredentials,
+		MaxAge:             config.MaxAge,
 		OptionsPassthrough: false,
 	}
 
@@ -375,7 +331,7 @@ func corsMiddleware(config CORSConfig) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -383,10 +339,10 @@ func corsMiddleware(config CORSConfig) gin.HandlerFunc {
 // rateLimitMiddleware provides rate limiting middleware
 func rateLimitMiddleware(config RateLimitConfig) gin.HandlerFunc {
 	limiter := ratelimit.NewMemoryFixedWindow(config.Requests, parseDuration(config.Window))
-	
+
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		
+
 		if limiter.Allow(clientIP) {
 			c.Next()
 		} else {
@@ -408,7 +364,7 @@ func requestIDMiddleware() gin.HandlerFunc {
 		if requestID == "" {
 			requestID = requestid.MustNew()
 		}
-		
+
 		c.Set("request_id", requestID)
 		c.Header("X-Request-ID", requestID)
 		c.Next()
@@ -451,8 +407,8 @@ func IsTimeout(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), "timeout") || 
-		   strings.Contains(err.Error(), "deadline exceeded")
+	return strings.Contains(err.Error(), "timeout") ||
+		strings.Contains(err.Error(), "deadline exceeded")
 }
 
 // IsTooManyRetries checks if error is due to too many retries

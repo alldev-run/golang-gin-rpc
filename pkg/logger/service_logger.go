@@ -164,10 +164,10 @@ func createServiceFileCores(serviceName string, serviceConfig ServiceLoggerConfi
 	if serviceConfig.SeparateByLevel {
 		// Create separate files for different levels
 		levelConfigs := []struct {
-			level      string
-			zapLevel   zapcore.Level
-			suffix     string
-			shouldLog  bool
+			level     string
+			zapLevel  zapcore.Level
+			suffix    string
+			shouldLog bool
 		}{
 			{"debug", zapcore.DebugLevel, "debug", level <= zapcore.DebugLevel},
 			{"info", zapcore.InfoLevel, "info", level <= zapcore.InfoLevel},

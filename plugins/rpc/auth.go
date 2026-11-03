@@ -3,22 +3,23 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"net/http"
 )
 
 // AuthConfig holds RPC authentication configuration
 type AuthConfig struct {
 	// APIKeys is a map of valid API keys (key -> description/user)
 	APIKeys map[string]string
-	
+
 	// HeaderName is the header name for API key (default: X-API-Key)
 	HeaderName string
-	
+
 	// QueryName is the query parameter name for API key (default: api_key)
 	QueryName string
-	
+
 	// SkipMethods are RPC methods that skip authentication
 	SkipMethods []string
-	
+
 	// Enabled indicates if RPC authentication is enabled
 	Enabled bool
 }
@@ -57,7 +58,7 @@ func (a *RPCAuth) Execute(ctx context.Context, req interface{}) (interface{}, er
 
 	// Extract method name from request context if available
 	methodName := extractRPCMethod(ctx)
-	
+
 	// Check if method should skip authentication
 	if a.shouldSkipMethod(methodName) {
 		return req, nil
@@ -75,7 +76,9 @@ func (a *RPCAuth) Execute(ctx context.Context, req interface{}) (interface{}, er
 	}
 
 	// Set authentication info in context
-	ctx = setAuthInfo(ctx, apiKey, a.config.APIKeys[apiKey])
+	if request, ok := req.(*http.Request); ok {
+		req = request.WithContext(setAuthInfo(ctx, apiKey, a.config.APIKeys[apiKey]))
+	}
 
 	return req, nil
 }
@@ -142,9 +145,9 @@ func (a *RPCAuth) IsAuthenticated(ctx context.Context) bool {
 type contextKey string
 
 const (
-	apiKeyContextKey    contextKey = "api_key"
-	apiUserContextKey   contextKey = "api_user"
-	methodContextKey    contextKey = "rpc_method"
+	apiKeyContextKey  contextKey = "api_key"
+	apiUserContextKey contextKey = "api_user"
+	methodContextKey  contextKey = "rpc_method"
 )
 
 // extractRPCMethod extracts RPC method name from context

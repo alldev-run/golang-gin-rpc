@@ -14,7 +14,7 @@ func NewClient(config Config) (Client, error) {
 
 	// Check if the messaging type is implemented
 	if !msgType.IsImplemented() {
-		return nil, fmt.Errorf("messaging type '%s' is not yet implemented. Supported types: %v", 
+		return nil, fmt.Errorf("messaging type '%s' is not yet implemented. Supported types: %v",
 			msgType.DisplayName(), GetImplementedTypes())
 	}
 
@@ -87,21 +87,21 @@ func ValidateConfig(config Config) error {
 			config.Port = msgType.DefaultPort()
 		}
 		if config.Username == "" {
-			return fmt.Errorf("RabbitMQ requires username")
+			return fmt.Errorf("rabbitmq requires username")
 		}
 		if config.Password == "" {
-			return fmt.Errorf("RabbitMQ requires password")
+			return fmt.Errorf("rabbitmq requires password")
 		}
 	case MessageTypeKafka:
 		if config.Host == "" {
-			return fmt.Errorf("Kafka requires host")
+			return fmt.Errorf("kafka requires host")
 		}
 		if config.Port == 0 {
 			config.Port = msgType.DefaultPort()
 		}
 	case MessageTypeNATS:
 		if config.Host == "" {
-			return fmt.Errorf("NATS requires host")
+			return fmt.Errorf("nats requires host")
 		}
 		if config.Port == 0 {
 			config.Port = msgType.DefaultPort()

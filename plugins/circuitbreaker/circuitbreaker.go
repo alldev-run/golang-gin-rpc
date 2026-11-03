@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // State represents the circuit breaker state
@@ -37,13 +37,13 @@ func (s State) String() string {
 
 // Config holds circuit breaker configuration
 type Config struct {
-	MaxRequests        uint32        // Maximum requests in half-open state
-	Interval           time.Duration // Time to collect metrics in closed state
-	Timeout            time.Duration // Time to wait in open state
-	ReadyToTrip        func(counts Counts) bool
-	OnStateChange      func(name string, from, to State)
-	IsSuccessful       func(err error) bool
-	Fallback          func(err error) error
+	MaxRequests   uint32        // Maximum requests in half-open state
+	Interval      time.Duration // Time to collect metrics in closed state
+	Timeout       time.Duration // Time to wait in open state
+	ReadyToTrip   func(counts Counts) bool
+	OnStateChange func(name string, from, to State)
+	IsSuccessful  func(err error) bool
+	Fallback      func(err error) error
 }
 
 // DefaultConfig returns default circuit breaker configuration
@@ -52,7 +52,7 @@ func DefaultConfig() Config {
 		MaxRequests: 1,
 		Interval:    time.Minute,
 		Timeout:     time.Minute,
-		ReadyToTrip:  func(counts Counts) bool { return counts.ConsecutiveFailures > 5 },
+		ReadyToTrip: func(counts Counts) bool { return counts.ConsecutiveFailures > 5 },
 		OnStateChange: func(name string, from, to State) {
 			logger.Info("Circuit breaker state changed",
 				zap.String("name", name),
@@ -81,7 +81,7 @@ type CircuitBreaker struct {
 	readyToTrip   func(counts Counts) bool
 	onStateChange func(name string, from, to State)
 	isSuccessful  func(err error) bool
-	fallback     func(err error) error
+	fallback      func(err error) error
 
 	mutex      sync.Mutex
 	state      State
@@ -100,7 +100,7 @@ func NewCircuitBreaker(name string, config Config) *CircuitBreaker {
 		readyToTrip:   config.ReadyToTrip,
 		onStateChange: config.OnStateChange,
 		isSuccessful:  config.IsSuccessful,
-		fallback:     config.Fallback,
+		fallback:      config.Fallback,
 	}
 
 	if cb.maxRequests == 0 {
@@ -320,7 +320,7 @@ func (cb *CircuitBreaker) toNewGeneration(now time.Time) {
 // Errors
 var (
 	ErrCircuitBreakerOpen = errors.New("circuit breaker is open")
-	ErrTooManyRequests   = errors.New("too many requests in half-open state")
+	ErrTooManyRequests    = errors.New("too many requests in half-open state")
 )
 
 // CircuitBreakerGroup manages multiple circuit breakers
@@ -420,30 +420,30 @@ func NewHealthChecker(group *CircuitBreakerGroup) *HealthChecker {
 // CheckHealth checks the health of all circuit breakers
 func (h *HealthChecker) CheckHealth() error {
 	states := h.group.States()
-	
+
 	for name, state := range states {
 		if state == StateOpen {
 			return fmt.Errorf("circuit breaker %s is open", name)
 		}
 	}
-	
+
 	return nil
 }
 
 // GetHealthStatus returns detailed health status
 func (h *HealthChecker) GetHealthStatus() map[string]interface{} {
 	states := h.group.States()
-	
+
 	status := make(map[string]interface{})
 	for name, state := range states {
 		cb, _ := h.group.Get(name)
-		
+
 		status[name] = map[string]interface{}{
 			"state":  state.String(),
 			"counts": cb.Counts(),
 		}
 	}
-	
+
 	return status
 }
 
@@ -464,13 +464,14 @@ func (m *Middleware) Wrap(name string, handler http.Handler) http.Handler {
 			handler.ServeHTTP(w, r)
 			return nil, nil
 		})
-		
+
 		if err != nil {
-			if err == ErrCircuitBreakerOpen {
+			switch err {
+			case ErrCircuitBreakerOpen:
 				http.Error(w, "Service temporarily unavailable", http.StatusServiceUnavailable)
-			} else if err == ErrTooManyRequests {
+			case ErrTooManyRequests:
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
-			} else {
+			default:
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
 		}

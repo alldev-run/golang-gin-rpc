@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/plugins/metrics"
+	"github.com/gin-gonic/gin"
 )
 
 var (

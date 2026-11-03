@@ -13,12 +13,12 @@ import (
 
 // KafkaClient implements the Client interface for Apache Kafka
 type KafkaClient struct {
-	config      Config
-	producer    sarama.SyncProducer
+	config        Config
+	producer      sarama.SyncProducer
 	asyncProducer sarama.AsyncProducer
-	consumer    sarama.ConsumerGroup
-	mu          sync.RWMutex
-	consumers   map[string]sarama.ConsumerGroupHandler
+	consumer      sarama.ConsumerGroup
+	mu            sync.RWMutex
+	consumers     map[string]sarama.ConsumerGroupHandler
 }
 
 // NewKafkaClient creates a new Kafka client
@@ -39,7 +39,7 @@ func NewKafkaClient(config Config) (*KafkaClient, error) {
 	kafkaConfig.Producer.Retry.Backoff = 100 * time.Millisecond
 
 	// Consumer configuration
-	kafkaConfig.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
+	kafkaConfig.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategyRoundRobin()
 	kafkaConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
 	kafkaConfig.Consumer.Group.Session.Timeout = 10 * time.Second
 	kafkaConfig.Consumer.Group.Heartbeat.Interval = 3 * time.Second
@@ -95,10 +95,10 @@ func (c *KafkaClient) Publish(ctx context.Context, topic string, msg *Message) e
 
 	// Create Kafka message
 	kafkaMsg := &sarama.ProducerMessage{
-		Topic: topic,
-		Key:   sarama.StringEncoder(msg.Key),
-		Value: sarama.ByteEncoder(msg.Payload),
-		Headers: []sarama.RecordHeader{},
+		Topic:     topic,
+		Key:       sarama.StringEncoder(msg.Key),
+		Value:     sarama.ByteEncoder(msg.Payload),
+		Headers:   []sarama.RecordHeader{},
 		Timestamp: msg.Timestamp,
 	}
 
@@ -144,10 +144,10 @@ func (c *KafkaClient) PublishAsync(ctx context.Context, topic string, msg *Messa
 
 	// Create Kafka message
 	kafkaMsg := &sarama.ProducerMessage{
-		Topic: topic,
-		Key:   sarama.StringEncoder(msg.Key),
-		Value: sarama.ByteEncoder(msg.Payload),
-		Headers: []sarama.RecordHeader{},
+		Topic:     topic,
+		Key:       sarama.StringEncoder(msg.Key),
+		Value:     sarama.ByteEncoder(msg.Payload),
+		Headers:   []sarama.RecordHeader{},
 		Timestamp: msg.Timestamp,
 	}
 
@@ -176,7 +176,7 @@ func (c *KafkaClient) Subscribe(ctx context.Context, topic string, handler Messa
 
 	// Create consumer group configuration
 	kafkaConfig := sarama.NewConfig()
-	kafkaConfig.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
+	kafkaConfig.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategyRoundRobin()
 	kafkaConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
 	kafkaConfig.Consumer.Group.Session.Timeout = 10 * time.Second
 	kafkaConfig.Consumer.Group.Heartbeat.Interval = 3 * time.Second

@@ -375,11 +375,6 @@ func TracingFromGatewayConfig(cfg *gateway.Config) gin.HandlerFunc {
 	}
 }
 
-// generateRequestID 生成请求ID
-func generateRequestID() string {
-	return strconv.FormatInt(time.Now().UnixNano(), 36)
-}
-
 // joinStrings 连接字符串数组
 func joinStrings(strs []string, sep string) string {
 	if len(strs) == 0 {

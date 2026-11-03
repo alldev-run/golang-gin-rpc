@@ -10,25 +10,25 @@ import (
 )
 
 type Router struct {
-	cfg    *gateway.Config
+	cfg     *gateway.Config
 	handler http.Handler
 }
 
 func NewRouter(cfg *gateway.Config, services *routes.Services) *Router {
 	// 使用 pkg 下的路由工厂创建构建器
 	builder := router.CreateRouter(cfg)
-	
+
 	// 注册调试路由
 	builder.RegisterDebugRoutes()
-	
+
 	// 注册业务路由
 	builder.RegisterBusinessRoutes(&RouteRegistrarAdapter{services: services})
-	
+
 	// 构建最终处理器
 	handler := builder.Build()
-	
+
 	return &Router{
-		cfg:    cfg,
+		cfg:     cfg,
 		handler: handler,
 	}
 }

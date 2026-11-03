@@ -13,12 +13,12 @@ func CORSFromGatewayConfig(cfg *gateway.Config) Middleware {
 	}
 	gc := cfg.CORS
 	cc := cors.Config{
-		AllowedOrigins:   gc.AllowedOrigins,
-		AllowedMethods:   gc.AllowedMethods,
-		AllowedHeaders:   gc.AllowedHeaders,
-		ExposedHeaders:   gc.ExposedHeaders,
-		AllowCredentials: gc.AllowCredentials,
-		MaxAge:           gc.MaxAge,
+		AllowedOrigins:     gc.AllowedOrigins,
+		AllowedMethods:     gc.AllowedMethods,
+		AllowedHeaders:     gc.AllowedHeaders,
+		ExposedHeaders:     gc.ExposedHeaders,
+		AllowCredentials:   gc.AllowCredentials,
+		MaxAge:             gc.MaxAge,
 		OptionsPassthrough: false,
 	}
 

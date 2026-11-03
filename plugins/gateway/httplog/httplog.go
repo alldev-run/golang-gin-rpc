@@ -8,19 +8,19 @@ import (
 )
 
 type Fields struct {
-	Method         string
-	Path           string
-	Query          string
-	PathParams     map[string]string
-	QueryParams    map[string][]string
-	ClientIP       string
-	UserAgent      string
-	Status         int
-	Latency        time.Duration
-	RequestID      string
-	RequestBody    *interface{} `json:"request_body,omitempty"`
-	RequestBodyStr *string       `json:"request_body_str,omitempty"`
-	ResponseBody   *interface{} `json:"response_body,omitempty"`
+	Method          string
+	Path            string
+	Query           string
+	PathParams      map[string]string
+	QueryParams     map[string][]string
+	ClientIP        string
+	UserAgent       string
+	Status          int
+	Latency         time.Duration
+	RequestID       string
+	RequestBody     *interface{} `json:"request_body,omitempty"`
+	RequestBodyStr  *string      `json:"request_body_str,omitempty"`
+	ResponseBody    *interface{} `json:"response_body,omitempty"`
 	ResponseBodyStr *string      `json:"response_body_str,omitempty"`
 }
 
@@ -113,21 +113,21 @@ func LogWithLevelEnhancedWithThresholds(f Fields, errorThreshold, warnThreshold,
 		baseFields = append(baseFields, zap.Any("query_param", f.QueryParams))
 		baseFields = append(baseFields, zap.Any("query_params", f.QueryParams))
 	}
-	
+
 	// 添加请求体字段
 	if f.RequestBody != nil {
 		baseFields = append(baseFields, zap.Any("request_body", *f.RequestBody))
 	} else if f.RequestBodyStr != nil {
 		baseFields = append(baseFields, zap.String("request_body", *f.RequestBodyStr))
 	}
-	
+
 	// 添加响应体字段
 	if f.ResponseBody != nil {
 		baseFields = append(baseFields, zap.Any("response_body", *f.ResponseBody))
 	} else if f.ResponseBodyStr != nil {
 		baseFields = append(baseFields, zap.String("response_body", *f.ResponseBodyStr))
 	}
-	
+
 	// 根据自定义阈值确定日志级别并记录
 	switch {
 	case f.Status >= errorThreshold:
@@ -188,14 +188,14 @@ func LogSlowRequestEnhanced(f Fields, threshold time.Duration) {
 		baseFields = append(baseFields, zap.Any("query_param", f.QueryParams))
 		baseFields = append(baseFields, zap.Any("query_params", f.QueryParams))
 	}
-	
+
 	// 添加请求体字段（慢请求通常需要上下文信息）
 	if f.RequestBody != nil {
 		baseFields = append(baseFields, zap.Any("request_body", *f.RequestBody))
 	} else if f.RequestBodyStr != nil {
 		baseFields = append(baseFields, zap.String("request_body", *f.RequestBodyStr))
 	}
-	
+
 	// 记录慢请求日志
 	logger.Warn("Slow HTTP Request", baseFields...)
 }

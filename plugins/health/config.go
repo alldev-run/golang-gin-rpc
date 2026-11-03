@@ -6,31 +6,31 @@ import "time"
 type HealthConfig struct {
 	// Enabled indicates if the health service is enabled
 	Enabled bool `yaml:"enabled" json:"enabled"`
-	
+
 	// Host is the health service host
 	Host string `yaml:"host" json:"host"`
-	
+
 	// Port is the health service port
 	Port int `yaml:"port" json:"port"`
-	
+
 	// Path is the health check endpoint path
 	Path string `yaml:"path" json:"path"`
-	
+
 	// Timeout for health check operations
 	Timeout time.Duration `yaml:"timeout" json:"timeout"`
-	
+
 	// CheckInterval for periodic health checks
 	CheckInterval time.Duration `yaml:"check_interval" json:"check_interval"`
-	
+
 	// Detailed indicates if detailed health information should be returned
 	Detailed bool `yaml:"detailed" json:"detailed"`
-	
+
 	// Version information to include in health response
 	Version string `yaml:"version" json:"version"`
-	
+
 	// Build information to include in health response
 	Build string `yaml:"build" json:"build"`
-	
+
 	// Description of the service
 	Description string `yaml:"description" json:"description"`
 }
@@ -39,31 +39,31 @@ type HealthConfig struct {
 type HealthCheckConfig struct {
 	// Name of the health check
 	Name string `yaml:"name" json:"name"`
-	
+
 	// Type of health check (http, tcp, redis, mysql, etc.)
 	Type string `yaml:"type" json:"type"`
-	
+
 	// Target is the check target (URL, host:port, etc.)
 	Target string `yaml:"target" json:"target"`
-	
+
 	// Timeout for this specific check
 	Timeout time.Duration `yaml:"timeout" json:"timeout"`
-	
+
 	// Interval for this specific check
 	Interval time.Duration `yaml:"interval" json:"interval"`
-	
+
 	// FailureThreshold before marking as unhealthy
 	FailureThreshold int `yaml:"failure_threshold" json:"failure_threshold"`
-	
+
 	// SuccessThreshold before marking as healthy again
 	SuccessThreshold int `yaml:"success_threshold" json:"success_threshold"`
-	
+
 	// Enabled indicates if this check is enabled
 	Enabled bool `yaml:"enabled" json:"enabled"`
-	
+
 	// Critical indicates if this check is critical for overall health
 	Critical bool `yaml:"critical" json:"critical"`
-	
+
 	// Additional configuration options
 	Options map[string]interface{} `yaml:"options" json:"options"`
 }
@@ -71,16 +71,16 @@ type HealthCheckConfig struct {
 // DefaultHealthConfig returns default health service configuration
 func DefaultHealthConfig() HealthConfig {
 	return HealthConfig{
-		Enabled:     true,
-		Host:        "0.0.0.0",
-		Port:        8081,
-		Path:        "/health",
-		Timeout:     5 * time.Second,
+		Enabled:       true,
+		Host:          "0.0.0.0",
+		Port:          8081,
+		Path:          "/health",
+		Timeout:       5 * time.Second,
 		CheckInterval: 30 * time.Second,
-		Detailed:    true,
-		Version:     "1.0.0",
-		Build:       "",
-		Description: "AllDev Gin RPC Service",
+		Detailed:      true,
+		Version:       "1.0.0",
+		Build:         "",
+		Description:   "AllDev Gin RPC Service",
 	}
 }
 
@@ -193,7 +193,7 @@ func CustomCheckConfig(name string, checkFunc func() error) HealthCheckConfig {
 }
 
 // Validate validates the health service configuration
-func (c HealthConfig) Validate() error {
+func (c *HealthConfig) Validate() error {
 	if c.Host == "" {
 		c.Host = "0.0.0.0"
 	}
@@ -213,7 +213,7 @@ func (c HealthConfig) Validate() error {
 }
 
 // Validate validates the health check configuration
-func (c HealthCheckConfig) Validate() error {
+func (c *HealthCheckConfig) Validate() error {
 	if c.Name == "" {
 		c.Name = "default"
 	}

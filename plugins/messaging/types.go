@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-
 // IsValid checks if the message type is supported
 func (mt MessageType) IsValid() bool {
 	supportedTypes := []MessageType{
@@ -15,7 +14,7 @@ func (mt MessageType) IsValid() bool {
 		MessageTypeRedis,
 		MessageTypeMemory,
 	}
-	
+
 	for _, supportedType := range supportedTypes {
 		if mt == supportedType {
 			return true
@@ -109,7 +108,7 @@ func GetFutureTypes() []MessageType {
 // ParseMessageType parses a string into MessageType
 func ParseMessageType(s string) (MessageType, error) {
 	s = strings.ToLower(strings.TrimSpace(s))
-	
+
 	switch s {
 	case "rabbitmq", "amqp":
 		return MessageTypeRabbitMQ, nil
@@ -128,16 +127,16 @@ func ParseMessageType(s string) (MessageType, error) {
 
 // MessagingCapabilities represents the capabilities of a messaging system
 type MessagingCapabilities struct {
-	SupportsPublish       bool `json:"supports_publish"`
-	SupportsSubscribe     bool `json:"supports_subscribe"`
-	SupportsHeaders       bool `json:"supports_headers"`
-	SupportsPartitioning  bool `json:"supports_partitioning"`
-	SupportsOrdering      bool `json:"supports_ordering"`
-	SupportsPersistence   bool `json:"supports_persistence"`
-	SupportsTransactions  bool `json:"supports_transactions"`
-	SupportsDLQ           bool `json:"supports_dlq"` // Dead Letter Queue
-	SupportsReplay        bool `json:"supports_replay"`
-	SupportsCompression   bool `json:"supports_compression"`
+	SupportsPublish      bool `json:"supports_publish"`
+	SupportsSubscribe    bool `json:"supports_subscribe"`
+	SupportsHeaders      bool `json:"supports_headers"`
+	SupportsPartitioning bool `json:"supports_partitioning"`
+	SupportsOrdering     bool `json:"supports_ordering"`
+	SupportsPersistence  bool `json:"supports_persistence"`
+	SupportsTransactions bool `json:"supports_transactions"`
+	SupportsDLQ          bool `json:"supports_dlq"` // Dead Letter Queue
+	SupportsReplay       bool `json:"supports_replay"`
+	SupportsCompression  bool `json:"supports_compression"`
 }
 
 // GetCapabilities returns the capabilities for a given messaging type

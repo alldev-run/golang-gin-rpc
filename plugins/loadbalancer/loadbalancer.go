@@ -16,19 +16,19 @@ var (
 type Target struct {
 	// Address is the target address (e.g., "http://server:8080")
 	Address string
-	
+
 	// Weight for weighted load balancing (default: 1)
 	Weight int
-	
+
 	// Healthy indicates if the target is healthy (default: true)
 	Healthy bool
-	
+
 	// ConnectionCount for least connections load balancing
 	ConnectionCount int32
-	
+
 	// Metadata contains additional target information
 	Metadata map[string]any
-	
+
 	// LastUpdated timestamp
 	LastUpdated time.Time
 }
@@ -36,10 +36,10 @@ type Target struct {
 // NewTarget creates a new target with default values
 func NewTarget(address string) *Target {
 	return &Target{
-		Address:    address,
-		Weight:     1,
-		Healthy:    true,
-		Metadata:   make(map[string]any),
+		Address:     address,
+		Weight:      1,
+		Healthy:     true,
+		Metadata:    make(map[string]any),
 		LastUpdated: time.Now(),
 	}
 }
@@ -69,13 +69,13 @@ func (t *Target) SetMetadata(key string, value any) {
 type LoadBalancer interface {
 	// Select selects a target based on the load balancing strategy
 	Select(ctx context.Context, targets []*Target) (*Target, error)
-	
+
 	// UpdateTargets updates the target list
 	UpdateTargets(targets []*Target) error
-	
+
 	// GetTargets returns the current target list
 	GetTargets() []*Target
-	
+
 	// Close gracefully closes the load balancer
 	Close() error
 }
@@ -84,9 +84,9 @@ type LoadBalancer interface {
 type Strategy string
 
 const (
-	StrategyRoundRobin     Strategy = "round_robin"
-	StrategyRandom         Strategy = "random"
-	StrategyWeighted       Strategy = "weighted"
+	StrategyRoundRobin       Strategy = "round_robin"
+	StrategyRandom           Strategy = "random"
+	StrategyWeighted         Strategy = "weighted"
 	StrategyLeastConnections Strategy = "least_connections"
 )
 
@@ -94,16 +94,16 @@ const (
 type Options struct {
 	// Strategy is the load balancing strategy
 	Strategy Strategy
-	
+
 	// EnableMetrics enables metrics collection
 	EnableMetrics bool
-	
+
 	// EnableHealthCheck enables health status checking
 	EnableHealthCheck bool
-	
+
 	// UpdateInterval for background updates
 	UpdateInterval time.Duration
-	
+
 	// Logger for logging
 	Logger Logger
 }
@@ -126,8 +126,8 @@ type Field struct {
 func DefaultOptions() *Options {
 	return &Options{
 		Strategy:          StrategyRoundRobin,
-		EnableMetrics:      false,
-		EnableHealthCheck:  true,
+		EnableMetrics:     false,
+		EnableHealthCheck: true,
 		UpdateInterval:    30 * time.Second,
 		Logger:            &NoopLogger{},
 	}

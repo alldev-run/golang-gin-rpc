@@ -15,7 +15,6 @@ type BloomFilter struct {
 	bits   []uint64
 	size   uint64
 	hashes uint64
-	salt   []byte
 	mu     sync.RWMutex
 }
 

@@ -14,19 +14,19 @@ import (
 type APIKeyConfig struct {
 	// APIKeys is a map of valid API keys (key -> description/user)
 	APIKeys map[string]string
-	
+
 	// HeaderName is the header name for API key (default: X-API-Key)
 	HeaderName string
-	
+
 	// QueryName is the query parameter name for API key (default: api_key)
 	QueryName string
-	
+
 	// SkipPaths are paths that skip authentication
 	SkipPaths []string
-	
+
 	// Skipper is a function to skip authentication for specific requests
 	Skipper func(c *gin.Context) bool
-	
+
 	// Enabled indicates if API key middleware is enabled
 	Enabled bool
 }

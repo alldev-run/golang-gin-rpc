@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // Application represents the main application
@@ -77,7 +77,7 @@ func (app *Application) Start() error {
 // Shutdown gracefully shuts down the application
 func (app *Application) Shutdown(ctx context.Context) error {
 	logger.Info("Shutting down server...")
-	
+
 	if err := app.server.Shutdown(ctx); err != nil {
 		logger.Errorf("Server forced to shutdown", logger.Error(err))
 		return err

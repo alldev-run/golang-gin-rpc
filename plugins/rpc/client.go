@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/plugins/ratelimit/ratelimiter"
 
 	"google.golang.org/grpc"
@@ -35,24 +35,24 @@ const (
 
 // ClientConfig holds client configuration
 type ClientConfig struct {
-	Type        ClientType    `yaml:"type" json:"type"`
-	Host        string        `yaml:"host" json:"host"`
-	Port        int           `yaml:"port" json:"port"`
-	Timeout     time.Duration `yaml:"timeout" json:"timeout"`
-	EnableTLS   bool          `yaml:"enable_tls" json:"enable_tls"`
-	MaxMsgSize  int           `yaml:"max_msg_size" json:"max_msg_size"`
-	ServiceName string        `yaml:"service_name" json:"service_name"`
-	APIKey      string        `yaml:"api_key" json:"api_key"`
-	AuthHeader  string        `yaml:"auth_header" json:"auth_header"`
-	LoadBalance string        `yaml:"load_balance" json:"load_balance"`
-	RetryCount  int           `yaml:"retry_count" json:"retry_count"`
-	RetryBackoff time.Duration `yaml:"retry_backoff" json:"retry_backoff"`
-	RetryJitter float64       `yaml:"retry_jitter" json:"retry_jitter"`
-	IdempotentMethods []string `yaml:"idempotent_methods" json:"idempotent_methods"`
+	Type                ClientType    `yaml:"type" json:"type"`
+	Host                string        `yaml:"host" json:"host"`
+	Port                int           `yaml:"port" json:"port"`
+	Timeout             time.Duration `yaml:"timeout" json:"timeout"`
+	EnableTLS           bool          `yaml:"enable_tls" json:"enable_tls"`
+	MaxMsgSize          int           `yaml:"max_msg_size" json:"max_msg_size"`
+	ServiceName         string        `yaml:"service_name" json:"service_name"`
+	APIKey              string        `yaml:"api_key" json:"api_key"`
+	AuthHeader          string        `yaml:"auth_header" json:"auth_header"`
+	LoadBalance         string        `yaml:"load_balance" json:"load_balance"`
+	RetryCount          int           `yaml:"retry_count" json:"retry_count"`
+	RetryBackoff        time.Duration `yaml:"retry_backoff" json:"retry_backoff"`
+	RetryJitter         float64       `yaml:"retry_jitter" json:"retry_jitter"`
+	IdempotentMethods   []string      `yaml:"idempotent_methods" json:"idempotent_methods"`
 	MaxRetryElapsedTime time.Duration `yaml:"max_retry_elapsed_time" json:"max_retry_elapsed_time"`
-	DiscoveryCacheTTL time.Duration `yaml:"discovery_cache_ttl" json:"discovery_cache_ttl"`
-	FailoverThreshold int `yaml:"failover_threshold" json:"failover_threshold"`
-	FailoverCooldown time.Duration `yaml:"failover_cooldown" json:"failover_cooldown"`
+	DiscoveryCacheTTL   time.Duration `yaml:"discovery_cache_ttl" json:"discovery_cache_ttl"`
+	FailoverThreshold   int           `yaml:"failover_threshold" json:"failover_threshold"`
+	FailoverCooldown    time.Duration `yaml:"failover_cooldown" json:"failover_cooldown"`
 }
 
 type discoveryServiceResolver interface {
@@ -67,20 +67,20 @@ type clientObserver interface {
 // DefaultClientConfig returns default client configuration
 func DefaultClientConfig() ClientConfig {
 	return ClientConfig{
-		Type:       ClientTypeGRPC,
-		Host:       "localhost",
-		Port:       50051,
-		Timeout:    30 * time.Second,
-		MaxMsgSize: 4 * 1024 * 1024,
-		AuthHeader: "X-API-Key",
-		LoadBalance: "round_robin",
-		RetryCount:  1,
-		RetryBackoff: 100 * time.Millisecond,
-		RetryJitter: 0.2,
+		Type:                ClientTypeGRPC,
+		Host:                "localhost",
+		Port:                50051,
+		Timeout:             30 * time.Second,
+		MaxMsgSize:          4 * 1024 * 1024,
+		AuthHeader:          "X-API-Key",
+		LoadBalance:         "round_robin",
+		RetryCount:          1,
+		RetryBackoff:        100 * time.Millisecond,
+		RetryJitter:         0.2,
 		MaxRetryElapsedTime: 2 * time.Second,
-		DiscoveryCacheTTL: 5 * time.Second,
-		FailoverThreshold: 3,
-		FailoverCooldown: 30 * time.Second,
+		DiscoveryCacheTTL:   5 * time.Second,
+		FailoverThreshold:   3,
+		FailoverCooldown:    30 * time.Second,
 	}
 }
 
@@ -95,32 +95,32 @@ type Client interface {
 
 // GRPCClient wraps gRPC client
 type GRPCClient struct {
-	config      ClientConfig
-	conn        *grpc.ClientConn
-	dialOptions []grpc.DialOption
-	degradation *DegradationManager
-	rateLimiter *ratelimiter.Manager
-	discovery   discoveryServiceResolver
+	config         ClientConfig
+	conn           *grpc.ClientConn
+	dialOptions    []grpc.DialOption
+	degradation    *DegradationManager
+	rateLimiter    *ratelimiter.Manager
+	discovery      discoveryServiceResolver
 	targetSelector *clientTargetSelector
-	observer    clientObserver
-	cache       *clientEndpointCache
-	failover    *clientTargetFailover
+	observer       clientObserver
+	cache          *clientEndpointCache
+	failover       *clientTargetFailover
 }
 
 // JSONRPCClient wraps JSON-RPC client
 type JSONRPCClient struct {
-	config      ClientConfig
-	httpClient  *http.Client
-	baseURL     string
-	mu          sync.RWMutex
-	requestID   uint64
-	degradation *DegradationManager
-	rateLimiter *ratelimiter.Manager
-	discovery   discoveryServiceResolver
+	config         ClientConfig
+	httpClient     *http.Client
+	baseURL        string
+	mu             sync.RWMutex
+	requestID      uint64
+	degradation    *DegradationManager
+	rateLimiter    *ratelimiter.Manager
+	discovery      discoveryServiceResolver
 	targetSelector *clientTargetSelector
-	observer    clientObserver
-	cache       *clientEndpointCache
-	failover    *clientTargetFailover
+	observer       clientObserver
+	cache          *clientEndpointCache
+	failover       *clientTargetFailover
 }
 
 type clientTargetSelector struct {
@@ -163,11 +163,11 @@ func NewGRPCClient(config ClientConfig) *GRPCClient {
 		config.Timeout = 30 * time.Second
 	}
 	return &GRPCClient{
-		config:      config,
-		rateLimiter: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+		config:         config,
+		rateLimiter:    ratelimiter.NewManager(ratelimiter.DefaultConfig()),
 		targetSelector: newClientTargetSelector(config.LoadBalance),
-		cache:       &clientEndpointCache{},
-		failover:    newClientTargetFailover(),
+		cache:          &clientEndpointCache{},
+		failover:       newClientTargetFailover(),
 	}
 }
 
@@ -202,7 +202,7 @@ func (c *GRPCClient) Connect() error {
 		opts = append(opts, c.dialOptions...)
 	}
 
-	conn, err := grpc.Dial(addr, opts...)
+	conn, err := grpc.NewClient(addr, opts...)
 	if err != nil {
 		c.invalidateTargets()
 		return fmt.Errorf("failed to connect to gRPC server: %w", err)
@@ -353,12 +353,12 @@ func NewJSONRPCClient(config ClientConfig) *JSONRPCClient {
 	}
 
 	return &JSONRPCClient{
-		config:      config,
-		baseURL:     baseURL,
-		rateLimiter: ratelimiter.NewManager(ratelimiter.DefaultConfig()),
+		config:         config,
+		baseURL:        baseURL,
+		rateLimiter:    ratelimiter.NewManager(ratelimiter.DefaultConfig()),
 		targetSelector: newClientTargetSelector(config.LoadBalance),
-		cache:       &clientEndpointCache{},
-		failover:    newClientTargetFailover(),
+		cache:          &clientEndpointCache{},
+		failover:       newClientTargetFailover(),
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},

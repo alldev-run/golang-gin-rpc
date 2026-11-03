@@ -4,13 +4,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/response"
 	"github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
 	"github.com/alldev-run/golang-gin-rpc/plugins/rbac"
-	"github.com/alldev-run/golang-gin-rpc/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
-
 
 // JWT creates a JWT authentication middleware
 func JWT(config AuthConfig) gin.HandlerFunc {
@@ -251,7 +250,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 func shouldSkipAuth(c *gin.Context, config AuthConfig) bool {
 	// Check custom skipper function - convert string-based skipper to gin.Context-based
 	if config.Skipper != nil {
-		// For now, we'll just check the path since Skipper expects string, not gin.Context
+		// The configured skipper accepts a request path, so evaluate it against the URL path.
 		if config.Skipper(c.Request.URL.Path) {
 			return true
 		}

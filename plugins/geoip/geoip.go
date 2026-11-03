@@ -16,24 +16,24 @@ var (
 
 // GeoIPManager GeoIP 管理器
 type GeoIPManager struct {
-	db    *geoip2.Reader
-	path  string
-	mu    sync.RWMutex
+	db   *geoip2.Reader
+	path string
+	mu   sync.RWMutex
 }
 
 // CountryInfo 国家信息
 type CountryInfo struct {
-	Code       string            // ISO 国家代码（如: CN, US）
-	Name       string            // 国家名称
-	Names      map[string]string // 多语言名称
-	IsEU       bool              // 是否在欧盟
-	Continent  string            // 大洲
+	Code      string            // ISO 国家代码（如: CN, US）
+	Name      string            // 国家名称
+	Names     map[string]string // 多语言名称
+	IsEU      bool              // 是否在欧盟
+	Continent string            // 大洲
 }
 
 // CityInfo 城市信息
 type CityInfo struct {
-	Country   CountryInfo
-	City      string
+	Country     CountryInfo
+	City        string
 	Subdivision string // 省/州
 	PostalCode  string
 	Latitude    float64

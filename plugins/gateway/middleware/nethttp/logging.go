@@ -42,7 +42,7 @@ func httpLog(sw *statusWriter, r *http.Request, latency time.Duration, requestID
 		Latency:   latency,
 		RequestID: requestID,
 	})
-	
+
 	// 如果是慢请求，额外记录慢请求日志
 	if latency > 1*time.Second {
 		httplog.LogSlowRequest(httplog.Fields{

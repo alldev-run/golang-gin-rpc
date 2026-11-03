@@ -84,13 +84,13 @@ func (c *RabbitMQClient) Publish(ctx context.Context, topic string, msg *Message
 
 	// Declare exchange if it doesn't exist
 	err := c.channel.ExchangeDeclare(
-		topic,     // name
-		"fanout",  // type
-		true,      // durable
-		false,     // auto-deleted
-		false,     // internal
-		false,     // no-wait
-		nil,       // arguments
+		topic,    // name
+		"fanout", // type
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
 	)
 	if err != nil {
 		return &MessageError{
@@ -158,13 +158,13 @@ func (c *RabbitMQClient) Subscribe(ctx context.Context, topic string, handler Me
 
 	// Declare exchange
 	err = consumerCh.ExchangeDeclare(
-		topic,     // name
-		"fanout",  // type
-		true,      // durable
-		false,     // auto-deleted
-		false,     // internal
-		false,     // no-wait
-		nil,       // arguments
+		topic,    // name
+		"fanout", // type
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
 	)
 	if err != nil {
 		consumerCh.Close()
@@ -263,10 +263,14 @@ func (c *RabbitMQClient) Subscribe(ctx context.Context, topic string, handler Me
 				if err := handler(ctx, msg); err != nil {
 					log.Printf("Error handling message: %v", err)
 					// Negative acknowledge
-					delivery.Nack(false, false)
+					if nackErr := delivery.Nack(false, false); nackErr != nil {
+						log.Printf("RabbitMQ negative acknowledgement failed: %v", nackErr)
+					}
 				} else {
 					// Acknowledge message
-					delivery.Ack(false)
+					if ackErr := delivery.Ack(false); ackErr != nil {
+						log.Printf("RabbitMQ acknowledgement failed: %v", ackErr)
+					}
 				}
 			}
 		}

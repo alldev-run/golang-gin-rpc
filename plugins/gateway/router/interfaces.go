@@ -20,16 +20,16 @@ type RouteHandler interface {
 type IRouterBuilder interface {
 	// 注册调试路由
 	RegisterDebugRoutes()
-	
+
 	// 注册业务路由
 	RegisterBusinessRoutes(registrar interface{})
-	
+
 	// 构建最终处理器
 	Build() http.Handler
-	
+
 	// 获取底层引擎（用于扩展）
 	GetEngine() interface{}
-	
+
 	// 获取路由注册器（用于扩展）
 	GetRegistry() interface{}
 }

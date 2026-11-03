@@ -3,12 +3,12 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/health"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/health"
 	middlewarepkg "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
 	"github.com/alldev-run/golang-gin-rpc/plugins/rbac"
 	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
@@ -16,23 +16,23 @@ import (
 
 // Gateway represents the HTTP gateway
 type Gateway struct {
-	config     *Config
-	server     *Server
-	router     *Router
-	discovery  *ServiceDiscovery
-	balancer   LoadBalancer
-	health     *health.HealthManager
-	tracer     *tracing.TracerProvider
-	grpcProxy  *GRPCProxy
-	jsonProxy  *JSONRPCProxy
-	proxy      *Proxy           // HTTP proxy
-	auth       *GatewayAuth     // Authentication middleware
+	config      *Config
+	server      *Server
+	router      *Router
+	discovery   *ServiceDiscovery
+	balancer    LoadBalancer
+	health      *health.HealthManager
+	tracer      *tracing.TracerProvider
+	grpcProxy   *GRPCProxy
+	jsonProxy   *JSONRPCProxy
+	proxy       *Proxy       // HTTP proxy
+	auth        *GatewayAuth // Authentication middleware
 	auditConfig middlewarepkg.AuditConfig
-	rbacPolicy *rbac.Policy
-	mu         sync.RWMutex
-	started    bool
-	ctx        context.Context
-	cancel     context.CancelFunc
+	rbacPolicy  *rbac.Policy
+	mu          sync.RWMutex
+	started     bool
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // Server represents the HTTP server
@@ -52,13 +52,12 @@ type Router struct {
 
 // Route represents a single route
 type Route struct {
-	config    RouteConfig
-	targets   []string
-	healthyTargets []string
+	config          RouteConfig
+	targets         []string
+	healthyTargets  []string
 	lastHealthCheck time.Time
-	balancer  LoadBalancer
-	timeout   time.Duration
-	retries   int
+	timeout         time.Duration
+	retries         int
 }
 
 // LoadBalancer interface for different load balancing strategies
@@ -97,12 +96,12 @@ func NewGateway(config *Config) *Gateway {
 			writeTimeout: config.WriteTimeout,
 			idleTimeout:  config.IdleTimeout,
 		},
-		router:   router,
-		balancer: balancer,
+		router:      router,
+		balancer:    balancer,
 		auditConfig: auditCfg,
-		rbacPolicy: rbacPolicy,
-		ctx:      ctx,
-		cancel:   cancel,
+		rbacPolicy:  rbacPolicy,
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 
 	for _, routeConfig := range config.Routes {
@@ -174,11 +173,11 @@ func (g *Gateway) initTracing() {
 			logger.String("type", g.config.Tracing.Type),
 			logger.String("service", g.config.Tracing.ServiceName))
 	}
-	
+
 	// Initialize protocol proxies
 	g.grpcProxy = NewGRPCProxy(g)
 	g.jsonProxy = NewJSONRPCProxy(g)
-	
+
 	// Initialize authentication
 	g.auth = NewGatewayAuth(g.config.Protocols.Security.Auth)
 }
@@ -230,7 +229,7 @@ func (g *Gateway) Stop() error {
 	// Cancel context to stop all background goroutines
 	g.cancel()
 	logger.Info("Gateway context cancelled")
-	
+
 	// Stop service discovery
 	if g.discovery != nil {
 		if err := g.discovery.Stop(); err != nil {
@@ -239,13 +238,13 @@ func (g *Gateway) Stop() error {
 			logger.Info("Service discovery stopped")
 		}
 	}
-	
+
 	// Stop health manager
 	if g.health != nil {
 		g.health.Stop()
 		logger.Info("Health manager stopped")
 	}
-	
+
 	// Close protocol proxies
 	if g.grpcProxy != nil {
 		if err := g.grpcProxy.Close(); err != nil {
@@ -254,7 +253,7 @@ func (g *Gateway) Stop() error {
 			logger.Info("gRPC proxy closed")
 		}
 	}
-	
+
 	if g.jsonProxy != nil {
 		if err := g.jsonProxy.Close(); err != nil {
 			logger.Errorf("Failed to close JSON-RPC proxy", logger.Error(err))
@@ -262,7 +261,7 @@ func (g *Gateway) Stop() error {
 			logger.Info("JSON-RPC proxy closed")
 		}
 	}
-	
+
 	// Close HTTP proxy
 	if g.proxy != nil {
 		if err := g.proxy.Close(); err != nil {
@@ -271,7 +270,7 @@ func (g *Gateway) Stop() error {
 			logger.Info("HTTP proxy closed")
 		}
 	}
-	
+
 	g.started = false
 	logger.Info("Gateway stopped successfully")
 
@@ -373,10 +372,10 @@ func (g *Gateway) initDiscovery() error {
 	if err != nil {
 		return fmt.Errorf("failed to create service discovery: %w", err)
 	}
-	
+
 	// Store the discovery instance
 	g.discovery = sd
-	
+
 	return nil
 }
 
@@ -395,37 +394,37 @@ func (g *Gateway) initRoutes() error {
 	for _, routeConfig := range g.config.Routes {
 		routeConfig.Path = normalizeGinRoutePath(routeConfig.Path)
 		route := &Route{
-			config:   routeConfig,
-			targets:  append([]string(nil), routeConfig.Targets...),
-			timeout:  routeConfig.Timeout,
-			retries:  routeConfig.Retries,
+			config:  routeConfig,
+			targets: append([]string(nil), routeConfig.Targets...),
+			timeout: routeConfig.Timeout,
+			retries: routeConfig.Retries,
 		}
-		
+
 		// Get service endpoints
 		if g.discovery != nil && g.config.Discovery.Enabled {
 			// 只有在服务发现启用时才尝试获取动态端点
 			endpoints, err := g.discovery.GetServiceEndpoints(routeConfig.Service)
 			if err != nil {
-				logger.Debug("Service discovery failed during initialization", 
-					logger.String("service", routeConfig.Service), 
+				logger.Debug("Service discovery failed during initialization",
+					logger.String("service", routeConfig.Service),
 					logger.String("error", err.Error()))
 				// 使用配置中的静态 targets
 				if len(routeConfig.Targets) > 0 {
 					route.targets = append([]string(nil), routeConfig.Targets...)
-					logger.Debug("Using static targets for service", 
+					logger.Debug("Using static targets for service",
 						logger.String("service", routeConfig.Service),
 						logger.Any("targets", routeConfig.Targets))
 				}
 			} else if len(endpoints) > 0 {
 				route.targets = endpoints
-				logger.Info("Using discovery endpoints for service", 
+				logger.Info("Using discovery endpoints for service",
 					logger.String("service", routeConfig.Service),
 					logger.Any("endpoints", endpoints))
 			} else {
 				// 服务发现返回空结果，使用静态 targets
 				if len(routeConfig.Targets) > 0 {
 					route.targets = append([]string(nil), routeConfig.Targets...)
-					logger.Debug("Discovery returned empty, using static targets for service", 
+					logger.Debug("Discovery returned empty, using static targets for service",
 						logger.String("service", routeConfig.Service),
 						logger.Any("targets", routeConfig.Targets))
 				}
@@ -434,15 +433,15 @@ func (g *Gateway) initRoutes() error {
 			// 服务发现被禁用或不可用，直接使用静态 targets
 			if len(routeConfig.Targets) > 0 {
 				route.targets = append([]string(nil), routeConfig.Targets...)
-				logger.Debug("Service discovery disabled, using static targets for service", 
+				logger.Debug("Service discovery disabled, using static targets for service",
 					logger.String("service", routeConfig.Service),
 					logger.Any("targets", routeConfig.Targets))
 			} else {
-				logger.Warn("No targets available for service", 
+				logger.Warn("No targets available for service",
 					logger.String("service", routeConfig.Service))
 			}
 		}
-		
+
 		key := g.routeKey(routeConfig.Path, routeConfig.Method)
 		g.router.routes[key] = route
 	}
@@ -500,49 +499,49 @@ func (g *Gateway) refreshServices() {
 	if g.discovery == nil {
 		return
 	}
-	
+
 	// 检查服务发现是否被禁用
 	if !g.config.Discovery.Enabled {
 		return
 	}
-	
+
 	// Refresh routes with updated service endpoints
 	g.router.mu.Lock()
 	defer g.router.mu.Unlock()
-	
+
 	for _, route := range g.router.routes {
 		endpoints, err := g.discovery.GetServiceEndpoints(route.config.Service)
 		if err != nil {
 			// 减少日志噪音：只在第一次或错误类型变化时记录
-			logger.Debug("Service discovery refresh failed", 
-				logger.String("service", route.config.Service), 
+			logger.Debug("Service discovery refresh failed",
+				logger.String("service", route.config.Service),
 				logger.String("error", err.Error()))
-			
+
 			// 使用配置中的静态 targets
 			if len(route.config.Targets) > 0 {
 				route.targets = append([]string(nil), route.config.Targets...)
-				logger.Debug("Using static targets for service", 
+				logger.Debug("Using static targets for service",
 					logger.String("service", route.config.Service),
 					logger.Any("targets", route.config.Targets))
 			}
 			continue
 		}
-		
+
 		// 如果服务发现返回空结果，使用静态 targets
 		if len(endpoints) == 0 && len(route.config.Targets) > 0 {
 			route.targets = append([]string(nil), route.config.Targets...)
-			logger.Debug("Discovery returned empty, using static targets for service", 
+			logger.Debug("Discovery returned empty, using static targets for service",
 				logger.String("service", route.config.Service),
 				logger.Any("targets", route.config.Targets))
 		} else {
 			// Update route targets
 			route.targets = endpoints
-			logger.Debug("Updated service endpoints from discovery", 
+			logger.Debug("Updated service endpoints from discovery",
 				logger.String("service", route.config.Service),
 				logger.Any("endpoints", endpoints))
 		}
 		route.healthyTargets = nil
-		
+
 		// Update load balancer targets
 		if g.balancer != nil {
 			g.balancer.UpdateTargets(route.targets)

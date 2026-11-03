@@ -245,12 +245,14 @@ func (m *ipFilterMiddleware) Handle(c *gin.Context) {
 		c.Writer.WriteHeader(m.config.BlockStatusCode)
 		c.Abort()
 		resp := map[string]interface{}{
-			"error":   m.config.BlockMessage,
-			"code":    "IP_BLOCKED",
-			"ip":      clientIP,
-			"reason":  reason,
+			"error":  m.config.BlockMessage,
+			"code":   "IP_BLOCKED",
+			"ip":     clientIP,
+			"reason": reason,
 		}
-		json.NewEncoder(c.Writer).Encode(resp)
+		if err := json.NewEncoder(c.Writer).Encode(resp); err != nil {
+			c.Error(err).Type = gin.ErrorTypePrivate
+		}
 		return
 	}
 

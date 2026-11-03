@@ -8,9 +8,9 @@ import (
 type Middleware func(http.Handler) http.Handler
 
 type HTTPServiceOptions struct {
-	BizHandler    http.Handler
+	BizHandler     http.Handler
 	IsBusinessPath func(string) bool
-	Middlewares   []Middleware
+	Middlewares    []Middleware
 }
 
 type HTTPService struct {

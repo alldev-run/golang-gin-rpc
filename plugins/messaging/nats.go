@@ -185,7 +185,9 @@ func (c *NATSClient) Subscribe(ctx context.Context, topic string, handler Messag
 		<-ctx.Done()
 		c.mu.Lock()
 		if s, ok := c.subs[topic]; ok {
-			s.Unsubscribe()
+			if err := s.Unsubscribe(); err != nil {
+				log.Printf("NATS unsubscribe for %q failed: %v", topic, err)
+			}
 			delete(c.subs, topic)
 		}
 		c.mu.Unlock()
@@ -219,7 +221,9 @@ func (c *NATSClient) Close() error {
 	defer c.mu.Unlock()
 
 	for _, sub := range c.subs {
-		sub.Unsubscribe()
+		if err := sub.Unsubscribe(); err != nil {
+			log.Printf("NATS unsubscribe failed: %v", err)
+		}
 	}
 	c.subs = make(map[string]*nats.Subscription)
 

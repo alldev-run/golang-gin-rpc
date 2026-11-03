@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
-	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 )
 
 // TracingMiddleware creates a tracing middleware for the gateway

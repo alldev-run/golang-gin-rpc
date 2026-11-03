@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	userTableName      = "users"
-	defaultListLimit   = 20
-	maxListLimit       = 200
-	defaultListOffset  = 0
+	userTableName     = "users"
+	defaultListLimit  = 20
+	maxListLimit      = 200
+	defaultListOffset = 0
 )
 
 type UserEntity struct {

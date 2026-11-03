@@ -12,8 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,9 +150,9 @@ func loadSQLMigrations(dir string) ([]sqlMigrationSpec, error) {
 
 	re := regexp.MustCompile(`^(\d+)_([a-z0-9_]+)\.(up|down)\.sql$`)
 	type holder struct {
-		Version int
-		Name    string
-		UpPath  string
+		Version  int
+		Name     string
+		UpPath   string
 		DownPath string
 	}
 	items := make(map[string]*holder)
@@ -528,9 +528,7 @@ func copyTreeWithReplace(srcDir, dstDir string, opt copyOptions, replace func(re
 		}
 
 		dstRel := rel
-		if strings.HasSuffix(dstRel, ".gotmpl") {
-			dstRel = strings.TrimSuffix(dstRel, ".gotmpl")
-		}
+		dstRel = strings.TrimSuffix(dstRel, ".gotmpl")
 		dstPath := filepath.Join(dstDir, dstRel)
 		if d.IsDir() {
 			return os.MkdirAll(dstPath, 0o755)
@@ -1079,15 +1077,6 @@ func isSelected(sel []string, name string) bool {
 		}
 	}
 	return false
-}
-
-func initKind(name string) string {
-	for _, c := range initCatalog {
-		if c.name == name {
-			return c.kind
-		}
-	}
-	return ""
 }
 
 // buildServicesList renders the Go slice literal for frameworkOptions.Services.

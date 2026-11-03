@@ -2,7 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	
+
 	"github.com/alldev-run/golang-gin-rpc/internal/app"
 	"github.com/alldev-run/golang-gin-rpc/pkg/response"
 )
@@ -26,7 +26,7 @@ func (r *Router) RegisterRoutes() {
 	// Health check
 	router.GET("/health", func(c *gin.Context) {
 		response.Success(c, gin.H{
-			"status": "healthy",
+			"status":  "healthy",
 			"service": "github.com/alldev-run/golang-gin-rpc",
 		})
 	})
@@ -81,7 +81,7 @@ func (r *Router) getUser(c *gin.Context) {
 	id := c.Param("id")
 	// TODO: Implement get user logic
 	response.Success(c, gin.H{
-		"id": id,
+		"id":   id,
 		"user": gin.H{},
 	})
 }
@@ -90,7 +90,7 @@ func (r *Router) updateUser(c *gin.Context) {
 	id := c.Param("id")
 	// TODO: Implement update user logic
 	response.Success(c, gin.H{
-		"id": id,
+		"id":      id,
 		"message": "User updated successfully",
 	})
 }
@@ -99,7 +99,7 @@ func (r *Router) deleteUser(c *gin.Context) {
 	id := c.Param("id")
 	// TODO: Implement delete user logic
 	response.Success(c, gin.H{
-		"id": id,
+		"id":      id,
 		"message": "User deleted successfully",
 	})
 }
@@ -108,7 +108,7 @@ func (r *Router) getDatabaseStatus(c *gin.Context) {
 	// TODO: Implement database status check
 	response.Success(c, gin.H{
 		"databases": gin.H{},
-		"status": "healthy",
+		"status":    "healthy",
 	})
 }
 
@@ -124,7 +124,7 @@ func (r *Router) getCache(c *gin.Context) {
 	key := c.Param("key")
 	// TODO: Implement get cache logic
 	response.Success(c, gin.H{
-		"key": key,
+		"key":   key,
 		"value": nil,
 	})
 }
@@ -133,7 +133,7 @@ func (r *Router) setCache(c *gin.Context) {
 	key := c.Param("key")
 	// TODO: Implement set cache logic
 	response.Success(c, gin.H{
-		"key": key,
+		"key":     key,
 		"message": "Cache set successfully",
 	})
 }
@@ -142,7 +142,7 @@ func (r *Router) deleteCache(c *gin.Context) {
 	key := c.Param("key")
 	// TODO: Implement delete cache logic
 	response.Success(c, gin.H{
-		"key": key,
+		"key":     key,
 		"message": "Cache deleted successfully",
 	})
 }

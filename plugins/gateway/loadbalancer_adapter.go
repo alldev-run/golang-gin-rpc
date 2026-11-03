@@ -6,16 +6,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer"
 	"go.uber.org/zap"
 )
 
 // LoadBalancerAdapter adapts pkg/loadbalancer to gateway.LoadBalancer interface
 type LoadBalancerAdapter struct {
-	lb       loadbalancer.LoadBalancer
-	targets  []string
-	mu       sync.RWMutex
+	lb      loadbalancer.LoadBalancer
+	targets []string
+	mu      sync.RWMutex
 }
 
 // NewLoadBalancerAdapter creates a new adapter
@@ -23,7 +23,7 @@ func NewLoadBalancerAdapter(strategy string) LoadBalancer {
 	opts := []loadbalancer.Option{
 		loadbalancer.WithLogger(&gatewayLoggerAdapter{}),
 	}
-	
+
 	var lbStrategy loadbalancer.Strategy
 	switch strings.ToLower(strategy) {
 	case "round_robin":
@@ -37,14 +37,14 @@ func NewLoadBalancerAdapter(strategy string) LoadBalancer {
 	default:
 		lbStrategy = loadbalancer.StrategyRoundRobin
 	}
-	
+
 	factory := loadbalancer.NewLoadBalancerFactory(opts...)
 	lb, err := factory.Create(lbStrategy)
 	if err != nil {
 		// Fallback to round robin
 		lb, _ = factory.Create(loadbalancer.StrategyRoundRobin)
 	}
-	
+
 	return &LoadBalancerAdapter{lb: lb}
 }
 
@@ -53,28 +53,28 @@ func (a *LoadBalancerAdapter) Select(targets []string) (string, error) {
 	a.mu.RLock()
 	currentTargets := a.targets
 	a.mu.RUnlock()
-	
+
 	// If targets provided, update them
 	if len(targets) > 0 {
 		a.UpdateTargets(targets)
 		currentTargets = targets
 	}
-	
+
 	if len(currentTargets) == 0 {
 		return "", ErrLoadBalancerFailed
 	}
-	
+
 	// Convert string targets to loadbalancer.Target
 	lbTargets := make([]*loadbalancer.Target, len(currentTargets))
 	for i, target := range currentTargets {
 		lbTargets[i] = loadbalancer.NewTarget(target)
 	}
-	
+
 	// Update targets in the load balancer
 	if err := a.lb.UpdateTargets(lbTargets); err != nil {
 		return "", ErrLoadBalancerFailed
 	}
-	
+
 	// Select target
 	selected, err := a.lb.Select(context.Background(), nil)
 	if err != nil {
@@ -83,7 +83,7 @@ func (a *LoadBalancerAdapter) Select(targets []string) (string, error) {
 		}
 		return "", err
 	}
-	
+
 	return selected.Address, nil
 }
 
@@ -91,21 +91,21 @@ func (a *LoadBalancerAdapter) Select(targets []string) (string, error) {
 func (a *LoadBalancerAdapter) UpdateTargets(targets []string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	
+
 	if len(targets) == 0 {
 		return
 	}
-	
+
 	// Store targets for future use
 	a.targets = make([]string, len(targets))
 	copy(a.targets, targets)
-	
+
 	// Convert string targets to loadbalancer.Target
 	lbTargets := make([]*loadbalancer.Target, len(targets))
 	for i, target := range targets {
 		lbTargets[i] = loadbalancer.NewTarget(target)
 	}
-	
+
 	_ = a.lb.UpdateTargets(lbTargets)
 }
 

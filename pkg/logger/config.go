@@ -38,49 +38,49 @@ const (
 type Config struct {
 	// Level is the logging level
 	Level LogLevel `yaml:"level" json:"level"`
-	
+
 	// Env is the deployment environment
 	Env string `yaml:"env" json:"env"`
-	
+
 	// LogPath is the log file path (when output is "file")
 	LogPath string `yaml:"log_path" json:"log_path"`
-	
+
 	// Output is the log output destination
 	Output LogOutput `yaml:"output" json:"output"`
-	
+
 	// Format is the log format
 	Format LogFormat `yaml:"format" json:"format"`
-	
+
 	// EnableConsoleColors enables console colors
 	EnableConsoleColors bool `yaml:"enable_console_colors" json:"enable_console_colors"`
-	
+
 	// EnableCaller enables caller information
 	EnableCaller bool `yaml:"enable_caller" json:"enable_caller"`
-	
+
 	// EnableStacktrace enables stack trace for errors
 	EnableStacktrace bool `yaml:"enable_stacktrace" json:"enable_stacktrace"`
-	
+
 	// TimeFormat is the time format for logs
 	TimeFormat string `yaml:"time_format" json:"time_format"`
-	
+
 	// MaxSize is the maximum size of a log file in MB
 	MaxSize int `yaml:"max_size" json:"max_size"`
-	
+
 	// MaxBackups is the maximum number of old log files to retain
 	MaxBackups int `yaml:"max_backups" json:"max_backups"`
-	
+
 	// MaxAge is the maximum number of days to retain old log files
 	MaxAge int `yaml:"max_age" json:"max_age"`
-	
+
 	// Compress indicates if old log files should be compressed
 	Compress bool `yaml:"compress" json:"compress"`
-	
+
 	// LocalTime indicates if timestamps should use local time
 	LocalTime bool `yaml:"local_time" json:"local_time"`
-	
+
 	// Fields are additional fields to include in all logs
 	Fields map[string]interface{} `yaml:"fields" json:"fields"`
-	
+
 	// Sampling configuration
 	Sampling SamplingConfig `yaml:"sampling" json:"sampling"`
 }
@@ -89,16 +89,16 @@ type Config struct {
 type SamplingConfig struct {
 	// Enabled indicates if sampling is enabled
 	Enabled bool `yaml:"enabled" json:"enabled"`
-	
+
 	// Rate is the sampling rate (0.0 to 1.0)
 	Rate float64 `yaml:"rate" json:"rate"`
-	
+
 	// Tick is the sampling interval
 	Tick time.Duration `yaml:"tick" json:"tick"`
-	
+
 	// Initial is the initial burst of logs to allow
 	Initial int `yaml:"initial" json:"initial"`
-	
+
 	// Thereafter is the rate after initial burst
 	Thereafter int `yaml:"thereafter" json:"thereafter"`
 }
@@ -106,21 +106,21 @@ type SamplingConfig struct {
 // DefaultConfig returns default logger configuration
 func DefaultConfig() Config {
 	return Config{
-		Level:              LogLevelInfo,
-		Env:                "development",
-		LogPath:            "./logs/app.log",
-		Output:             LogOutputStdout,
-		Format:             LogFormatJSON,
+		Level:               LogLevelInfo,
+		Env:                 "development",
+		LogPath:             "./logs/app.log",
+		Output:              LogOutputStdout,
+		Format:              LogFormatJSON,
 		EnableConsoleColors: true,
-		EnableCaller:       true,
-		EnableStacktrace:   true,
-		TimeFormat:         time.RFC3339,
-		MaxSize:            100, // 100MB
-		MaxBackups:         10,
-		MaxAge:             30, // 30 days
-		Compress:           true,
-		LocalTime:          false,
-		Fields:             make(map[string]interface{}),
+		EnableCaller:        true,
+		EnableStacktrace:    true,
+		TimeFormat:          time.RFC3339,
+		MaxSize:             100, // 100MB
+		MaxBackups:          10,
+		MaxAge:              30, // 30 days
+		Compress:            true,
+		LocalTime:           false,
+		Fields:              make(map[string]interface{}),
 		Sampling: SamplingConfig{
 			Enabled:    false,
 			Rate:       0.1, // 10%
@@ -134,20 +134,20 @@ func DefaultConfig() Config {
 // DevelopmentConfig returns development-friendly logger configuration
 func DevelopmentConfig() Config {
 	return Config{
-		Level:              LogLevelDebug,
-		Env:                "development",
-		LogPath:            "./logs/dev.log",
-		Output:             LogOutputStdout,
-		Format:             LogFormatText,
+		Level:               LogLevelDebug,
+		Env:                 "development",
+		LogPath:             "./logs/dev.log",
+		Output:              LogOutputStdout,
+		Format:              LogFormatText,
 		EnableConsoleColors: true,
-		EnableCaller:       true,
-		EnableStacktrace:   true,
-		TimeFormat:         "2006-01-02 15:04:05",
-		MaxSize:            50, // 50MB
-		MaxBackups:         5,
-		MaxAge:             7, // 7 days
-		Compress:           false,
-		LocalTime:          true,
+		EnableCaller:        true,
+		EnableStacktrace:    true,
+		TimeFormat:          "2006-01-02 15:04:05",
+		MaxSize:             50, // 50MB
+		MaxBackups:          5,
+		MaxAge:              7, // 7 days
+		Compress:            false,
+		LocalTime:           true,
 		Fields: map[string]interface{}{
 			"env": "development",
 		},
@@ -164,22 +164,22 @@ func DevelopmentConfig() Config {
 // ProductionConfig returns production-friendly logger configuration
 func ProductionConfig() Config {
 	return Config{
-		Level:              LogLevelInfo,
-		Env:                "production",
-		LogPath:            "/var/log/app/app.log",
-		Output:             LogOutputFile,
-		Format:             LogFormatJSON,
+		Level:               LogLevelInfo,
+		Env:                 "production",
+		LogPath:             "/var/log/app/app.log",
+		Output:              LogOutputFile,
+		Format:              LogFormatJSON,
 		EnableConsoleColors: false,
-		EnableCaller:       false,
-		EnableStacktrace:   false,
-		TimeFormat:         time.RFC3339,
-		MaxSize:            500, // 500MB
-		MaxBackups:         30,
-		MaxAge:             90, // 90 days
-		Compress:           true,
-		LocalTime:          false,
+		EnableCaller:        false,
+		EnableStacktrace:    false,
+		TimeFormat:          time.RFC3339,
+		MaxSize:             500, // 500MB
+		MaxBackups:          30,
+		MaxAge:              90, // 90 days
+		Compress:            true,
+		LocalTime:           false,
 		Fields: map[string]interface{}{
-			"env": "production",
+			"env":     "production",
 			"service": "github.com/alldev-run/golang-gin-rpc",
 		},
 		Sampling: SamplingConfig{
@@ -195,20 +195,20 @@ func ProductionConfig() Config {
 // TestConfig returns test-friendly logger configuration
 func TestConfig() Config {
 	return Config{
-		Level:              LogLevelDebug,
-		Env:                "test",
-		LogPath:            "./logs/test.log",
-		Output:             LogOutputStdout,
-		Format:             LogFormatText,
+		Level:               LogLevelDebug,
+		Env:                 "test",
+		LogPath:             "./logs/test.log",
+		Output:              LogOutputStdout,
+		Format:              LogFormatText,
 		EnableConsoleColors: false,
-		EnableCaller:       false,
-		EnableStacktrace:   false,
-		TimeFormat:         time.RFC3339,
-		MaxSize:            10, // 10MB
-		MaxBackups:         3,
-		MaxAge:             1, // 1 day
-		Compress:           false,
-		LocalTime:          false,
+		EnableCaller:        false,
+		EnableStacktrace:    false,
+		TimeFormat:          time.RFC3339,
+		MaxSize:             10, // 10MB
+		MaxBackups:          3,
+		MaxAge:              1, // 1 day
+		Compress:            false,
+		LocalTime:           false,
 		Fields: map[string]interface{}{
 			"env": "test",
 		},
@@ -225,22 +225,22 @@ func TestConfig() Config {
 // DockerConfig returns Docker-friendly logger configuration
 func DockerConfig() Config {
 	return Config{
-		Level:              LogLevelInfo,
-		Env:                "docker",
-		LogPath:            "/app/logs/app.log",
-		Output:             LogOutputStdout,
-		Format:             LogFormatJSON,
+		Level:               LogLevelInfo,
+		Env:                 "docker",
+		LogPath:             "/app/logs/app.log",
+		Output:              LogOutputStdout,
+		Format:              LogFormatJSON,
 		EnableConsoleColors: false,
-		EnableCaller:       true,
-		EnableStacktrace:   true,
-		TimeFormat:         time.RFC3339,
-		MaxSize:            100, // 100MB
-		MaxBackups:         10,
-		MaxAge:             30, // 30 days
-		Compress:           true,
-		LocalTime:          false,
+		EnableCaller:        true,
+		EnableStacktrace:    true,
+		TimeFormat:          time.RFC3339,
+		MaxSize:             100, // 100MB
+		MaxBackups:          10,
+		MaxAge:              30, // 30 days
+		Compress:            true,
+		LocalTime:           false,
 		Fields: map[string]interface{}{
-			"env": "docker",
+			"env":     "docker",
 			"service": "github.com/alldev-run/golang-gin-rpc",
 		},
 		Sampling: SamplingConfig{
@@ -254,7 +254,7 @@ func DockerConfig() Config {
 }
 
 // Validate validates the logger configuration
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
 	if c.Level == "" {
 		c.Level = LogLevelInfo
 	}
@@ -294,14 +294,14 @@ func (c Config) Validate() error {
 	if c.Sampling.Thereafter == 0 {
 		c.Sampling.Thereafter = 100
 	}
-	
+
 	// Ensure log directory exists
 	if c.Output == LogOutputFile && c.LogPath != "" {
 		if err := os.MkdirAll(c.LogPath[:len(c.LogPath)-len("/app.log")], 0755); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 

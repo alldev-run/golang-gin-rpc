@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrBatchSQLSinkClosed   = errors.New("batch sql sink closed")
-	ErrBatchSizeInvalid     = errors.New("batch size must be greater than 0")
+	ErrBatchSQLSinkClosed = errors.New("batch sql sink closed")
+	ErrBatchSizeInvalid   = errors.New("batch size must be greater than 0")
 )
 
 var batchAuditTableNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_\.]+$`)

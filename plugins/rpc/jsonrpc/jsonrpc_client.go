@@ -14,12 +14,12 @@ import (
 
 // ClientConfig holds JSON-RPC client configuration
 type ClientConfig struct {
-	URL        string        `yaml:"url" json:"url"`
-	Timeout    time.Duration `yaml:"timeout" json:"timeout"`
+	URL        string            `yaml:"url" json:"url"`
+	Timeout    time.Duration     `yaml:"timeout" json:"timeout"`
 	Headers    map[string]string `yaml:"headers" json:"headers"`
-	UserAgent  string        `yaml:"user_agent" json:"user_agent"`
-	MaxRetries int           `yaml:"max_retries" json:"max_retries"`
-	RetryDelay time.Duration `yaml:"retry_delay" json:"retry_delay"`
+	UserAgent  string            `yaml:"user_agent" json:"user_agent"`
+	MaxRetries int               `yaml:"max_retries" json:"max_retries"`
+	RetryDelay time.Duration     `yaml:"retry_delay" json:"retry_delay"`
 }
 
 // DefaultClientConfig returns default JSON-RPC client configuration
@@ -44,10 +44,10 @@ type Request struct {
 
 // Response represents a JSON-RPC 2.0 response
 type Response struct {
-	JSONRPC string          `json:"jsonrpc"`
-	Result  interface{}     `json:"result,omitempty"`
-	Error   *RPCError       `json:"error,omitempty"`
-	ID      interface{}     `json:"id"`
+	JSONRPC string      `json:"jsonrpc"`
+	Result  interface{} `json:"result,omitempty"`
+	Error   *RPCError   `json:"error,omitempty"`
+	ID      interface{} `json:"id"`
 }
 
 // RPCError represents a JSON-RPC error
@@ -108,7 +108,13 @@ func (c *Client) CallWithID(ctx context.Context, method string, params interface
 	}
 
 	if result != nil && response.Result != nil {
-		return json.Unmarshal(response.Result.(json.RawMessage), result)
+		resultData, err := json.Marshal(response.Result)
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON-RPC result: %w", err)
+		}
+		if err := json.Unmarshal(resultData, result); err != nil {
+			return fmt.Errorf("failed to unmarshal JSON-RPC result: %w", err)
+		}
 	}
 
 	return nil
@@ -226,15 +232,15 @@ func (c *Client) doBatchRequest(ctx context.Context, requests []*Request) (Batch
 // CallWithRetry makes a JSON-RPC call with retry logic
 func (c *Client) CallWithRetry(ctx context.Context, method string, params interface{}, result interface{}) error {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
 		err := c.Call(ctx, method, params, result)
 		if err == nil {
 			return nil
 		}
-		
+
 		lastErr = err
-		
+
 		// Don't retry on certain errors
 		if rpcErr, ok := err.(*RPCError); ok {
 			if rpcErr.Code == -32600 || rpcErr.Code == -32601 || rpcErr.Code == -32602 {
@@ -242,7 +248,7 @@ func (c *Client) CallWithRetry(ctx context.Context, method string, params interf
 				return err
 			}
 		}
-		
+
 		if attempt < c.config.MaxRetries {
 			select {
 			case <-ctx.Done():
@@ -252,7 +258,7 @@ func (c *Client) CallWithRetry(ctx context.Context, method string, params interf
 			}
 		}
 	}
-	
+
 	return fmt.Errorf("max retries exceeded, last error: %w", lastErr)
 }
 
@@ -330,7 +336,7 @@ func (p *ClientPool) Get(url string) *Client {
 
 	config := p.config
 	config.URL = url
-	
+
 	client := NewClient(config)
 	p.mu.Lock()
 	defer p.mu.Unlock()

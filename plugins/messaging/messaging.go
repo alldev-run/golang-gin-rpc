@@ -37,7 +37,6 @@ type Client interface {
 	Subscriber
 }
 
-
 // MessageError represents an error in messaging operations
 type MessageError struct {
 	Operation string

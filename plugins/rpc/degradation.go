@@ -102,9 +102,9 @@ func DefaultDegradationConfig() DegradationConfig {
 
 // slidingWindowMetrics holds degradation metrics with sliding window
 type slidingWindowMetrics struct {
-	mu            sync.RWMutex
-	windowSize    time.Duration
-	requests      []metricEntry
+	mu         sync.RWMutex
+	windowSize time.Duration
+	requests   []metricEntry
 }
 
 type metricEntry struct {
@@ -115,22 +115,22 @@ type metricEntry struct {
 
 // DegradationManager manages service degradation
 type DegradationManager struct {
-	config            DegradationConfig
-	currentLevel      DegradationLevel
-	mu                sync.RWMutex
-	fallbacks         map[string]FallbackFunc
-	methodLevels      map[string]DegradationLevel
-	metrics           *slidingWindowMetrics
-	stopCh            chan struct{}
-	wg                sync.WaitGroup
-	onLevelChange     func(DegradationLevel, DegradationLevel)
+	config        DegradationConfig
+	currentLevel  DegradationLevel
+	mu            sync.RWMutex
+	fallbacks     map[string]FallbackFunc
+	methodLevels  map[string]DegradationLevel
+	metrics       *slidingWindowMetrics
+	stopCh        chan struct{}
+	wg            sync.WaitGroup
+	onLevelChange func(DegradationLevel, DegradationLevel)
 	// Concurrency limiting
-	activeRequests    int64
-	semaphore         chan struct{}
+	activeRequests int64
+	semaphore      chan struct{}
 	// Circuit breaker integration
-	circuitBreaker    *circuitbreaker.CircuitBreaker
+	circuitBreaker *circuitbreaker.CircuitBreaker
 	// Health check registration
-	healthRegistered  bool
+	healthRegistered bool
 }
 
 // NewDegradationManager creates a new degradation manager
@@ -141,12 +141,12 @@ func NewDegradationManager(config DegradationConfig) (*DegradationManager, error
 
 	dm := &DegradationManager{
 		config:       config,
-		currentLevel:   config.Level,
-		fallbacks:      make(map[string]FallbackFunc),
-		methodLevels:   make(map[string]DegradationLevel),
-		metrics:        &slidingWindowMetrics{windowSize: time.Minute, requests: make([]metricEntry, 0)},
-		stopCh:         make(chan struct{}),
-		semaphore:      make(chan struct{}, 100),
+		currentLevel: config.Level,
+		fallbacks:    make(map[string]FallbackFunc),
+		methodLevels: make(map[string]DegradationLevel),
+		metrics:      &slidingWindowMetrics{windowSize: time.Minute, requests: make([]metricEntry, 0)},
+		stopCh:       make(chan struct{}),
+		semaphore:    make(chan struct{}, 100),
 	}
 
 	// Initialize semaphore
@@ -278,7 +278,7 @@ func (dm *DegradationManager) RegisterHealthCheck(checker health.HealthChecker) 
 	if checker == nil {
 		return
 	}
-	
+
 	// Try to register - the interface may vary
 	// For now, just mark as registered
 	dm.healthRegistered = true
@@ -292,7 +292,7 @@ func (dm *DegradationManager) CircuitBreaker() *circuitbreaker.CircuitBreaker {
 // AcquireConcurrencyToken acquires a concurrency token, returns error if limit reached
 func (dm *DegradationManager) AcquireConcurrencyToken(ctx context.Context) error {
 	currentLevel := dm.GetCurrentLevel()
-	
+
 	// Adjust concurrency based on level
 	limit := 100 // default limit
 	switch currentLevel {
@@ -376,14 +376,14 @@ func (dm *DegradationManager) RecordMetrics(duration time.Duration, err error) {
 			newRequests = append(newRequests, entry)
 		}
 	}
-	
+
 	// Add new entry
 	newRequests = append(newRequests, metricEntry{
 		timestamp: now,
 		duration:  duration,
 		err:       err,
 	})
-	
+
 	dm.metrics.requests = newRequests
 }
 

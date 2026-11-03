@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
-	
+
 	"gopkg.in/yaml.v3"
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/httpapi"
@@ -17,8 +17,8 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/routes"
 	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
-	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 )
 
@@ -52,13 +52,13 @@ func main() {
 	gatewayLoggerConfig.InheritGlobalConfig = false
 	gatewayLoggerConfig.OverrideConfig = loggerCfg
 	gatewayLoggerConfig.OverrideConfig.Level = logger.LogLevelDebug // API Gateway 需要详细日志
-	gatewayLoggerConfig.OverrideConfig.MaxSize = 200 // 更大的文件大小
+	gatewayLoggerConfig.OverrideConfig.MaxSize = 200                // 更大的文件大小
 	gatewayLoggerConfig.OverrideConfig.MaxBackups = 15
 	gatewayLoggerConfig.OverrideConfig.MaxAge = 45
-	
+
 	gatewayLogger := logger.GetServiceLoggerInstance("api-gateway", gatewayLoggerConfig)
 
-	gatewayLogger.Info("http-gateway starting", 
+	gatewayLogger.Info("http-gateway starting",
 		logger.String("version", "1.0.0"),
 		logger.String("config", configPath),
 		logger.String("service", gwCfg.ServiceName),
@@ -108,7 +108,7 @@ func main() {
 
 	// 创建业务处理器 - 框架已内置请求日志中间件
 	bizHandler := httpapi.NewRouter(mergedGwCfg, routeServices).Handler()
-	
+
 	if err := bootstrap.RegisterAPIGatewayServiceFactory(boot, bootstrap.APIGatewayServiceOptions{
 		Name:   gatewayServiceName,
 		Config: mergedGwCfg,
@@ -121,33 +121,33 @@ func main() {
 		log.Fatalf("failed to register api-gateway service factory: %v", err)
 	}
 
-	frameworkOptions := boot.FrameworkOptionsFromConfig()
-	frameworkOptions.Services = []string{gatewayServiceName}
-
 	serviceDBConfigPath := filepath.Join(filepath.Dir(configPath), "database.yml")
 	if _, err := os.Stat(serviceDBConfigPath); err == nil {
 		if err := bootstrap.LoadDatabaseConfig(boot, serviceDBConfigPath); err != nil {
 			log.Fatalf("failed to load service database config: %v", err)
 		}
-		frameworkOptions.InitDatabases = true
+		boot.GetConfig().Framework.InitDatabases = true
 		gatewayLogger.Info("service database config loaded and overrides framework database config",
 			logger.String("path", serviceDBConfigPath),
 		)
 	} else if frameworkConfigPath == "" {
-		frameworkOptions.InitDatabases = false
+		boot.GetConfig().Framework.InitDatabases = false
 	}
 
 	if frameworkConfigPath == "" {
-		frameworkOptions.InitCache = false
-		frameworkOptions.InitDiscovery = false
-		frameworkOptions.InitTracing = false
-		frameworkOptions.InitAuth = false
-		frameworkOptions.InitMetrics = false
-		frameworkOptions.InitHealth = true
-		frameworkOptions.InitErrors = true
-		frameworkOptions.ValidateDependencyCoverage = false
+		framework := &boot.GetConfig().Framework
+		framework.InitCache = false
+		framework.InitDiscovery = false
+		framework.InitTracing = false
+		framework.InitAuth = false
+		framework.InitMetrics = false
+		framework.InitHealth = true
+		framework.InitErrors = true
+		framework.ValidateDependencyCoverage = false
 	}
 
+	frameworkOptions := boot.FrameworkOptionsFromConfig()
+	frameworkOptions.Services = []string{gatewayServiceName}
 	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
 		log.Fatalf("failed to start framework services: %v", err)
 	}
@@ -172,7 +172,7 @@ func main() {
 	if err := boot.StopFramework(shutdownCtx, frameworkOptions.Services...); err != nil {
 		gatewayLogger.Error("framework shutdown failed", logger.Error(err))
 	}
-	
+
 	gatewayLogger.Info("http-gateway stopped")
 }
 
@@ -266,13 +266,13 @@ func buildGatewayConfigFromFramework(cfg *config.GlobalConfig) *gateway.Config {
 	}
 
 	base.Tracing = &tracing.Config{
-		Enabled:       cfg.Observability.Tracing.Enabled,
-		Type:          cfg.Observability.Tracing.Type,
-		Endpoint:      cfg.Observability.Tracing.Endpoint,
-		SampleRate:    cfg.Observability.Tracing.SampleRate,
-		ServiceName:   cfg.App.Name,
+		Enabled:        cfg.Observability.Tracing.Enabled,
+		Type:           cfg.Observability.Tracing.Type,
+		Endpoint:       cfg.Observability.Tracing.Endpoint,
+		SampleRate:     cfg.Observability.Tracing.SampleRate,
+		ServiceName:    cfg.App.Name,
 		ServiceVersion: cfg.App.Version,
-		Environment:   cfg.App.Environment,
+		Environment:    cfg.App.Environment,
 	}
 
 	return base
@@ -322,7 +322,7 @@ func resolveFrameworkConfigPath(gatewayConfigPath string) string {
 // getEnabledProtocols 获取启用的协议列表
 func getEnabledProtocols(cfg *gateway.Config) string {
 	var protocols []string
-	
+
 	if cfg.Protocols.HTTP {
 		protocols = append(protocols, "HTTP")
 	}
@@ -335,15 +335,15 @@ func getEnabledProtocols(cfg *gateway.Config) string {
 	if cfg.Protocols.JSONRPC {
 		protocols = append(protocols, "JSON-RPC")
 	}
-	
+
 	if len(protocols) == 0 {
 		return "HTTP"
 	}
-	
+
 	result := protocols[0]
 	for i := 1; i < len(protocols); i++ {
 		result += "/" + protocols[i]
 	}
-	
+
 	return result
 }

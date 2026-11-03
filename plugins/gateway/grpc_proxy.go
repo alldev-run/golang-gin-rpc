@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/otel/attribute"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/rpc/grpc"
 	"github.com/alldev-run/golang-gin-rpc/plugins/rpc/jsonrpc"
+	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // GRPCProxy handles gRPC proxy requests using pkg/rpc
@@ -173,7 +173,7 @@ func (p *GRPCProxy) Close() error {
 		}
 	}
 	p.clients = make(map[string]*grpc.Client)
-	
+
 	logger.Info("Found gRPC clients to close", logger.Int("count", clientCount))
 	logger.Info("gRPC proxy closed successfully")
 	return lastErr
@@ -329,7 +329,7 @@ func (p *JSONRPCProxy) Close() error {
 	clientCount := len(p.clients)
 
 	p.clients = make(map[string]*jsonrpc.Client)
-	
+
 	logger.Info("Found JSON-RPC clients to close", logger.Int("count", clientCount))
 	logger.Info("JSON-RPC proxy closed successfully")
 	return nil

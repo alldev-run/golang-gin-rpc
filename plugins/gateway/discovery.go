@@ -3,17 +3,15 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 )
 
 // ServiceDiscovery integrates with existing discovery package
 type ServiceDiscovery struct {
 	discovery discovery.Discovery
-	mu        sync.RWMutex
 	ctx       context.Context
 	cancel    context.CancelFunc
 }
@@ -53,7 +51,7 @@ func NewServiceDiscovery(config DiscoveryConfig) (*ServiceDiscovery, error) {
 			cancel: cancel,
 		}, nil
 	}
-	
+
 	// Create discovery instance using existing factory
 	discoveryConfig := discovery.Config{
 		Type:    discovery.RegistryType(config.Type),
@@ -61,17 +59,17 @@ func NewServiceDiscovery(config DiscoveryConfig) (*ServiceDiscovery, error) {
 		Timeout: config.Timeout,
 		Enabled: config.Enabled,
 	}
-	
+
 	disc, err := discovery.NewDiscovery(discoveryConfig)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create discovery: %w", err)
 	}
-	
+
 	return &ServiceDiscovery{
 		discovery: disc,
-		ctx:        ctx,
-		cancel:     cancel,
+		ctx:       ctx,
+		cancel:    cancel,
 	}, nil
 }
 
@@ -93,23 +91,23 @@ func (sd *ServiceDiscovery) GetServiceEndpoints(serviceName string) ([]string, e
 		// Static discovery - return mock endpoints
 		return sd.getStaticEndpoints(serviceName)
 	}
-	
+
 	// Use existing discovery
 	instances, err := sd.discovery.GetService(context.Background(), serviceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service %s: %w", serviceName, err)
 	}
-	
+
 	endpoints := make([]string, 0, len(instances))
 	for _, instance := range instances {
 		endpoint := fmt.Sprintf("http://%s:%d", instance.Address, instance.Port)
 		endpoints = append(endpoints, endpoint)
 	}
-	
+
 	if len(endpoints) == 0 {
 		return nil, fmt.Errorf("no instances found for service: %s", serviceName)
 	}
-	
+
 	return endpoints, nil
 }
 
@@ -117,22 +115,22 @@ func (sd *ServiceDiscovery) GetServiceEndpoints(serviceName string) ([]string, e
 func (sd *ServiceDiscovery) Start() error {
 	// Start background sync
 	go sd.syncLoop()
-	
+
 	discoveryType := "static"
 	if sd.discovery != nil {
 		discoveryType = "dynamic"
 	}
-	
+
 	logger.Info("Service discovery started",
 		logger.String("type", discoveryType))
-	
+
 	return nil
 }
 
 // Stop stops the service discovery
 func (sd *ServiceDiscovery) Stop() error {
 	sd.cancel()
-	
+
 	if sd.discovery != nil {
 		// Existing discovery doesn't have explicit close method
 		// Just log the shutdown
@@ -140,7 +138,7 @@ func (sd *ServiceDiscovery) Stop() error {
 	} else {
 		logger.Info("Static service discovery stopped")
 	}
-	
+
 	return nil
 }
 
@@ -151,7 +149,6 @@ func (sd *ServiceDiscovery) getStaticEndpoints(serviceName string) ([]string, er
 	// 这个函数现在只用于向后兼容
 	return nil, fmt.Errorf("static discovery should use route targets directly: %s", serviceName)
 }
-
 
 // syncLoop runs the background sync loop
 func (sd *ServiceDiscovery) syncLoop() {
@@ -179,12 +176,12 @@ func (sd *ServiceDiscovery) syncServices() {
 func (sd *ServiceDiscovery) RegisterService(name string, instances []ServiceInstance) error {
 	if sd.discovery == nil {
 		// Static discovery - just log
-		logger.Info("Static registration for service", 
+		logger.Info("Static registration for service",
 			logger.String("service", name),
 			logger.Int("instances", len(instances)))
 		return nil
 	}
-	
+
 	// Register with existing discovery
 	for _, instance := range instances {
 		discInstance := &discovery.ServiceInstance{
@@ -194,15 +191,14 @@ func (sd *ServiceDiscovery) RegisterService(name string, instances []ServiceInst
 			Port:    instance.Port,
 			Payload: instance.Metadata,
 		}
-		
+
 		if err := sd.discovery.Register(context.Background(), discInstance); err != nil {
 			return fmt.Errorf("failed to register instance %s: %w", instance.ID, err)
 		}
 	}
-	
-	logger.Info("Registered service", 
+
+	logger.Info("Registered service",
 		logger.String("service", name),
 		logger.Int("instances", len(instances)))
 	return nil
 }
-

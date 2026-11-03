@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 )
 
 // TracedClient wraps a JSON-RPC client with tracing capabilities

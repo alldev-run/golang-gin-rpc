@@ -55,7 +55,7 @@ func (s *BaseService) GetMetadata(key string) (interface{}, bool) {
 func (s *BaseService) GetAllMetadata() map[string]interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	metadata := make(map[string]interface{})
 	for k, v := range s.metadata {
 		metadata[k] = v
@@ -95,8 +95,8 @@ func (s *BaseService) Health() HealthStatus {
 type MethodInfo struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
-	InputType    string      `json:"input_type"`
-	OutputType   string      `json:"output_type"`
+	InputType   string      `json:"input_type"`
+	OutputType  string      `json:"output_type"`
 	Parameters  []Parameter `json:"parameters"`
 }
 
@@ -112,26 +112,26 @@ type Parameter struct {
 func (s *BaseService) GetMethods() []MethodInfo {
 	serviceType := reflect.TypeOf(s)
 	var methods []MethodInfo
-	
+
 	for i := 0; i < serviceType.NumMethod(); i++ {
 		method := serviceType.Method(i)
-		
+
 		// Only include exported methods that start with capital letters
-		if !method.IsExported() || strings.HasPrefix(method.Name, "Get") && 
-		   (strings.HasSuffix(method.Name, "Metadata") || strings.HasSuffix(method.Name, "Methods")) {
+		if !method.IsExported() || strings.HasPrefix(method.Name, "Get") &&
+			(strings.HasSuffix(method.Name, "Metadata") || strings.HasSuffix(method.Name, "Methods")) {
 			continue
 		}
-		
+
 		methodInfo := MethodInfo{
 			Name:        method.Name,
 			Description: fmt.Sprintf("Method %s of service %s", method.Name, s.name),
-			InputType:    getMethodInputType(method),
-			OutputType:   getMethodOutputType(method),
+			InputType:   getMethodInputType(method),
+			OutputType:  getMethodOutputType(method),
 		}
-		
+
 		methods = append(methods, methodInfo)
 	}
-	
+
 	return methods
 }
 
@@ -187,9 +187,9 @@ func (s *SystemService) Ping(ctx context.Context, req interface{}) (interface{},
 // Info returns information about the service
 func (s *SystemService) Info(ctx context.Context, req interface{}) (interface{}, error) {
 	return map[string]interface{}{
-		"name":    s.Name(),
-		"uptime":  s.Uptime().String(),
-		"methods": s.GetMethods(),
+		"name":     s.Name(),
+		"uptime":   s.Uptime().String(),
+		"methods":  s.GetMethods(),
 		"metadata": s.GetAllMetadata(),
 	}, nil
 }
@@ -212,47 +212,47 @@ func NewJSONRPCHandler(service interface{}) *JSONRPCHandler {
 // Handle handles a JSON-RPC method call
 func (h *JSONRPCHandler) Handle(c *gin.Context, method string, params interface{}) (interface{}, error) {
 	ctx := c.Request.Context()
-	
+
 	// Use reflection to call the method
 	serviceValue := reflect.ValueOf(h.service)
 	methodValue := serviceValue.MethodByName(method)
-	
+
 	if !methodValue.IsValid() {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("method not found: %s", method))
 	}
-	
+
 	// Prepare arguments
 	var args []reflect.Value
 	args = append(args, reflect.ValueOf(ctx))
-	
+
 	if params != nil {
 		args = append(args, reflect.ValueOf(params))
 	} else {
 		args = append(args, reflect.ValueOf(nil))
 	}
-	
+
 	// Call the method
 	results := methodValue.Call(args)
-	
+
 	// Handle results
 	if len(results) == 0 {
 		return nil, nil
 	}
-	
+
 	if len(results) == 1 {
 		if err, ok := results[0].Interface().(error); ok && err != nil {
 			return nil, err
 		}
 		return results[0].Interface(), nil
 	}
-	
+
 	if len(results) == 2 {
 		if err, ok := results[1].Interface().(error); ok && err != nil {
 			return nil, err
 		}
 		return results[0].Interface(), nil
 	}
-	
+
 	return nil, fmt.Errorf("unexpected number of return values: %d", len(results))
 }
 
@@ -288,7 +288,7 @@ func (r *ServiceRegistry) Get(name string) (interface{}, bool) {
 func (r *ServiceRegistry) List() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	names := make([]string, 0, len(r.services))
 	for name := range r.services {
 		names = append(names, name)
@@ -321,7 +321,7 @@ func (r *ServiceRegistry) Clear() {
 func (r *ServiceRegistry) GetAll() map[string]interface{} {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	services := make(map[string]interface{})
 	for name, service := range r.services {
 		services[name] = service
@@ -373,7 +373,7 @@ func (c *MiddlewareChain) Add(middleware *Middleware) {
 // Execute executes all middleware in the chain
 func (c *MiddlewareChain) Execute(ctx context.Context, req interface{}) (interface{}, error) {
 	currentReq := req
-	
+
 	for _, middleware := range c.middleware {
 		result, err := middleware.Execute(ctx, currentReq)
 		if err != nil {
@@ -381,7 +381,7 @@ func (c *MiddlewareChain) Execute(ctx context.Context, req interface{}) (interfa
 		}
 		currentReq = result
 	}
-	
+
 	return currentReq, nil
 }
 

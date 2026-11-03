@@ -2,8 +2,8 @@ package configcenter
 
 import (
 	"context"
-	"fmt"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -64,10 +64,6 @@ func New(provider Provider, opts ...Option) *ConfigCenter {
 	}
 
 	return cc
-}
-
-func cacheKey(namespace, key string) string {
-	return fmt.Sprintf("%s::%s", namespace, key)
 }
 
 // Get retrieves a configuration value, using cache when valid.

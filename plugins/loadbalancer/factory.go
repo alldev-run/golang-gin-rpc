@@ -96,15 +96,15 @@ func NewBaseLoadBalancer(opts *Options) *BaseLoadBalancer {
 func (lb *BaseLoadBalancer) UpdateTargets(targets []*Target) error {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-	
+
 	if lb.closed {
 		return ErrLoadBalancerFailed
 	}
-	
+
 	// Create a copy of targets
 	lb.targets = make([]*Target, len(targets))
 	copy(lb.targets, targets)
-	
+
 	lb.opts.Logger.Debug("Load balancer targets updated", Field{Key: "count", Value: len(targets)})
 	return nil
 }
@@ -113,7 +113,7 @@ func (lb *BaseLoadBalancer) UpdateTargets(targets []*Target) error {
 func (lb *BaseLoadBalancer) GetTargets() []*Target {
 	lb.mu.RLock()
 	defer lb.mu.RUnlock()
-	
+
 	// Return a copy of targets
 	targets := make([]*Target, len(lb.targets))
 	copy(targets, lb.targets)
@@ -124,7 +124,7 @@ func (lb *BaseLoadBalancer) GetTargets() []*Target {
 func (lb *BaseLoadBalancer) Close() error {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-	
+
 	lb.closed = true
 	lb.targets = nil
 	return nil
@@ -134,14 +134,14 @@ func (lb *BaseLoadBalancer) Close() error {
 func (lb *BaseLoadBalancer) GetHealthyTargets() []*Target {
 	lb.mu.RLock()
 	defer lb.mu.RUnlock()
-	
+
 	if !lb.opts.EnableHealthCheck {
 		// If health check is disabled, return all targets
 		targets := make([]*Target, len(lb.targets))
 		copy(targets, lb.targets)
 		return targets
 	}
-	
+
 	var healthyTargets []*Target
 	for _, target := range lb.targets {
 		if target.Healthy {
@@ -165,20 +165,20 @@ func NewRoundRobinLoadBalancer(opts *Options) *RoundRobinLoadBalancer {
 }
 
 // Select selects a target using round-robin
-func (lb *RoundRobinLoadBalancer) Select(ctx context.Context, targets []*Target) (*Target, error) {
-	targets = lb.GetHealthyTargets()
+func (lb *RoundRobinLoadBalancer) Select(ctx context.Context, _ []*Target) (*Target, error) {
+	targets := lb.GetHealthyTargets()
 	if len(targets) == 0 {
 		return nil, ErrNoTargetsAvailable
 	}
-	
+
 	// Use atomic counter for thread safety
 	index := atomic.AddUint64(&lb.current, 1) - 1
 	selected := targets[index%uint64(len(targets))]
-	
-	lb.opts.Logger.Debug("RoundRobin selected target", 
+
+	lb.opts.Logger.Debug("RoundRobin selected target",
 		Field{Key: "target", Value: selected.Address},
 		Field{Key: "index", Value: index})
-	
+
 	return selected, nil
 }
 
@@ -192,23 +192,23 @@ type RandomLoadBalancer struct {
 func NewRandomLoadBalancer(opts *Options) *RandomLoadBalancer {
 	return &RandomLoadBalancer{
 		BaseLoadBalancer: NewBaseLoadBalancer(opts),
-		rand:            NewRandomGenerator(),
+		rand:             NewRandomGenerator(),
 	}
 }
 
 // Select selects a target randomly
-func (lb *RandomLoadBalancer) Select(ctx context.Context, targets []*Target) (*Target, error) {
-	targets = lb.GetHealthyTargets()
+func (lb *RandomLoadBalancer) Select(ctx context.Context, _ []*Target) (*Target, error) {
+	targets := lb.GetHealthyTargets()
 	if len(targets) == 0 {
 		return nil, ErrNoTargetsAvailable
 	}
-	
+
 	index := lb.rand.Intn(len(targets))
 	selected := targets[index]
-	
-	lb.opts.Logger.Debug("Random selected target", 
+
+	lb.opts.Logger.Debug("Random selected target",
 		Field{Key: "target", Value: selected.Address},
 		Field{Key: "index", Value: index})
-	
+
 	return selected, nil
 }

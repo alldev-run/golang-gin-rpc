@@ -22,8 +22,7 @@ func main() {
 	}
 	defer boot.Close()
 
-	frameworkOptions := bootstrap.DefaultFrameworkOptions()
-	frameworkOptions = boot.FrameworkOptionsFromConfig()
+	frameworkOptions := boot.FrameworkOptionsFromConfig()
 	if len(frameworkOptions.Services) == 0 {
 		frameworkOptions.Services = []string{bootstrap.ServiceRPC}
 	}
@@ -67,7 +66,7 @@ func main() {
 	// Shutdown application
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
-	
+
 	if err := application.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Error during shutdown: %v", err)
 	}

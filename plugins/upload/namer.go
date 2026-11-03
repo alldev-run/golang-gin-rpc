@@ -34,7 +34,7 @@ func (n *UUIDNamer) Generate(originalName string) string {
 // TimestampNamer generates timestamp-based filenames
 type TimestampNamer struct {
 	preserveExtension bool
-	format           string
+	format            string
 }
 
 func NewTimestampNamer(preserveExtension bool, format string) *TimestampNamer {
@@ -66,7 +66,7 @@ func (n *OriginalNamer) Generate(originalName string) string {
 
 // CustomNamer generates filenames based on a custom template
 type CustomNamer struct {
-	template         string
+	template          string
 	preserveExtension bool
 }
 
