@@ -62,8 +62,8 @@ func TestInit(t *testing.T) {
 
 	// Test with custom values
 	customCfg := Config{
-		Secret:         "custom-secret",
-		AccessTokenTTL: time.Hour,
+		Secret:          "custom-secret",
+		AccessTokenTTL:  time.Hour,
 		RefreshTokenTTL: 30 * 24 * time.Hour,
 	}
 	Init(customCfg)
@@ -299,9 +299,9 @@ func TestRefreshErrors(t *testing.T) {
 
 	// Test expired refresh token
 	Init(Config{
-		Secret:         "test-secret",
+		Secret:          "test-secret",
 		RefreshTokenTTL: time.Millisecond,
-		Store:          store,
+		Store:           store,
 	})
 
 	expiredPair, err := GenerateTokenPair(userID, username, deviceID)

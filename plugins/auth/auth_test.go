@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"testing"
 	"github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
+	"testing"
 )
 
 func TestNewAuthManager(t *testing.T) {

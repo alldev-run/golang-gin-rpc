@@ -10,7 +10,7 @@ import (
 
 func TestTracingConfiguration(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	// Test default tracing configuration
 	assert.NotNil(t, config.Tracing)
 	assert.Equal(t, "jaeger", config.Tracing.Type)
@@ -22,17 +22,17 @@ func TestTracingConfiguration(t *testing.T) {
 
 func TestProtocolConfiguration(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	// Test default protocol configuration
 	assert.True(t, config.Protocols.HTTP)
 	assert.True(t, config.Protocols.HTTP2)
 	assert.False(t, config.Protocols.GRPC)
 	assert.False(t, config.Protocols.JSONRPC)
-	
+
 	// Test gRPC configuration
 	assert.False(t, config.Protocols.GRPCConfig.EnableTLS)
 	assert.Equal(t, 30*time.Second, config.Protocols.GRPCConfig.Timeout)
-	
+
 	// Test JSON-RPC configuration
 	assert.Equal(t, "2.0", config.Protocols.JSONRPCConfig.Version)
 	assert.False(t, config.Protocols.JSONRPCConfig.EnableBatch)
@@ -44,10 +44,10 @@ func TestGatewayWithTracing(t *testing.T) {
 	config.Tracing.Enabled = true
 	config.Tracing.Type = "zipkin" // Use implemented tracer
 	config.Tracing.Port = 9411     // Zipkin default port
-	
+
 	gw := NewGateway(config)
 	assert.NotNil(t, gw)
-	
+
 	// Initialize gateway to setup tracing
 	err := gw.Initialize()
 	assert.NoError(t, err)
@@ -59,10 +59,10 @@ func TestGatewayWithProtocols(t *testing.T) {
 	config := DefaultConfig()
 	config.Protocols.GRPC = true
 	config.Protocols.JSONRPC = true
-	
+
 	gw := NewGateway(config)
 	assert.NotNil(t, gw)
-	
+
 	// Initialize gateway to setup protocol proxies
 	err := gw.Initialize()
 	assert.NoError(t, err)
@@ -95,14 +95,14 @@ func TestRouteWithProtocol(t *testing.T) {
 			Targets:  []string{"http://localhost:8080/rpc"},
 		},
 	}
-	
+
 	gw := NewGateway(config)
 	assert.NotNil(t, gw)
-	
+
 	// Test route initialization
 	err := gw.initRoutes()
 	assert.NoError(t, err)
-	
+
 	// Verify routes were created
 	router := gw.GetRouter()
 	assert.NotNil(t, router)
@@ -111,10 +111,10 @@ func TestRouteWithProtocol(t *testing.T) {
 func TestTracingMiddleware(t *testing.T) {
 	config := DefaultConfig()
 	config.Tracing.Enabled = true
-	
+
 	gw := NewGateway(config)
 	assert.NotNil(t, gw)
-	
+
 	// Test tracing middleware creation
 	middleware := gw.TracingMiddleware()
 	assert.NotNil(t, middleware)
@@ -123,14 +123,14 @@ func TestTracingMiddleware(t *testing.T) {
 func TestInjectTracingHeaders(t *testing.T) {
 	config := DefaultConfig()
 	config.Tracing.Enabled = true
-	
+
 	gw := NewGateway(config)
 	assert.NotNil(t, gw)
-	
+
 	// Test tracing headers injection
 	req, err := http.NewRequest("GET", "http://localhost:8080/test", nil)
 	assert.NoError(t, err)
-	
+
 	gw.InjectTracingHeaders(req, req.Context())
 	// Should not panic and headers should be added if tracing is enabled
 }

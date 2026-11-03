@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
 	auditpkg "github.com/alldev-run/golang-gin-rpc/plugins/audit"
+	"github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
 	middlewarepkg "github.com/alldev-run/golang-gin-rpc/plugins/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +29,7 @@ func (s *captureGatewayAuditSink) Write(ctx context.Context, event auditpkg.Even
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	assert.Equal(t, "0.0.0.0", config.Host)
 	assert.Equal(t, 8080, config.Port)
 	assert.Equal(t, 30*time.Second, config.ReadTimeout)
@@ -43,7 +43,7 @@ func TestDefaultConfig(t *testing.T) {
 func TestNewGateway(t *testing.T) {
 	config := DefaultConfig()
 	gw := NewGateway(config)
-	
+
 	assert.NotNil(t, gw)
 	assert.Equal(t, config, gw.GetConfig())
 	assert.NotNil(t, gw.GetRouter())
@@ -79,30 +79,30 @@ func TestNewGateway_RBACPolicyFromGatewayConfig(t *testing.T) {
 func TestRouteKey(t *testing.T) {
 	config := DefaultConfig()
 	gw := NewGateway(config)
-	
+
 	key := gw.routeKey("/api/user", "GET")
 	assert.Equal(t, "GET:/api/user", key)
-	
+
 	key2 := gw.routeKey("/api/order/*", "POST")
 	assert.Equal(t, "POST:/api/order/*", key2)
 }
 
 func TestLoadBalancerFactory(t *testing.T) {
 	factory := NewLoadBalancerFactory()
-	
+
 	// Test different strategies
 	rr := factory.Create("round_robin")
 	assert.NotNil(t, rr)
-	
+
 	random := factory.Create("random")
 	assert.NotNil(t, random)
-	
+
 	weighted := factory.Create("weighted")
 	assert.NotNil(t, weighted)
-	
+
 	leastConn := factory.Create("least_connections")
 	assert.NotNil(t, leastConn)
-	
+
 	// Test unknown strategy (should default to round_robin)
 	unknown := factory.Create("unknown")
 	assert.NotNil(t, unknown)
@@ -110,32 +110,32 @@ func TestLoadBalancerFactory(t *testing.T) {
 
 func TestRoundRobinLoadBalancer(t *testing.T) {
 	lb := NewRoundRobinLoadBalancer()
-	
+
 	targets := []string{"http://localhost:8001", "http://localhost:8002"}
 	lb.UpdateTargets(targets)
-	
+
 	// Test selection
 	selected, err := lb.Select(nil)
 	assert.NoError(t, err)
 	assert.Contains(t, targets, selected)
-	
+
 	// Test multiple selections
 	selections := make(map[string]int)
 	for i := 0; i < 100; i++ {
 		selected, _ := lb.Select(nil)
 		selections[selected]++
 	}
-	
+
 	// Should have selected both targets
 	assert.Equal(t, 2, len(selections))
 }
 
 func TestRandomLoadBalancer(t *testing.T) {
 	lb := NewRandomLoadBalancer()
-	
+
 	targets := []string{"http://localhost:8001", "http://localhost:8002"}
 	lb.UpdateTargets(targets)
-	
+
 	// Test selection
 	selected, err := lb.Select(nil)
 	assert.NoError(t, err)
@@ -149,25 +149,25 @@ func TestServiceDiscovery(t *testing.T) {
 		Namespace: "test",
 		Timeout:   5 * time.Second,
 	}
-	
+
 	sd, err := NewServiceDiscovery(config)
 	assert.NoError(t, err)
 	assert.NotNil(t, sd)
-	
+
 	// Test static initialization
 	err = sd.Initialize()
 	assert.NoError(t, err)
-	
+
 	// Test getting endpoints
 	endpoints, err := sd.GetServiceEndpoints("user-service")
 	assert.Error(t, err)
 	assert.Nil(t, endpoints)
 	assert.Contains(t, err.Error(), "static discovery should use route targets directly")
-	
+
 	// Test unknown service
 	_, err = sd.GetServiceEndpoints("unknown-service")
 	assert.Error(t, err)
-	
+
 	// Test consul discovery (if available)
 	consulConfig := DiscoveryConfig{
 		Type:      "consul",
@@ -175,7 +175,7 @@ func TestServiceDiscovery(t *testing.T) {
 		Namespace: "test",
 		Timeout:   5 * time.Second,
 	}
-	
+
 	consulSD, err := NewServiceDiscovery(consulConfig)
 	// This might fail if consul is not running, which is expected
 	if err == nil {
@@ -188,7 +188,7 @@ func TestParseDuration(t *testing.T) {
 	// Test valid duration
 	d := parseDuration("1m")
 	assert.Equal(t, time.Minute, d)
-	
+
 	// Test invalid duration (should default to 1 minute)
 	d = parseDuration("invalid")
 	assert.Equal(t, time.Minute, d)
@@ -197,7 +197,7 @@ func TestParseDuration(t *testing.T) {
 func TestGenerateRequestID(t *testing.T) {
 	id1 := generateRequestID()
 	id2 := generateRequestID()
-	
+
 	assert.NotEmpty(t, id1)
 	assert.NotEmpty(t, id2)
 	assert.NotEqual(t, id1, id2)
@@ -207,7 +207,7 @@ func TestIsTimeout(t *testing.T) {
 	// Test timeout error
 	timeoutErr := IsTimeout(assert.AnError)
 	assert.False(t, timeoutErr)
-	
+
 	// Test nil error
 	nilErr := IsTimeout(nil)
 	assert.False(t, nilErr)
@@ -217,7 +217,7 @@ func TestIsTooManyRetries(t *testing.T) {
 	// Test retry error
 	retryErr := IsTooManyRetries(assert.AnError)
 	assert.False(t, retryErr)
-	
+
 	// Test nil error
 	nilErr := IsTooManyRetries(nil)
 	assert.False(t, nilErr)
@@ -226,7 +226,7 @@ func TestIsTooManyRetries(t *testing.T) {
 // TestProxy tests the proxy functionality
 func TestProxy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create a mock backend server
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -243,10 +243,10 @@ func TestProxy(t *testing.T) {
 	config := DefaultConfig()
 	config.Routes = []RouteConfig{
 		{
-			Path:     "/api/test",
-			Method:   "GET",
-			Service:  "test-service",
-			Targets:  []string{backendServer.URL},
+			Path:        "/api/test",
+			Method:      "GET",
+			Service:     "test-service",
+			Targets:     []string{backendServer.URL},
 			StripPrefix: false,
 		},
 	}
@@ -265,7 +265,7 @@ func TestProxy(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -400,7 +400,7 @@ func TestSetupRoutes_RBACPermissionAllowed(t *testing.T) {
 // TestProxyWithStripPrefix tests proxy with prefix stripping
 func TestProxyWithStripPrefix(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create a mock backend server
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -434,7 +434,7 @@ func TestProxyWithStripPrefix(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -444,7 +444,7 @@ func TestProxyWithStripPrefix(t *testing.T) {
 // TestProxyWithHeaders tests proxy with custom headers
 func TestProxyWithHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create a mock backend server that captures headers
 	var receivedHeaders map[string][]string
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -461,13 +461,13 @@ func TestProxyWithHeaders(t *testing.T) {
 	config := DefaultConfig()
 	config.Routes = []RouteConfig{
 		{
-			Path:   "/api/test",
-			Method: "GET",
+			Path:    "/api/test",
+			Method:  "GET",
 			Service: "test-service",
 			Targets: []string{backendServer.URL},
 			Headers: map[string]string{
 				"X-Custom-Header": "custom-value",
-				"X-Service":      "gateway",
+				"X-Service":       "gateway",
 			},
 		},
 	}
@@ -493,7 +493,7 @@ func TestProxyWithHeaders(t *testing.T) {
 // TestProxyWithQueryParams tests proxy with custom query parameters
 func TestProxyWithQueryParams(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create a mock backend server that captures query params
 	var receivedQuery string
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -510,8 +510,8 @@ func TestProxyWithQueryParams(t *testing.T) {
 	config := DefaultConfig()
 	config.Routes = []RouteConfig{
 		{
-			Path:   "/api/test",
-			Method: "GET",
+			Path:    "/api/test",
+			Method:  "GET",
 			Service: "test-service",
 			Targets: []string{backendServer.URL},
 			Query: map[string]string{
@@ -532,11 +532,11 @@ func TestProxyWithQueryParams(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)
-	
+
 	// Should contain both original and added query parameters
 	assert.Contains(t, receivedQuery, "client=web")
 	assert.Contains(t, receivedQuery, "version=v1")
@@ -546,7 +546,7 @@ func TestProxyWithQueryParams(t *testing.T) {
 // TestProxyErrorHandling tests proxy error handling
 func TestProxyErrorHandling(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create gateway config with invalid target
 	config := DefaultConfig()
 	config.Routes = []RouteConfig{
@@ -575,7 +575,7 @@ func TestProxyErrorHandling(t *testing.T) {
 // TestProxyNotFound tests proxy when route is not found
 func TestProxyNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create gateway config without the requested route
 	config := DefaultConfig()
 	config.Routes = []RouteConfig{
@@ -598,14 +598,14 @@ func TestProxyNotFound(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusNotFound, resp.Code)
-	
+
 	assert.Contains(t, resp.Body.String(), "404 page not found")
 }
 
 // TestHealthCheck tests the health check endpoint
 func TestHealthCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	config := DefaultConfig()
 	gw := NewGateway(config)
 	engine := gin.New()
@@ -617,7 +617,7 @@ func TestHealthCheck(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -628,7 +628,7 @@ func TestHealthCheck(t *testing.T) {
 // TestReadinessCheck tests the readiness check endpoint
 func TestReadinessCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	config := DefaultConfig()
 	gw := NewGateway(config)
 	engine := gin.New()
@@ -640,7 +640,7 @@ func TestReadinessCheck(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusServiceUnavailable, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -651,7 +651,7 @@ func TestReadinessCheck(t *testing.T) {
 // TestGatewayInfo tests the gateway info endpoint
 func TestGatewayInfo(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	config := DefaultConfig()
 	config.Routes = []RouteConfig{
 		{
@@ -672,7 +672,7 @@ func TestGatewayInfo(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -686,7 +686,7 @@ func TestGatewayInfo(t *testing.T) {
 // TestProxyRequestBody tests proxy with request body
 func TestProxyRequestBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create a mock backend server that captures request body
 	var receivedBody []byte
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -724,7 +724,7 @@ func TestProxyRequestBody(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -734,10 +734,9 @@ func TestProxyRequestBody(t *testing.T) {
 // TestProxyRetry tests proxy retry functionality
 func TestProxyRetry(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	attemptCount := 0
-	var backendServer *httptest.Server
-	backendServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attemptCount++
 		if attemptCount < 3 {
 			hj, ok := w.(http.Hijacker)
@@ -778,7 +777,7 @@ func TestProxyRetry(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	require.NoError(t, err)

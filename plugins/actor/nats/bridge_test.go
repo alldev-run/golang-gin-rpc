@@ -12,12 +12,12 @@ import (
 )
 
 type mockClient struct {
-	mu          sync.Mutex
-	published   []*messaging.Message
-	subscribed  map[string]messaging.MessageHandler
+	mu           sync.Mutex
+	published    []*messaging.Message
+	subscribed   map[string]messaging.MessageHandler
 	unsubscribed []string
-	closed      bool
-	publishErr  error
+	closed       bool
+	publishErr   error
 	subscribeErr error
 }
 
@@ -117,9 +117,9 @@ func TestBridge_SubscribeAndForward(t *testing.T) {
 	assert.NotNil(t, handler)
 
 	err = handler(ctx, &messaging.Message{
-		Topic:     "orders",
-		Payload:   []byte("world"),
-		Headers:   map[string]interface{}{"id": "2"},
+		Topic:   "orders",
+		Payload: []byte("world"),
+		Headers: map[string]interface{}{"id": "2"},
 	})
 	assert.NoError(t, err)
 

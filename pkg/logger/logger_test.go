@@ -123,7 +123,7 @@ func TestLWithoutInit(t *testing.T) {
 	// Note: Due to sync.Once, we can't test true auto-initialization
 	// after previous tests have already initialized the logger
 	// Instead, we test that L() returns a valid logger
-	
+
 	logger := L()
 	if logger == nil {
 		t.Error("Expected logger to be available")
@@ -166,7 +166,7 @@ func TestConcurrentLogging(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			for j := 0; j < numMessages; j++ {
-				Info("concurrent log message", 
+				Info("concurrent log message",
 					zap.Int("goroutine", id),
 					zap.Int("message", j))
 			}
@@ -256,7 +256,7 @@ func TestLoggerPerformance(t *testing.T) {
 	duration := time.Since(start)
 	messagesPerSecond := float64(numMessages) / duration.Seconds()
 
-	t.Logf("Logged %d messages in %v (%.0f messages/second)", 
+	t.Logf("Logged %d messages in %v (%.0f messages/second)",
 		numMessages, duration, messagesPerSecond)
 
 	// Should be able to log at least 1000 messages per second

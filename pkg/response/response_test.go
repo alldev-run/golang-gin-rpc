@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/alldev-run/golang-gin-rpc/pkg/status_code"
+	"github.com/gin-gonic/gin"
 )
 
 func TestResponse_Struct(t *testing.T) {
@@ -39,7 +39,7 @@ func TestResponse_Struct(t *testing.T) {
 
 func TestSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
 		Success(c, map[string]interface{}{"message": "test data"})
@@ -74,7 +74,7 @@ func TestSuccess(t *testing.T) {
 
 func TestSuccess_WithRequestID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("request_id", "test-request-123")
@@ -100,7 +100,7 @@ func TestSuccess_WithRequestID(t *testing.T) {
 
 func TestSuccess_WithNilData(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
 		Success(c, nil)
@@ -122,7 +122,7 @@ func TestSuccess_WithNilData(t *testing.T) {
 
 func TestError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
 		Error(c, "test error", map[string]interface{}{"field": "value"})
@@ -157,7 +157,7 @@ func TestError(t *testing.T) {
 
 func TestError_WithRequestID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("request_id", "error-request-456")
@@ -183,7 +183,7 @@ func TestError_WithRequestID(t *testing.T) {
 
 func TestError_WithNilData(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
 		Error(c, "test error", nil)
@@ -246,11 +246,11 @@ func TestResponse_JSON_Marshaling(t *testing.T) {
 
 func TestResponse_WithComplexData(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	complexData := struct {
-		Name    string   `json:"name"`
-		Age     int      `json:"age"`
-		Tags    []string `json:"tags"`
+		Name    string                 `json:"name"`
+		Age     int                    `json:"age"`
+		Tags    []string               `json:"tags"`
 		Details map[string]interface{} `json:"details"`
 	}{
 		Name: "John Doe",
@@ -310,7 +310,7 @@ func TestResponse_WithComplexData(t *testing.T) {
 
 func TestResponse_EmptyMessage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
 		Error(c, "", nil)
@@ -332,9 +332,9 @@ func TestResponse_EmptyMessage(t *testing.T) {
 
 func TestResponse_TimestampAccuracy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	before := time.Now().Unix()
-	
+
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
 		Success(c, "test")
@@ -358,14 +358,14 @@ func TestResponse_TimestampAccuracy(t *testing.T) {
 
 func TestResponse_ConcurrentRequests(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
 		Success(c, map[string]int{"id": 123})
 	})
 
 	done := make(chan bool, 10)
-	
+
 	for i := 0; i < 10; i++ {
 		go func() {
 			req, _ := http.NewRequest("GET", "/test", nil)
@@ -376,11 +376,11 @@ func TestResponse_ConcurrentRequests(t *testing.T) {
 			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 				t.Errorf("Failed to unmarshal response: %v", err)
 			}
-			
+
 			if response.Code != int(status_code.Success) {
 				t.Errorf("Expected success code, got %d", response.Code)
 			}
-			
+
 			done <- true
 		}()
 	}

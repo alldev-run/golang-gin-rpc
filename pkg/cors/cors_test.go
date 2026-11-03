@@ -35,7 +35,7 @@ func TestApplyOptionsPassthrough(t *testing.T) {
 	rw := httptest.NewRecorder()
 
 	handled := Apply(rw, req, Config{
-		AllowedOrigins:      []string{"*"},
+		AllowedOrigins:     []string{"*"},
 		OptionsPassthrough: true,
 	})
 	if handled {

@@ -93,8 +93,8 @@ func TestLoadDatabaseConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid yaml",
-			configData: `invalid: yaml: content: [`,
+			name:        "invalid yaml",
+			configData:  `invalid: yaml: content: [`,
 			expectError: true,
 		},
 	}
@@ -114,14 +114,14 @@ func TestLoadDatabaseConfig(t *testing.T) {
 
 			// Load database config
 			err = LoadDatabaseConfig(boot, configFile)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				return
 			}
-			
+
 			require.NoError(t, err)
-			
+
 			// Verify the config was loaded correctly
 			// We can't directly access the internal config, but we can test
 			// that the UpdateDatabaseConfig method was called successfully
@@ -135,7 +135,7 @@ func TestNewBootstrapWithDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, boot)
 	defer boot.Close()
-	
+
 	// Test that bootstrap was created with default config
 	assert.NoError(t, err)
 }
@@ -144,7 +144,7 @@ func TestUpdateDatabaseConfig(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
-	
+
 	dbConfigs := map[string]config.DBConfig{
 		"test_db": {
 			Enabled:  true,
@@ -156,7 +156,7 @@ func TestUpdateDatabaseConfig(t *testing.T) {
 			Password: "password",
 		},
 	}
-	
+
 	err = boot.UpdateDatabaseConfig(dbConfigs)
 	assert.NoError(t, err)
 }
@@ -164,10 +164,10 @@ func TestUpdateDatabaseConfig(t *testing.T) {
 func TestLoadDatabaseConfigNilBootstrap(t *testing.T) {
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "database.yml")
-	
+
 	err := os.WriteFile(configFile, []byte("test: config"), 0644)
 	require.NoError(t, err)
-	
+
 	err = LoadDatabaseConfig(nil, configFile)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bootstrap instance is nil")
@@ -177,7 +177,7 @@ func TestGetDatabaseFactory(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
-	
+
 	factory := GetDatabaseFactory(boot)
 	// Factory is nil when database is not initialized
 	assert.Nil(t, factory)
@@ -187,13 +187,13 @@ func TestGetMySQLClient(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
-	
+
 	// Test when database is not initialized
 	client, err := GetMySQLClient(boot)
 	assert.Error(t, err)
 	assert.Nil(t, client)
 	assert.Contains(t, err.Error(), "database factory not initialized")
-	
+
 	// Test with nil bootstrap
 	client, err = GetMySQLClient(nil)
 	assert.Error(t, err)
@@ -205,13 +205,13 @@ func TestGetMySQLSQLClient(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
-	
+
 	// Test when database is not initialized
 	client, err := GetMySQLSQLClient(boot)
 	assert.Error(t, err)
 	assert.Nil(t, client)
 	assert.Contains(t, err.Error(), "database factory not initialized")
-	
+
 	// Test with nil bootstrap
 	client, err = GetMySQLSQLClient(nil)
 	assert.Error(t, err)
@@ -223,13 +223,13 @@ func TestGetRedisClient(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
-	
+
 	// Test when database is not initialized
 	client, err := GetRedisClient(boot)
 	assert.Error(t, err)
 	assert.Nil(t, client)
 	assert.Contains(t, err.Error(), "database factory not initialized")
-	
+
 	// Test with nil bootstrap
 	client, err = GetRedisClient(nil)
 	assert.Error(t, err)
@@ -241,13 +241,13 @@ func TestGetPostgresClient(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
-	
+
 	// Test when database is not initialized
 	client, err := GetPostgresClient(boot)
 	assert.Error(t, err)
 	assert.Nil(t, client)
 	assert.Contains(t, err.Error(), "database factory not initialized")
-	
+
 	// Test with nil bootstrap
 	client, err = GetPostgresClient(nil)
 	assert.Error(t, err)
@@ -259,7 +259,7 @@ func TestLoadDatabaseConfigFileNotFound(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
-	
+
 	err = LoadDatabaseConfig(boot, "/nonexistent/config.yml")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read database config file")

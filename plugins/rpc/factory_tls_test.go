@@ -605,7 +605,7 @@ func TestGRPCClient_Call_InvokesViaBufconn(t *testing.T) {
 	observer := &mockClientObserver{}
 	client := NewGRPCClient(ClientConfig{
 		Type:         ClientTypeGRPC,
-		Host:         "bufconn",
+		Host:         "passthrough:///bufconn",
 		Port:         0,
 		RetryCount:   1,
 		RetryBackoff: time.Millisecond,

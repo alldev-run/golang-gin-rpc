@@ -73,12 +73,12 @@ func TestMessageError_NilError(t *testing.T) {
 
 // MockPublisher implements Publisher interface for testing
 type MockPublisher struct {
-	publishCalled   bool
+	publishCalled      bool
 	publishAsyncCalled bool
-	closeCalled     bool
-	lastTopic       string
-	lastMessage     *Message
-	publishError    error
+	closeCalled        bool
+	lastTopic          string
+	lastMessage        *Message
+	publishError       error
 }
 
 func (m *MockPublisher) Publish(ctx context.Context, topic string, msg *Message) error {
@@ -102,19 +102,19 @@ func (m *MockPublisher) Close() error {
 
 func TestPublisherInterface(t *testing.T) {
 	mock := &MockPublisher{}
-	
+
 	// Test Publish
 	ctx := context.Background()
 	msg := &Message{
 		Topic:   "test-topic",
 		Payload: []byte("test"),
 	}
-	
+
 	err := mock.Publish(ctx, "test-topic", msg)
 	if err != nil {
 		t.Errorf("Publish() error = %v, want nil", err)
 	}
-	
+
 	if !mock.publishCalled {
 		t.Error("Publish() was not called")
 	}
@@ -124,27 +124,27 @@ func TestPublisherInterface(t *testing.T) {
 	if mock.lastMessage != msg {
 		t.Error("Publish() lastMessage was not set correctly")
 	}
-	
+
 	// Test PublishAsync
 	mock.publishCalled = false
 	err = mock.PublishAsync(ctx, "async-topic", msg)
 	if err != nil {
 		t.Errorf("PublishAsync() error = %v, want nil", err)
 	}
-	
+
 	if !mock.publishAsyncCalled {
 		t.Error("PublishAsync() was not called")
 	}
 	if mock.lastTopic != "async-topic" {
 		t.Errorf("PublishAsync() lastTopic = %v, want %v", mock.lastTopic, "async-topic")
 	}
-	
+
 	// Test Close
 	err = mock.Close()
 	if err != nil {
 		t.Errorf("Close() error = %v, want nil", err)
 	}
-	
+
 	if !mock.closeCalled {
 		t.Error("Close() was not called")
 	}
@@ -180,18 +180,18 @@ func (m *MockSubscriber) Close() error {
 
 func TestSubscriberInterface(t *testing.T) {
 	mock := &MockSubscriber{}
-	
+
 	// Test Subscribe
 	ctx := context.Background()
 	handler := func(ctx context.Context, msg *Message) error {
 		return nil
 	}
-	
+
 	err := mock.Subscribe(ctx, "test-topic", handler)
 	if err != nil {
 		t.Errorf("Subscribe() error = %v, want nil", err)
 	}
-	
+
 	if !mock.subscribeCalled {
 		t.Error("Subscribe() was not called")
 	}
@@ -201,27 +201,27 @@ func TestSubscriberInterface(t *testing.T) {
 	if mock.lastHandler == nil {
 		t.Error("Subscribe() lastHandler was not set")
 	}
-	
+
 	// Test Unsubscribe
 	mock.subscribeCalled = false
 	err = mock.Unsubscribe("test-topic")
 	if err != nil {
 		t.Errorf("Unsubscribe() error = %v, want nil", err)
 	}
-	
+
 	if !mock.unsubscribeCalled {
 		t.Error("Unsubscribe() was not called")
 	}
 	if mock.lastTopic != "test-topic" {
 		t.Errorf("Unsubscribe() lastTopic = %v, want %v", mock.lastTopic, "test-topic")
 	}
-	
+
 	// Test Close
 	err = mock.Close()
 	if err != nil {
 		t.Errorf("Close() error = %v, want nil", err)
 	}
-	
+
 	if !mock.closeCalled {
 		t.Error("Close() was not called")
 	}
@@ -245,42 +245,42 @@ func (m *MockClient) Close() error {
 
 func TestClientInterface(t *testing.T) {
 	mock := &MockClient{
-		MockPublisher: &MockPublisher{},
+		MockPublisher:  &MockPublisher{},
 		MockSubscriber: &MockSubscriber{},
 	}
-	
+
 	// Test that Client implements both Publisher and Subscriber
 	var _ Client = mock
-	
+
 	// Test Publisher methods
 	ctx := context.Background()
 	msg := &Message{Topic: "test", Payload: []byte("test")}
-	
+
 	err := mock.Publish(ctx, "test", msg)
 	if err != nil {
 		t.Errorf("Client.Publish() error = %v, want nil", err)
 	}
-	
+
 	err = mock.PublishAsync(ctx, "test", msg)
 	if err != nil {
 		t.Errorf("Client.PublishAsync() error = %v, want nil", err)
 	}
-	
+
 	// Test Subscriber methods
 	handler := func(ctx context.Context, msg *Message) error {
 		return nil
 	}
-	
+
 	err = mock.Subscribe(ctx, "test", handler)
 	if err != nil {
 		t.Errorf("Client.Subscribe() error = %v, want nil", err)
 	}
-	
+
 	err = mock.Unsubscribe("test")
 	if err != nil {
 		t.Errorf("Client.Unsubscribe() error = %v, want nil", err)
 	}
-	
+
 	// Test Close
 	err = mock.Close()
 	if err != nil {
@@ -307,7 +307,7 @@ func TestConfig(t *testing.T) {
 			"timeout":    "30s",
 		},
 	}
-	
+
 	if config.Type != "kafka" {
 		t.Errorf("Config.Type = %v, want %v", config.Type, "kafka")
 	}
@@ -339,23 +339,23 @@ func TestMessageHandler(t *testing.T) {
 	var handler MessageHandler = func(ctx context.Context, msg *Message) error {
 		return nil
 	}
-	
+
 	ctx := context.Background()
 	msg := &Message{
 		Topic:   "test",
 		Payload: []byte("test"),
 	}
-	
+
 	err := handler(ctx, msg)
 	if err != nil {
 		t.Errorf("MessageHandler() error = %v, want nil", err)
 	}
-	
+
 	// Test handler with error
 	errorHandler := func(ctx context.Context, msg *Message) error {
 		return errors.New("handler error")
 	}
-	
+
 	err = errorHandler(ctx, msg)
 	if err == nil {
 		t.Error("MessageHandler() error = nil, want error")
@@ -369,10 +369,10 @@ func TestPublisherError(t *testing.T) {
 	mock := &MockPublisher{
 		publishError: errors.New("publish failed"),
 	}
-	
+
 	ctx := context.Background()
 	msg := &Message{Topic: "test", Payload: []byte("test")}
-	
+
 	err := mock.Publish(ctx, "test", msg)
 	if err == nil {
 		t.Error("Publish() error = nil, want error")
@@ -386,12 +386,12 @@ func TestSubscriberError(t *testing.T) {
 	mock := &MockSubscriber{
 		subscribeError: errors.New("subscribe failed"),
 	}
-	
+
 	ctx := context.Background()
 	handler := func(ctx context.Context, msg *Message) error {
 		return nil
 	}
-	
+
 	err := mock.Subscribe(ctx, "test", handler)
 	if err == nil {
 		t.Error("Subscribe() error = nil, want error")

@@ -105,9 +105,10 @@ func TestIPFilter_Whitelist(t *testing.T) {
 		{
 			name: "whitelisted_ip",
 			config: IPFilterConfig{
-				Enabled: true,
-				Mode:    IPFilterModeWhitelist,
-				IPList:  []string{"192.168.1.100", "192.168.1.101"},
+				Enabled:    true,
+				Mode:       IPFilterModeWhitelist,
+				IPList:     []string{"192.168.1.100", "192.168.1.101"},
+				TrustProxy: true,
 			},
 			clientIP:   "192.168.1.100",
 			wantStatus: http.StatusOK,

@@ -380,11 +380,11 @@ func TestStringFilterEmpty(t *testing.T) {
 	input := []string{"a", "", "  ", "b", "\t", "c"}
 	result := StringFilterEmpty(input)
 	expected := []string{"a", "b", "c"}
-	
+
 	if len(result) != len(expected) {
 		t.Errorf("StringFilterEmpty() returned %d elements, want %d", len(result), len(expected))
 	}
-	
+
 	for i, v := range result {
 		if v != expected[i] {
 			t.Errorf("StringFilterEmpty()[%d] = %q, want %q", i, v, expected[i])
@@ -482,7 +482,7 @@ func TestMustToBool(t *testing.T) {
 		{1, true},
 		{0, false},
 		{"invalid", false}, // Should return false on error
-		{nil, false},      // Should return false on error
+		{nil, false},       // Should return false on error
 	}
 
 	for _, tt := range tests {
@@ -580,7 +580,7 @@ func TestRandomStringEdgeCases(t *testing.T) {
 			t.Errorf("RandomString(%d) returned length %d, want %d", n, len(result), n)
 		}
 	}
-	
+
 	// Test that random strings are different
 	s1, err1 := RandomString(10)
 	s2, err2 := RandomString(10)
@@ -606,7 +606,7 @@ func TestRandomHexEdgeCases(t *testing.T) {
 			t.Errorf("RandomHex(%d) returned length %d, want %d", n, len(result), expectedLen)
 		}
 	}
-	
+
 	// Test that hex strings contain only valid hex characters
 	result, err := RandomHex(5)
 	if err != nil {
@@ -614,7 +614,7 @@ func TestRandomHexEdgeCases(t *testing.T) {
 		return
 	}
 	for _, c := range result {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			t.Errorf("RandomHex() contains invalid hex character: %c", c)
 		}
 	}
@@ -626,19 +626,19 @@ func TestChunkEdgeCases(t *testing.T) {
 	if len(result) != 0 {
 		t.Errorf("Chunk() with empty slice should return empty slice, got %d chunks", len(result))
 	}
-	
+
 	// Test size larger than slice
 	result = Chunk([]string{"a", "b"}, 5)
 	if len(result) != 1 || len(result[0]) != 2 {
 		t.Error("Chunk() with size > slice length should return one chunk")
 	}
-	
+
 	// Test size 0 (should return single chunk)
 	result = Chunk([]string{"a", "b", "c"}, 0)
 	if len(result) != 1 || len(result[0]) != 3 {
 		t.Error("Chunk() with size 0 should return single chunk")
 	}
-	
+
 	// Test size 1
 	result = Chunk([]string{"a", "b", "c"}, 1)
 	if len(result) != 3 {
@@ -658,14 +658,14 @@ func TestToStringComplexTypes(t *testing.T) {
 	if result == "" {
 		t.Error("ToString() with slice should not be empty")
 	}
-	
+
 	// Test with map
 	m := map[string]int{"a": 1}
 	result = ToString(m)
 	if result == "" {
 		t.Error("ToString() with map should not be empty")
 	}
-	
+
 	// Test with struct
 	type TestStruct struct {
 		Field string
@@ -733,9 +733,9 @@ func TestStructToMap(t *testing.T) {
 
 	// 空标签
 	type UserWithEmptyTags struct {
-		ID   int `db:""`
+		ID   int    `db:""`
 		Name string `db:"-"`
-		Age  int `db:"age"`
+		Age  int    `db:"age"`
 	}
 	user2 := UserWithEmptyTags{ID: 1, Name: "John", Age: 30}
 	result = StructToMap(&user2)
@@ -771,7 +771,7 @@ func TestStructToMapConcurrency(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < numIterations; j++ {
 				result := StructToMap(&user)
-				
+
 				// 验证结果正确性
 				if result["id"] != int64(123) {
 					t.Errorf("Goroutine %d, iteration %d: id mismatch", id, j)

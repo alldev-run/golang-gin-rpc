@@ -11,14 +11,14 @@ import (
 
 func TestTracerProvider(t *testing.T) {
 	config := Config{
-		Type:              "zipkin",
-		ServiceName:       "test-service",
-		ServiceVersion:    "1.0.0",
-		Environment:       "test",
-		Enabled:           false, // Disabled for testing
-		Endpoint:          "http://localhost:9411/api/v2/spans",
-		SampleRate:        1.0,
-		BatchTimeout:      5 * time.Second,
+		Type:               "zipkin",
+		ServiceName:        "test-service",
+		ServiceVersion:     "1.0.0",
+		Environment:        "test",
+		Enabled:            false, // Disabled for testing
+		Endpoint:           "http://localhost:9411/api/v2/spans",
+		SampleRate:         1.0,
+		BatchTimeout:       5 * time.Second,
 		MaxExportBatchSize: 512,
 	}
 

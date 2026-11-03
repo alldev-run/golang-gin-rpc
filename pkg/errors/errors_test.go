@@ -32,24 +32,24 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := New(tt.code, tt.message)
-			
+
 			if err.Code != tt.code {
 				t.Errorf("New().Code = %v, want %v", err.Code, tt.code)
 			}
-			
+
 			if err.Message != tt.message {
 				t.Errorf("New().Message = %v, want %v", err.Message, tt.message)
 			}
-			
+
 			if err.Timestamp.IsZero() {
 				t.Error("New().Timestamp should not be zero")
 			}
-			
+
 			expectedLevel := getDefaultLevel(tt.code)
 			if err.Level != expectedLevel {
 				t.Errorf("New().Level = %v, want %v", err.Level, expectedLevel)
 			}
-			
+
 			expectedStatus := getDefaultHTTPStatus(tt.code)
 			if err.HTTPStatus != expectedStatus {
 				t.Errorf("New().HTTPStatus = %v, want %v", err.HTTPStatus, expectedStatus)
@@ -61,13 +61,13 @@ func TestNew(t *testing.T) {
 func TestAppError_WithCause(t *testing.T) {
 	originalErr := errors.New("original error")
 	appErr := New(ErrCodeInternalServer, "Test error")
-	
+
 	errWithCause := appErr.WithCause(originalErr)
-	
+
 	if errWithCause.Cause != originalErr {
 		t.Errorf("WithCause().Cause = %v, want %v", errWithCause.Cause, originalErr)
 	}
-	
+
 	// Test Error() method with cause
 	expected := "[SYSTEM_1000] Test error: %!s(<nil>) (caused by: original error)"
 	if errWithCause.Error() != expected {
@@ -80,20 +80,20 @@ func TestAppError_WithDetails(t *testing.T) {
 		"user_id": 123,
 		"action":  "create",
 	}
-	
+
 	appErr := New(ErrCodeValidationFailed, "Validation failed")
 	errWithDetails := appErr.WithDetails(details)
-	
+
 	if errWithDetails.Details == nil {
 		t.Error("WithDetails().Details should not be nil")
 	}
-	
+
 	detailsMap, ok := errWithDetails.Details.(map[string]interface{})
 	if !ok {
 		t.Error("WithDetails().Details should be a map")
 		return
 	}
-	
+
 	if detailsMap["user_id"] != 123 {
 		t.Errorf("WithDetails().Details[user_id] = %v, want %v", detailsMap["user_id"], 123)
 	}
@@ -101,7 +101,7 @@ func TestAppError_WithDetails(t *testing.T) {
 
 func TestAppError_WithLevel(t *testing.T) {
 	appErr := New(ErrCodeInternalServer, "Test error")
-	
+
 	errWithLevel := appErr.WithLevel(ErrorLevelFatal)
 	if errWithLevel.Level != ErrorLevelFatal {
 		t.Errorf("WithLevel().Level = %v, want %v", errWithLevel.Level, ErrorLevelFatal)
@@ -110,7 +110,7 @@ func TestAppError_WithLevel(t *testing.T) {
 
 func TestAppError_WithHTTPStatus(t *testing.T) {
 	appErr := New(ErrCodeInternalServer, "Test error")
-	
+
 	errWithStatus := appErr.WithHTTPStatus(http.StatusBadGateway)
 	if errWithStatus.HTTPStatus != http.StatusBadGateway {
 		t.Errorf("WithHTTPStatus().HTTPStatus = %v, want %v", errWithStatus.HTTPStatus, http.StatusBadGateway)
@@ -120,7 +120,7 @@ func TestAppError_WithHTTPStatus(t *testing.T) {
 func TestAppError_WithRequestID(t *testing.T) {
 	requestID := "req-123456"
 	appErr := New(ErrCodeInternalServer, "Test error")
-	
+
 	errWithRequestID := appErr.WithRequestID(requestID)
 	if errWithRequestID.RequestID != requestID {
 		t.Errorf("WithRequestID().RequestID = %v, want %v", errWithRequestID.RequestID, requestID)
@@ -130,7 +130,7 @@ func TestAppError_WithRequestID(t *testing.T) {
 func TestAppError_WithUserID(t *testing.T) {
 	userID := "user-123"
 	appErr := New(ErrCodeInternalServer, "Test error")
-	
+
 	errWithUserID := appErr.WithUserID(userID)
 	if errWithUserID.UserID != userID {
 		t.Errorf("WithUserID().UserID = %v, want %v", errWithUserID.UserID, userID)
@@ -139,12 +139,12 @@ func TestAppError_WithUserID(t *testing.T) {
 
 func TestAppError_WithStackTrace(t *testing.T) {
 	appErr := New(ErrCodeInternalServer, "Test error")
-	
+
 	errWithStack := appErr.WithStackTrace()
 	if errWithStack.StackTrace == "" {
 		t.Error("WithStackTrace().StackTrace should not be empty")
 	}
-	
+
 	// Check if stack trace contains expected patterns
 	if !contains(errWithStack.StackTrace, "github.com/alldev-run/golang-gin-rpc") {
 		t.Error("StackTrace should contain package name")
@@ -153,25 +153,25 @@ func TestAppError_WithStackTrace(t *testing.T) {
 
 func TestWrap(t *testing.T) {
 	originalErr := errors.New("original error")
-	
+
 	appErr := Wrap(originalErr, ErrCodeDBConnection, "Database connection failed")
-	
+
 	if appErr == nil {
 		t.Fatal("Wrap() should not return nil")
 	}
-	
+
 	if appErr.Code != ErrCodeDBConnection {
 		t.Errorf("Wrap().Code = %v, want %v", appErr.Code, ErrCodeDBConnection)
 	}
-	
+
 	if appErr.Message != "Database connection failed" {
 		t.Errorf("Wrap().Message = %v, want %v", appErr.Message, "Database connection failed")
 	}
-	
+
 	if appErr.Cause != originalErr {
 		t.Errorf("Wrap().Cause = %v, want %v", appErr.Cause, originalErr)
 	}
-	
+
 	// Test wrapping nil error
 	nilErr := Wrap(nil, ErrCodeInternalServer, "Test")
 	if nilErr != nil {
@@ -181,9 +181,9 @@ func TestWrap(t *testing.T) {
 
 func TestWrap_AppError(t *testing.T) {
 	originalErr := New(ErrCodeInternalServer, "Original error")
-	
+
 	wrappedErr := Wrap(originalErr, ErrCodeDBConnection, "Wrapped error")
-	
+
 	// Should return the original AppError with cause
 	if wrappedErr != originalErr {
 		t.Error("Wrap(AppError) should return the same error instance")
@@ -194,17 +194,17 @@ func TestAppError_Is(t *testing.T) {
 	err1 := New(ErrCodeInternalServer, "Error 1")
 	err2 := New(ErrCodeInternalServer, "Error 2")
 	err3 := New(ErrCodeDBConnection, "Error 3")
-	
+
 	// Test same code
 	if !err1.Is(err2) {
 		t.Error("Is() should return true for same error code")
 	}
-	
+
 	// Test different code
 	if err1.Is(err3) {
 		t.Error("Is() should return false for different error code")
 	}
-	
+
 	// Test with standard error
 	standardErr := errors.New("standard error")
 	if err1.Is(standardErr) {
@@ -215,12 +215,12 @@ func TestAppError_Is(t *testing.T) {
 func TestAppError_Unwrap(t *testing.T) {
 	originalErr := errors.New("original error")
 	appErr := New(ErrCodeInternalServer, "Test error").WithCause(originalErr)
-	
+
 	unwrapped := appErr.Unwrap()
 	if unwrapped != originalErr {
 		t.Errorf("Unwrap() = %v, want %v", unwrapped, originalErr)
 	}
-	
+
 	// Test without cause
 	appErrNoCause := New(ErrCodeInternalServer, "Test error")
 	if appErrNoCause.Unwrap() != nil {
@@ -286,8 +286,8 @@ func TestErrorCategories(t *testing.T) {
 
 func TestIsRetryable(t *testing.T) {
 	tests := []struct {
-		name     string
-		err      *AppError
+		name      string
+		err       *AppError
 		retryable bool
 	}{
 		{"retryable timeout", New(ErrCodeTimeout, "Test"), true},
@@ -387,7 +387,7 @@ func TestPredefinedErrors(t *testing.T) {
 			if err.Code != tt.code {
 				t.Errorf("Predefined error %s.Code = %v, want %v", tt.name, err.Code, tt.code)
 			}
-			
+
 			if err.Message != tt.message {
 				t.Errorf("Predefined error %s.Message = %v, want %v", tt.name, err.Message, tt.message)
 			}
@@ -397,11 +397,11 @@ func TestPredefinedErrors(t *testing.T) {
 
 func TestGetStackTrace(t *testing.T) {
 	stack := getStackTrace()
-	
+
 	if stack == "" {
 		t.Error("getStackTrace() should not return empty string")
 	}
-	
+
 	// Check if stack trace contains expected patterns
 	// Note: The actual stack trace may vary, so we just check it's not empty
 }
@@ -411,17 +411,17 @@ func TestSimpleHash(t *testing.T) {
 	key := "test"
 	hash1 := simpleHashInTest(key)
 	hash2 := simpleHashInTest(key)
-	
+
 	// Test consistency
 	if hash1 != hash2 {
 		t.Error("simpleHash() should be consistent for same input")
 	}
-	
+
 	// Test non-negative
 	if hash1 < 0 {
 		t.Error("simpleHash() should return non-negative value")
 	}
-	
+
 	// Test different keys produce different hashes
 	hash3 := simpleHashInTest("different")
 	if hash1 == hash3 {
@@ -443,11 +443,11 @@ func simpleHashInTest(key string) int {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   (s == substr || 
-		    s[:len(substr)] == substr || 
-		    s[len(s)-len(substr):] == substr || 
-		    indexOf(s, substr) >= 0)
+	return len(s) >= len(substr) &&
+		(s == substr ||
+			s[:len(substr)] == substr ||
+			s[len(s)-len(substr):] == substr ||
+			indexOf(s, substr) >= 0)
 }
 
 func indexOf(s, substr string) int {
@@ -469,7 +469,7 @@ func BenchmarkNew(b *testing.B) {
 func BenchmarkWithCause(b *testing.B) {
 	originalErr := errors.New("original error")
 	appErr := New(ErrCodeInternalServer, "Test error")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		appErr.WithCause(originalErr)
@@ -478,7 +478,7 @@ func BenchmarkWithCause(b *testing.B) {
 
 func BenchmarkError(b *testing.B) {
 	appErr := New(ErrCodeInternalServer, "Test error").WithCause(errors.New("cause"))
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = appErr.Error()

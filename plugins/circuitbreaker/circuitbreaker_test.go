@@ -29,7 +29,7 @@ func TestState_String(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	if config.MaxRequests != 1 {
 		t.Errorf("DefaultConfig().MaxRequests = %v, want %v", config.MaxRequests, 1)
 	}
@@ -88,9 +88,9 @@ func TestNewCircuitBreaker(t *testing.T) {
 
 func TestNewCircuitBreaker_DefaultValues(t *testing.T) {
 	config := Config{
-		MaxRequests: 0,        // Should default to 1
-		Interval:    0,        // Should default to time.Minute
-		Timeout:     0,        // Should default to time.Minute
+		MaxRequests: 0, // Should default to 1
+		Interval:    0, // Should default to time.Minute
+		Timeout:     0, // Should default to time.Minute
 	}
 
 	cb := NewCircuitBreaker("test", config)
@@ -108,13 +108,13 @@ func TestNewCircuitBreaker_DefaultValues(t *testing.T) {
 
 func TestCircuitBreaker_Execute_Success(t *testing.T) {
 	cb := NewCircuitBreaker("test", DefaultConfig())
-	
+
 	successFn := func() (interface{}, error) {
 		return "success", nil
 	}
 
 	result, err := cb.Execute(successFn)
-	
+
 	if err != nil {
 		t.Errorf("Execute() error = %v, want nil", err)
 	}
@@ -125,13 +125,13 @@ func TestCircuitBreaker_Execute_Success(t *testing.T) {
 
 func TestCircuitBreaker_Execute_Failure(t *testing.T) {
 	cb := NewCircuitBreaker("test", DefaultConfig())
-	
+
 	failFn := func() (interface{}, error) {
 		return nil, errors.New("test error")
 	}
 
 	result, err := cb.Execute(failFn)
-	
+
 	if err == nil {
 		t.Error("Execute() error = nil, want error")
 	}
@@ -142,7 +142,7 @@ func TestCircuitBreaker_Execute_Failure(t *testing.T) {
 
 func TestCircuitBreaker_Execute_Panic(t *testing.T) {
 	cb := NewCircuitBreaker("test", DefaultConfig())
-	
+
 	panicFn := func() (interface{}, error) {
 		panic("test panic")
 	}
@@ -163,15 +163,15 @@ func TestCircuitBreaker_Execute_Fallback(t *testing.T) {
 		fallbackCalled = true
 		return errors.New("fallback error")
 	}
-	
+
 	cb := NewCircuitBreaker("test", config)
-	
+
 	failFn := func() (interface{}, error) {
 		return nil, errors.New("original error")
 	}
 
 	_, err := cb.Execute(failFn)
-	
+
 	if err == nil {
 		t.Error("Execute() error = nil, want error")
 	}
@@ -185,7 +185,7 @@ func TestCircuitBreaker_Execute_Fallback(t *testing.T) {
 
 func TestCircuitBreaker_MultipleFailures(t *testing.T) {
 	cb := NewCircuitBreaker("test", DefaultConfig())
-	
+
 	failFn := func() (interface{}, error) {
 		return nil, errors.New("test error")
 	}
@@ -207,9 +207,9 @@ func TestCircuitBreaker_StateTransitions(t *testing.T) {
 		key := from.String() + "->" + to.String()
 		stateChanges[key]++
 	}
-	
+
 	cb := NewCircuitBreaker("test", config)
-	
+
 	failFn := func() (interface{}, error) {
 		return nil, errors.New("test error")
 	}
