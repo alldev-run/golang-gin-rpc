@@ -288,14 +288,12 @@ func TestConnRateLimit(t *testing.T) {
 
 	ctx := context.Background()
 	replies := 0
-	var closed bool
-	for i := 0; i < 10 && !closed; i++ {
+	for i := 0; i < 10; i++ {
 		if err := client.SendText(ctx, fmt.Sprintf(`{"action":"ping","req_id":"r%d"}`, i)); err != nil {
 			break
 		}
 		_, _, err := client.Receive(ctx)
 		if err != nil {
-			closed = true // 超限后连接被服务端关闭
 			break
 		}
 		replies++

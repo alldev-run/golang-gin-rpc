@@ -12,32 +12,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type traceHeadersCarrier struct {
-	headers map[string]string
-}
-
-func (c traceHeadersCarrier) Get(key string) string {
-	if c.headers == nil {
-		return ""
-	}
-	return c.headers[key]
-}
-
-func (c traceHeadersCarrier) Set(key, value string) {
-	if c.headers == nil {
-		return
-	}
-	c.headers[key] = value
-}
-
-func (c traceHeadersCarrier) Keys() []string {
-	keys := make([]string, 0, len(c.headers))
-	for k := range c.headers {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 func tracerOrGlobal(tp *pkgtracing.TracerProvider) *pkgtracing.TracerProvider {
 	if tp != nil {
 		return tp
@@ -58,13 +32,6 @@ func injectTraceToHTTPHeaders(ctx context.Context, headers http.Header) {
 		return
 	}
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(headers))
-}
-
-func injectTraceToMapHeaders(ctx context.Context, headers map[string]string) {
-	if ctx == nil || headers == nil {
-		return
-	}
-	otel.GetTextMapPropagator().Inject(ctx, traceHeadersCarrier{headers: headers})
 }
 
 func extractTraceFromHTTPHeaders(ctx context.Context, headers http.Header) context.Context {

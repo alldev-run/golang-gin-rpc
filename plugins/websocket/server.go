@@ -38,9 +38,10 @@ type ServerConfig struct {
 	// ReadLimit caps a single inbound message in bytes; 0 keeps the library
 	// default (32KiB), -1 disables the limit.
 	ReadLimit int64 `yaml:"read_limit" json:"read_limit"`
-	// OriginPatterns enables cross-origin verification when non-empty (e.g.
-	// "*.example.com"); empty keeps the legacy accept-any-origin behavior.
+	// OriginPatterns allows the listed origins; empty uses the library's same-origin policy.
 	OriginPatterns []string `yaml:"origin_patterns" json:"origin_patterns"`
+	// AllowAnyOrigin disables origin verification and should only be enabled for public APIs.
+	AllowAnyOrigin bool `yaml:"allow_any_origin" json:"allow_any_origin"`
 	// Compression enables permessage-deflate (no context takeover).
 	Compression bool `yaml:"compression" json:"compression"`
 	// RateLimit, when set, throttles inbound messages per connection.
@@ -315,7 +316,7 @@ func (a *connAcceptor) serve(w http.ResponseWriter, req *http.Request, handler H
 	acceptOpts := &nws.AcceptOptions{}
 	if len(a.config.OriginPatterns) > 0 {
 		acceptOpts.OriginPatterns = a.config.OriginPatterns
-	} else {
+	} else if a.config.AllowAnyOrigin {
 		acceptOpts.InsecureSkipVerify = true
 	}
 	if a.config.Compression {
@@ -567,7 +568,9 @@ func (c *Conn) send(_ context.Context, payload []byte, frameType byte) error {
 		return nil
 	default:
 		err := errors.New("websocket: send queue full")
-		c.CloseWithCode(CloseCodeSendQueueFull, err)
+		if closeErr := c.CloseWithCode(CloseCodeSendQueueFull, err); closeErr != nil {
+			return fmt.Errorf("%w: close connection: %v", err, closeErr)
+		}
 		return err
 	}
 }

@@ -43,8 +43,7 @@ func (o *RoomOptions) normalize() {
 
 // Room is an indexed group of connections with a lifecycle.
 type Room struct {
-	id   string
-	meta map[string]string
+	id string
 
 	mu         sync.RWMutex
 	members    map[string]*Conn // connectionID → conn
