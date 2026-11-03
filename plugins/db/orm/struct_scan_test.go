@@ -41,6 +41,31 @@ func TestStructScanRow(t *testing.T) {
 	}
 }
 
+func TestStructScanRow_UsesDeclarationOrder(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT").WillReturnRows(
+		sqlmock.NewRows([]string{"name", "id"}).AddRow("test", 1),
+	)
+
+	type User struct {
+		Name string `db:"name"`
+		ID   int    `db:"id"`
+	}
+
+	var user User
+	if err := StructScanRow(db.QueryRow("SELECT name, id FROM users"), &user); err != nil {
+		t.Fatalf("StructScanRow failed: %v", err)
+	}
+	if user.Name != "test" || user.ID != 1 {
+		t.Errorf("got user %+v, want Name=test and ID=1", user)
+	}
+}
+
 func TestStructScanRow_NoRows(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -126,10 +151,9 @@ func TestStructScanRow_WithNull(t *testing.T) {
 	if user.Name != "test" {
 		t.Errorf("expected Name = test, got %s", user.Name)
 	}
-	// Skip this check for now - the NULL handling needs more work
-	// if user.Email != nil {
-	// 	t.Errorf("expected Email = nil, got %v", user.Email)
-	// }
+	if user.Email != nil {
+		t.Errorf("expected Email = nil, got %v", *user.Email)
+	}
 }
 
 func TestStructScanRow_InvalidDest(t *testing.T) {

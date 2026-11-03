@@ -4,43 +4,42 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
 	"strings"
 )
 
 // InsertBuilder provides a fluent interface for building INSERT queries.
 type InsertBuilder struct {
-	db         DB
-	table      string
-	data       map[string]interface{}
-	columns    []string
-	values     [][]interface{}
-	onConflict string
+	db                   DB
+	table                string
+	data                 map[string]interface{}
+	columns              []string
+	values               [][]interface{}
+	onConflict           string
 	onDuplicateKeyUpdate []string
-	insertPrefix string
-	dialect    Dialect
+	insertPrefix         string
+	dialect              Dialect
 }
 
 // NewInsertBuilder creates a new INSERT query builder.
 func NewInsertBuilder(db DB, table string) *InsertBuilder {
 	dialect := NewDefaultDialect()
 	return &InsertBuilder{
-		db:      db,
-		table:   table,
-		data:    make(map[string]interface{}),
+		db:           db,
+		table:        table,
+		data:         make(map[string]interface{}),
 		insertPrefix: "INSERT INTO",
-		dialect: dialect,
+		dialect:      dialect,
 	}
 }
 
 // NewInsertBuilderWithDialect creates a new INSERT query builder with a specific dialect.
 func NewInsertBuilderWithDialect(db DB, table string, dialect Dialect) *InsertBuilder {
 	return &InsertBuilder{
-		db:      db,
-		table:   table,
-		data:    make(map[string]interface{}),
+		db:           db,
+		table:        table,
+		data:         make(map[string]interface{}),
 		insertPrefix: "INSERT INTO",
-		dialect: dialect,
+		dialect:      dialect,
 	}
 }
 
@@ -100,8 +99,8 @@ func (ib *InsertBuilder) OnConflictUpdate(updateColumns ...string) *InsertBuilde
 	} else {
 		updates := make([]string, len(updateColumns))
 		for i, col := range updateColumns {
-			updates[i] = fmt.Sprintf("%s = EXCLUDED.%s", 
-				ib.dialect.QuoteIdentifier(col), 
+			updates[i] = fmt.Sprintf("%s = EXCLUDED.%s",
+				ib.dialect.QuoteIdentifier(col),
 				ib.dialect.QuoteIdentifier(col))
 		}
 		ib.onConflict = "DO UPDATE SET " + strings.Join(updates, ", ")
@@ -119,7 +118,7 @@ func (ib *InsertBuilder) Build() (string, []interface{}, error) {
 	var query string
 	var args []interface{}
 	var err error
-	
+
 	if len(ib.values) > 0 && len(ib.columns) > 0 {
 		// Bulk insert mode
 		query, args, err = ib.buildBulkInsert()
@@ -134,11 +133,11 @@ func (ib *InsertBuilder) Build() (string, []interface{}, error) {
 	} else {
 		return "", nil, ErrEmptyData
 	}
-	
+
 	if err != nil {
 		return "", nil, err
 	}
-	
+
 	// Add ON CONFLICT clause if specified
 	if ib.onConflict != "" && ib.dialect.SupportsFeature(FeatureUpsert) {
 		query += " ON CONFLICT " + ib.onConflict
@@ -156,54 +155,24 @@ func (ib *InsertBuilder) Build() (string, []interface{}, error) {
 			query += " ON DUPLICATE KEY UPDATE " + strings.Join(updates, ", ")
 		}
 	}
-	
-	return query, args, nil
-}
 
-func (ib *InsertBuilder) buildSingleInsert() (string, []interface{}) {
-	// Sort keys for consistent query generation
-	keys := make([]string, 0, len(ib.data))
-	for k := range ib.data {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	
-	// Build column list
-	quotedKeys := QuoteIdentifiers(ib.dialect, keys...)
-	columns := strings.Join(quotedKeys, ", ")
-	
-	// Build placeholders
-	placeholders := BuildPlaceholders(ib.dialect, len(keys))
-	
-	// Build arguments
-	args := make([]interface{}, len(keys))
-	for i, key := range keys {
-		args[i] = ib.data[key]
-	}
-	
-	query := fmt.Sprintf("%s %s (%s) VALUES (%s)",
-		ib.insertPrefix,
-		ib.dialect.QuoteIdentifier(ib.table),
-		columns,
-		placeholders)
-	
-	return query, args
+	return query, args, nil
 }
 
 func (ib *InsertBuilder) buildBulkInsert() (string, []interface{}, error) {
 	// Quote column names
 	quotedColumns := QuoteIdentifiers(ib.dialect, ib.columns...)
 	columns := strings.Join(quotedColumns, ", ")
-	
+
 	// Build value placeholders for each row
 	valueStrings := make([]string, len(ib.values))
 	var args []interface{}
-	
+
 	for i, row := range ib.values {
 		if len(row) != len(ib.columns) {
 			return "", nil, fmt.Errorf("row %d has %d values, expected %d", i, len(row), len(ib.columns))
 		}
-		
+
 		placeholders := make([]string, len(row))
 		for j, value := range row {
 			placeholders[j] = ib.dialect.Placeholder(len(args))
@@ -211,13 +180,13 @@ func (ib *InsertBuilder) buildBulkInsert() (string, []interface{}, error) {
 		}
 		valueStrings[i] = "(" + strings.Join(placeholders, ", ") + ")"
 	}
-	
+
 	query := fmt.Sprintf("%s %s (%s) VALUES %s",
 		ib.insertPrefix,
 		ib.dialect.QuoteIdentifier(ib.table),
 		columns,
 		strings.Join(valueStrings, ", "))
-	
+
 	return query, args, nil
 }
 
@@ -262,12 +231,12 @@ func (ib *InsertBuilder) InsertReturning(ctx context.Context, returningColumns .
 	if !ib.dialect.SupportsFeature(FeatureCTE) {
 		return nil, fmt.Errorf("RETURNING clause not supported by this dialect")
 	}
-	
+
 	query, args, err := ib.Build()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Add RETURNING clause
 	if len(returningColumns) > 0 {
 		quotedColumns := QuoteIdentifiers(ib.dialect, returningColumns...)
@@ -275,7 +244,7 @@ func (ib *InsertBuilder) InsertReturning(ctx context.Context, returningColumns .
 	} else {
 		query += " RETURNING *"
 	}
-	
+
 	return ib.db.Query(ctx, query, args...)
 }
 
@@ -284,12 +253,12 @@ func (ib *InsertBuilder) InsertReturningTx(ctx context.Context, tx *sql.Tx, retu
 	if !ib.dialect.SupportsFeature(FeatureCTE) {
 		return nil, fmt.Errorf("RETURNING clause not supported by this dialect")
 	}
-	
+
 	query, args, err := ib.Build()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Add RETURNING clause
 	if len(returningColumns) > 0 {
 		quotedColumns := QuoteIdentifiers(ib.dialect, returningColumns...)
@@ -297,38 +266,38 @@ func (ib *InsertBuilder) InsertReturningTx(ctx context.Context, tx *sql.Tx, retu
 	} else {
 		query += " RETURNING *"
 	}
-	
+
 	return tx.QueryContext(ctx, query, args...)
 }
 
 // Clone creates a copy of the InsertBuilder.
 func (ib *InsertBuilder) Clone() *InsertBuilder {
 	clone := &InsertBuilder{
-		db:         ib.db,
-		table:      ib.table,
-		data:       make(map[string]interface{}),
-		columns:    make([]string, len(ib.columns)),
-		values:     make([][]interface{}, len(ib.values)),
-		onConflict: ib.onConflict,
+		db:                   ib.db,
+		table:                ib.table,
+		data:                 make(map[string]interface{}),
+		columns:              make([]string, len(ib.columns)),
+		values:               make([][]interface{}, len(ib.values)),
+		onConflict:           ib.onConflict,
 		onDuplicateKeyUpdate: append([]string(nil), ib.onDuplicateKeyUpdate...),
-		insertPrefix: ib.insertPrefix,
-		dialect:    ib.dialect,
+		insertPrefix:         ib.insertPrefix,
+		dialect:              ib.dialect,
 	}
-	
+
 	// Copy data
 	for k, v := range ib.data {
 		clone.data[k] = v
 	}
-	
+
 	// Copy columns
 	copy(clone.columns, ib.columns)
-	
+
 	// Copy values
 	for i, row := range ib.values {
 		clone.values[i] = make([]interface{}, len(row))
 		copy(clone.values[i], row)
 	}
-	
+
 	return clone
 }
 

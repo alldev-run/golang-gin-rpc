@@ -58,7 +58,7 @@ func IsZero(v interface{}) bool {
 		return rv.Float() == 0
 	case reflect.String:
 		return rv.String() == ""
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return rv.IsNil()
 	case reflect.Slice, reflect.Map, reflect.Array:
 		return rv.Len() == 0
@@ -105,14 +105,14 @@ func ToCamelCase(s string) string {
 	if s == "" {
 		return ""
 	}
-	
+
 	parts := strings.Split(s, "_")
 	for i := 1; i < len(parts); i++ {
 		if len(parts[i]) > 0 {
 			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
 		}
 	}
-	
+
 	return strings.Join(parts, "")
 }
 
@@ -121,11 +121,11 @@ func BuildInsertQuery(table string, data map[string]interface{}, dialect Dialect
 	if err := ValidateTableName(table); err != nil {
 		return "", nil, err
 	}
-	
+
 	if len(data) == 0 {
 		return "", nil, ErrEmptyData
 	}
-	
+
 	// Validate column names and data types
 	for column, value := range data {
 		if err := ValidateColumnName(column); err != nil {
@@ -135,30 +135,30 @@ func BuildInsertQuery(table string, data map[string]interface{}, dialect Dialect
 			return "", nil, fmt.Errorf("invalid data type for column '%s': %w", column, ErrInvalidDataType)
 		}
 	}
-	
+
 	// Sort keys for consistent query generation
 	keys := make([]string, 0, len(data))
 	for k := range data {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	
+
 	// Build column list
 	quotedKeys := QuoteIdentifiers(dialect, keys...)
 	columns := strings.Join(quotedKeys, ", ")
-	
+
 	// Build placeholders
 	placeholders := BuildPlaceholders(dialect, len(keys))
-	
+
 	// Build arguments
 	args := make([]interface{}, len(keys))
 	for i, key := range keys {
 		args[i] = data[key]
 	}
-	
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", 
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
 		dialect.QuoteIdentifier(table), columns, placeholders)
-	
+
 	return query, args, nil
 }
 
@@ -167,15 +167,15 @@ func BuildUpdateQuery(table, idColumn string, id interface{}, data map[string]in
 	if err := ValidateTableName(table); err != nil {
 		return "", nil, err
 	}
-	
+
 	if err := ValidateColumnName(idColumn); err != nil {
 		return "", nil, fmt.Errorf("invalid ID column name '%s': %w", idColumn, err)
 	}
-	
+
 	if len(data) == 0 {
 		return "", nil, ErrEmptyData
 	}
-	
+
 	// Validate column names and data types
 	for column, value := range data {
 		if err := ValidateColumnName(column); err != nil {
@@ -185,7 +185,7 @@ func BuildUpdateQuery(table, idColumn string, id interface{}, data map[string]in
 			return "", nil, fmt.Errorf("invalid data type for column '%s': %w", column, ErrInvalidDataType)
 		}
 	}
-	
+
 	// Sort keys for consistent query generation
 	keys := make([]string, 0, len(data))
 	for k := range data {
@@ -194,30 +194,30 @@ func BuildUpdateQuery(table, idColumn string, id interface{}, data map[string]in
 		}
 	}
 	sort.Strings(keys)
-	
+
 	if len(keys) == 0 {
 		return "", nil, fmt.Errorf("no columns to update after excluding ID column '%s'", idColumn)
 	}
-	
+
 	// Build SET clause
 	setParts := make([]string, len(keys))
 	args := make([]interface{}, len(keys)+1) // +1 for ID
-	
+
 	for i, key := range keys {
 		quotedKey := dialect.QuoteIdentifier(key)
 		setParts[i] = fmt.Sprintf("%s = %s", quotedKey, dialect.Placeholder(i))
 		args[i] = data[key]
 	}
-	
+
 	// Add ID to arguments
 	args[len(keys)] = id
-	
+
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s = %s",
 		dialect.QuoteIdentifier(table),
 		strings.Join(setParts, ", "),
 		dialect.QuoteIdentifier(idColumn),
 		dialect.Placeholder(len(keys)))
-	
+
 	return query, args, nil
 }
 
@@ -253,11 +253,11 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 	if err := ValidateTableName(table); err != nil {
 		return "", err
 	}
-	
+
 	if len(columns) == 0 {
 		columns = []string{"*"}
 	}
-	
+
 	// Validate column names
 	for _, column := range columns {
 		if hasUnsafeSQLBoundary(column) {
@@ -270,7 +270,7 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 			}
 		}
 	}
-	
+
 	quotedColumns := make([]string, len(columns))
 	for i, column := range columns {
 		if column == "*" || strings.HasPrefix(column, "DISTINCT ") || strings.Contains(column, "(") {
@@ -279,11 +279,11 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 			quotedColumns[i] = dialect.QuoteIdentifier(column)
 		}
 	}
-	
-	query := fmt.Sprintf("SELECT %s FROM %s", 
-		strings.Join(quotedColumns, ", "), 
+
+	query := fmt.Sprintf("SELECT %s FROM %s",
+		strings.Join(quotedColumns, ", "),
 		dialect.QuoteIdentifier(table))
-	
+
 	if whereClause != "" {
 		if hasUnsafeSQLBoundary(whereClause) {
 			return "", fmt.Errorf("unsafe where clause")
@@ -293,7 +293,7 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 		}
 		query += " " + whereClause
 	}
-	
+
 	if orderBy != "" {
 		if hasUnsafeSQLBoundary(orderBy) {
 			return "", fmt.Errorf("unsafe order by clause")
@@ -309,12 +309,12 @@ func BuildSelectQuery(table string, columns []string, whereClause string, orderB
 		}
 		query += " ORDER BY " + strings.Join(safeItems, ", ")
 	}
-	
+
 	limitOffsetClause := dialect.LimitOffset(limit, offset)
 	if limitOffsetClause != "" {
 		query += " " + limitOffsetClause
 	}
-	
+
 	return query, nil
 }
 
@@ -371,20 +371,20 @@ func BuildDeleteQuery(table string, whereClause string, limit int, dialect Diale
 	if err := ValidateTableName(table); err != nil {
 		return "", err
 	}
-	
+
 	query := fmt.Sprintf("DELETE FROM %s", dialect.QuoteIdentifier(table))
-	
+
 	if whereClause != "" {
 		query += " " + whereClause
 	}
-	
+
 	if limit > 0 {
 		limitClause := dialect.LimitOffset(limit, 0)
 		if limitClause != "" {
 			query += " " + limitClause
 		}
 	}
-	
+
 	return query, nil
 }
 
@@ -447,11 +447,11 @@ func ValidateTableName(table string) error {
 	if table == "" {
 		return ErrInvalidTableName
 	}
-	
+
 	if !tableNamePattern.MatchString(table) {
 		return fmt.Errorf("%w: '%s' (must start with letter and contain only letters, numbers, underscores)", ErrInvalidTableName, table)
 	}
-	
+
 	return nil
 }
 
@@ -540,7 +540,7 @@ func ValidateJoinTableReference(table string) error {
 	}
 
 	base := parts[0]
-	if !(qualifiedIdentifierPattern.MatchString(base) || quotedQualifiedIdentifierPattern.MatchString(base)) {
+	if !qualifiedIdentifierPattern.MatchString(base) && !quotedQualifiedIdentifierPattern.MatchString(base) {
 		return fmt.Errorf("%w: '%s'", ErrInvalidTableName, table)
 	}
 
@@ -570,18 +570,18 @@ func isValidDataType(value interface{}) bool {
 	if value == nil {
 		return true
 	}
-	
+
 	switch value.(type) {
 	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string, []byte, time.Time:
 		return true
 	default:
 		// Check if it's a pointer to a supported type
 		rv := reflect.ValueOf(value)
-		if rv.Kind() == reflect.Ptr && !rv.IsNil() {
+		if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 			switch rv.Elem().Kind() {
 			case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-				 reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-				 reflect.Float32, reflect.Float64, reflect.String:
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+				reflect.Float32, reflect.Float64, reflect.String:
 				return true
 			}
 		}

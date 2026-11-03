@@ -123,7 +123,7 @@ func (m *Migrator) runUp(ctx context.Context, migration Migration) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, migration.UpSQL); err != nil {
 		return fmt.Errorf("up sql failed: %w", err)
@@ -146,7 +146,7 @@ func (m *Migrator) runDown(ctx context.Context, migration Migration) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, migration.DownSQL); err != nil {
 		return fmt.Errorf("down sql failed: %w", err)

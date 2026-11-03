@@ -294,8 +294,8 @@ func (ub *UpdateBuilder) Build() (string, []interface{}) {
 		}
 	}
 
-	query := fmt.Sprintf("UPDATE %s SET %s", 
-		ub.dialect.QuoteIdentifier(ub.table), 
+	query := fmt.Sprintf("UPDATE %s SET %s",
+		ub.dialect.QuoteIdentifier(ub.table),
 		strings.Join(setParts, ", "))
 
 	var allArgs []interface{}
@@ -313,9 +313,9 @@ func (ub *UpdateBuilder) Build() (string, []interface{}) {
 			tableExpr = ub.dialect.QuoteIdentifier(join.Table)
 		}
 		cond := replaceConditionPlaceholders(join.Condition, ub.dialect, len(allArgs))
-		query += fmt.Sprintf(" %s JOIN %s ON %s", 
-			join.Type, 
-			tableExpr, 
+		query += fmt.Sprintf(" %s JOIN %s ON %s",
+			join.Type,
+			tableExpr,
 			cond)
 		allArgs = append(allArgs, join.Args...)
 	}
@@ -376,36 +376,36 @@ func (ub *UpdateBuilder) UpdateTx(ctx context.Context, tx *sql.Tx) (int64, error
 // UpdateWithVersion executes the UPDATE query with optimistic locking.
 func (ub *UpdateBuilder) UpdateWithVersion(ctx context.Context, id interface{}, idColumn string, currentVersion interface{}) (int64, error) {
 	// Add version condition to WHERE clause
-	versionCondition := fmt.Sprintf("%s = %s", 
-		ub.dialect.QuoteIdentifier(ub.versionField), 
+	versionCondition := fmt.Sprintf("%s = %s",
+		ub.dialect.QuoteIdentifier(ub.versionField),
 		ub.dialect.Placeholder(len(ub.where.GetArgs())))
-	
+
 	ub.where.And(versionCondition, currentVersion)
-	
+
 	// Increment version field
 	ub.SetExpr(ub.versionField, fmt.Sprintf("%s + ?", ub.dialect.QuoteIdentifier(ub.versionField)), 1)
-	
+
 	// Add ID condition
 	ub.where.Eq(idColumn, id)
-	
+
 	return ub.Update(ctx)
 }
 
 // UpdateWithVersionTx executes the UPDATE query with optimistic locking within a transaction.
 func (ub *UpdateBuilder) UpdateWithVersionTx(ctx context.Context, tx *sql.Tx, id interface{}, idColumn string, currentVersion interface{}) (int64, error) {
 	// Add version condition to WHERE clause
-	versionCondition := fmt.Sprintf("%s = %s", 
-		ub.dialect.QuoteIdentifier(ub.versionField), 
+	versionCondition := fmt.Sprintf("%s = %s",
+		ub.dialect.QuoteIdentifier(ub.versionField),
 		ub.dialect.Placeholder(len(ub.where.GetArgs())))
-	
+
 	ub.where.And(versionCondition, currentVersion)
-	
+
 	// Increment version field
 	ub.SetExpr(ub.versionField, fmt.Sprintf("%s + ?", ub.dialect.QuoteIdentifier(ub.versionField)), 1)
-	
+
 	// Add ID condition
 	ub.where.Eq(idColumn, id)
-	
+
 	return ub.UpdateTx(ctx, tx)
 }
 
@@ -414,9 +414,9 @@ func (ub *UpdateBuilder) UpdateReturning(ctx context.Context, returningColumns .
 	if !ub.dialect.SupportsFeature(FeatureCTE) {
 		return nil, fmt.Errorf("RETURNING clause not supported by this dialect")
 	}
-	
+
 	query, args := ub.Build()
-	
+
 	// Add RETURNING clause
 	if len(returningColumns) > 0 {
 		quotedColumns := QuoteIdentifiers(ub.dialect, returningColumns...)
@@ -424,7 +424,7 @@ func (ub *UpdateBuilder) UpdateReturning(ctx context.Context, returningColumns .
 	} else {
 		query += " RETURNING *"
 	}
-	
+
 	return ub.db.Query(ctx, query, args...)
 }
 
@@ -433,9 +433,9 @@ func (ub *UpdateBuilder) UpdateReturningTx(ctx context.Context, tx *sql.Tx, retu
 	if !ub.dialect.SupportsFeature(FeatureCTE) {
 		return nil, fmt.Errorf("RETURNING clause not supported by this dialect")
 	}
-	
+
 	query, args := ub.Build()
-	
+
 	// Add RETURNING clause
 	if len(returningColumns) > 0 {
 		quotedColumns := QuoteIdentifiers(ub.dialect, returningColumns...)
@@ -443,7 +443,7 @@ func (ub *UpdateBuilder) UpdateReturningTx(ctx context.Context, tx *sql.Tx, retu
 	} else {
 		query += " RETURNING *"
 	}
-	
+
 	return tx.QueryContext(ctx, query, args...)
 }
 
@@ -459,20 +459,20 @@ func (ub *UpdateBuilder) Clone() *UpdateBuilder {
 		dialect:      ub.dialect,
 		versionField: ub.versionField,
 	}
-	
+
 	// Copy data
 	for k, v := range ub.data {
 		clone.data[k] = v
 	}
-	
+
 	// Copy joins
 	copy(clone.joins, ub.joins)
-	
+
 	// Copy orderBy
 	copy(clone.orderBy, ub.orderBy)
-	
+
 	clone.where = ub.where.Clone()
-	
+
 	return clone
 }
 

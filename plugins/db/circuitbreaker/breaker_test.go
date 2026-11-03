@@ -349,17 +349,10 @@ func TestFailureResetOnSuccess(t *testing.T) {
 }
 
 func TestErrCircuitOpen(t *testing.T) {
-	// Test that ErrCircuitOpen is the base error
-	err := errors.New("circuit breaker is open")
-	if !errors.Is(ErrCircuitOpen, errors.New("circuit breaker is open")) {
-		// This might not work with direct comparison, but the wrapped error should work
-	}
-
-	// Test wrapped error
 	cb := New(Config{Name: "test"})
 	cb.ForceOpen()
 
-	err = cb.Execute(context.Background(), func() error {
+	err := cb.Execute(context.Background(), func() error {
 		return nil
 	})
 

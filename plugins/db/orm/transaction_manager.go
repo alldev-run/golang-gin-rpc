@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -10,23 +11,6 @@ import (
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
-
-// log helpers to avoid direct zap dependency
-func logDebug(msg string) {
-	logger.Debug(msg)
-}
-
-func logInfo(msg string) {
-	logger.Info(msg)
-}
-
-func logWarn(msg string) {
-	logger.Warn(msg)
-}
-
-func logError(msg string) {
-	logger.Errorf(msg)
-}
 
 func logDebugf(msg string, args ...interface{}) {
 	logger.Debug(fmt.Sprintf(msg, args...))
@@ -40,33 +24,29 @@ func logWarnf(msg string, args ...interface{}) {
 	logger.Warn(fmt.Sprintf(msg, args...))
 }
 
-func logErrorf(msg string, args ...interface{}) {
-	logger.Errorf(fmt.Sprintf(msg, args...))
-}
-
 // TransactionConfig holds configuration for transaction operations.
 type TransactionConfig struct {
 	// Retry configuration
-	MaxRetries        int           `yaml:"max_retries" json:"max_retries"`
-	RetryDelay        time.Duration `yaml:"retry_delay" json:"retry_delay"`
-	RetryBackoffFactor float64      `yaml:"retry_backoff_factor" json:"retry_backoff_factor"`
-	MaxRetryDelay     time.Duration `yaml:"max_retry_delay" json:"max_retry_delay"`
-	
+	MaxRetries         int           `yaml:"max_retries" json:"max_retries"`
+	RetryDelay         time.Duration `yaml:"retry_delay" json:"retry_delay"`
+	RetryBackoffFactor float64       `yaml:"retry_backoff_factor" json:"retry_backoff_factor"`
+	MaxRetryDelay      time.Duration `yaml:"max_retry_delay" json:"max_retry_delay"`
+
 	// Transaction configuration
-	IsolationLevel    sql.IsolationLevel `yaml:"isolation_level" json:"isolation_level"`
-	ReadOnly          bool              `yaml:"read_only" json:"read_only"`
-	Timeout           time.Duration     `yaml:"timeout" json:"timeout"`
-	
+	IsolationLevel sql.IsolationLevel `yaml:"isolation_level" json:"isolation_level"`
+	ReadOnly       bool               `yaml:"read_only" json:"read_only"`
+	Timeout        time.Duration      `yaml:"timeout" json:"timeout"`
+
 	// Monitoring and logging
-	EnableMetrics     bool `yaml:"enable_metrics" json:"enable_metrics"`
-	EnableTracing     bool `yaml:"enable_tracing" json:"enable_tracing"`
-	LogSlowQueries    bool `yaml:"log_slow_queries" json:"log_slow_queries"`
+	EnableMetrics      bool          `yaml:"enable_metrics" json:"enable_metrics"`
+	EnableTracing      bool          `yaml:"enable_tracing" json:"enable_tracing"`
+	LogSlowQueries     bool          `yaml:"log_slow_queries" json:"log_slow_queries"`
 	SlowQueryThreshold time.Duration `yaml:"slow_query_threshold" json:"slow_query_threshold"`
-	
+
 	// Distributed transaction support
 	EnableDistributed bool   `yaml:"enable_distributed" json:"enable_distributed"`
 	CoordinatorURL    string `yaml:"coordinator_url" json:"coordinator_url"`
-	
+
 	// Connection pool configuration
 	MaxOpenConns    int           `yaml:"max_open_conns" json:"max_open_conns"`
 	MaxIdleConns    int           `yaml:"max_idle_conns" json:"max_idle_conns"`
@@ -78,7 +58,6 @@ type TransactionConfig struct {
 type TransactionManager struct {
 	config          TransactionConfig
 	metrics         *TransactionMetrics
-	mu              sync.RWMutex
 	activeTxCount   int64
 	totalTxCount    int64
 	coordinator     DistributedTransactionCoordinator
@@ -146,33 +125,33 @@ type SpanContext interface {
 type TransactionStatus string
 
 const (
-	TxStatusActive    TransactionStatus = "active"
-	TxStatusCommitted TransactionStatus = "committed"
+	TxStatusActive     TransactionStatus = "active"
+	TxStatusCommitted  TransactionStatus = "committed"
 	TxStatusRolledBack TransactionStatus = "rolled_back"
-	TxStatusFailed    TransactionStatus = "failed"
+	TxStatusFailed     TransactionStatus = "failed"
 )
 
 // ErrorClassification represents error classification.
 type ErrorClassification struct {
-	Type        ErrorType `json:"type"`
-	Retryable   bool      `json:"retryable"`
-	Transient   bool      `json:"transient"`
-	Severity    ErrorSeverity `json:"severity"`
-	Category    string    `json:"category"`
+	Type      ErrorType     `json:"type"`
+	Retryable bool          `json:"retryable"`
+	Transient bool          `json:"transient"`
+	Severity  ErrorSeverity `json:"severity"`
+	Category  string        `json:"category"`
 }
 
 // ErrorType represents error types.
 type ErrorType string
 
 const (
-	ErrorTypeConnection    ErrorType = "connection"
-	ErrorTypeTimeout       ErrorType = "timeout"
-	ErrorTypeDeadlock      ErrorType = "deadlock"
-	ErrorTypeConstraint    ErrorType = "constraint"
-	ErrorTypePermission    ErrorType = "permission"
-	ErrorTypeResource      ErrorType = "resource"
-	ErrorTypeLogic         ErrorType = "logic"
-	ErrorTypeUnknown       ErrorType = "unknown"
+	ErrorTypeConnection ErrorType = "connection"
+	ErrorTypeTimeout    ErrorType = "timeout"
+	ErrorTypeDeadlock   ErrorType = "deadlock"
+	ErrorTypeConstraint ErrorType = "constraint"
+	ErrorTypePermission ErrorType = "permission"
+	ErrorTypeResource   ErrorType = "resource"
+	ErrorTypeLogic      ErrorType = "logic"
+	ErrorTypeUnknown    ErrorType = "unknown"
 )
 
 // ErrorSeverity represents error severity.
@@ -187,46 +166,46 @@ const (
 
 // TransactionMetrics holds transaction performance metrics.
 type TransactionMetrics struct {
-	TotalTransactions    int64         `json:"total_transactions"`
-	SuccessfulTransactions int64      `json:"successful_transactions"`
-	FailedTransactions   int64         `json:"failed_transactions"`
-	RetriedTransactions  int64         `json:"retried_transactions"`
-	AvgDuration          time.Duration `json:"avg_duration"`
-	MaxDuration          time.Duration `json:"max_duration"`
-	MinDuration          time.Duration `json:"min_duration"`
-	LastReset            time.Time     `json:"last_reset"`
-	mu                   sync.RWMutex  `json:"-"`
+	TotalTransactions      int64         `json:"total_transactions"`
+	SuccessfulTransactions int64         `json:"successful_transactions"`
+	FailedTransactions     int64         `json:"failed_transactions"`
+	RetriedTransactions    int64         `json:"retried_transactions"`
+	AvgDuration            time.Duration `json:"avg_duration"`
+	MaxDuration            time.Duration `json:"max_duration"`
+	MinDuration            time.Duration `json:"min_duration"`
+	LastReset              time.Time     `json:"last_reset"`
+	mu                     sync.RWMutex  `json:"-"`
 }
 
 // TransactionResult contains the result of a transaction operation.
 type TransactionResult struct {
-	Success         bool          `json:"success"`
-	Duration        time.Duration `json:"duration"`
-	Retries         int           `json:"retries"`
-	Error           error         `json:"error,omitempty"`
-	TransactionID   string        `json:"transaction_id"`
-	IsolationLevel  sql.IsolationLevel `json:"isolation_level"`
-	ReadOnly        bool          `json:"read_only"`
-	RetryAttempts   []RetryAttempt `json:"retry_attempts,omitempty"`
-	Metrics         *DetailedMetrics `json:"metrics,omitempty"`
+	Success        bool               `json:"success"`
+	Duration       time.Duration      `json:"duration"`
+	Retries        int                `json:"retries"`
+	Error          error              `json:"error,omitempty"`
+	TransactionID  string             `json:"transaction_id"`
+	IsolationLevel sql.IsolationLevel `json:"isolation_level"`
+	ReadOnly       bool               `json:"read_only"`
+	RetryAttempts  []RetryAttempt     `json:"retry_attempts,omitempty"`
+	Metrics        *DetailedMetrics   `json:"metrics,omitempty"`
 }
 
 // RetryAttempt contains information about a retry attempt.
 type RetryAttempt struct {
 	AttemptNumber int           `json:"attempt_number"`
-	Error        error         `json:"error,omitempty"`
-	Duration     time.Duration `json:"duration"`
-	Timestamp    time.Time     `json:"timestamp"`
+	Error         error         `json:"error,omitempty"`
+	Duration      time.Duration `json:"duration"`
+	Timestamp     time.Time     `json:"timestamp"`
 }
 
 // DetailedMetrics contains detailed transaction metrics.
 type DetailedMetrics struct {
-	QueryCount       int           `json:"query_count"`
-	RowsAffected     int64         `json:"rows_affected"`
-	LockWaitTime     time.Duration `json:"lock_wait_time"`
-	IndexUsage       map[string]int64 `json:"index_usage"`
-	TableAccess      map[string]int64 `json:"table_access"`
-	MemoryUsage      int64         `json:"memory_usage"`
+	QueryCount   int              `json:"query_count"`
+	RowsAffected int64            `json:"rows_affected"`
+	LockWaitTime time.Duration    `json:"lock_wait_time"`
+	IndexUsage   map[string]int64 `json:"index_usage"`
+	TableAccess  map[string]int64 `json:"table_access"`
+	MemoryUsage  int64            `json:"memory_usage"`
 }
 
 // NewTransactionManager creates a new TransactionManager with enterprise settings.
@@ -360,15 +339,15 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 
 	for attempt := 0; attempt <= tm.config.MaxRetries; attempt++ {
 		attemptStartTime := time.Now()
-		
+
 		result, err := tm.executeTransactionOnce(ctx, db, fn, txID)
-		
+
 		// Record retry attempt
 		retryAttempt := RetryAttempt{
 			AttemptNumber: attempt + 1,
-			Error:        err,
-			Duration:     time.Since(attemptStartTime),
-			Timestamp:    time.Now(),
+			Error:         err,
+			Duration:      time.Since(attemptStartTime),
+			Timestamp:     time.Now(),
 		}
 		retryAttempts = append(retryAttempts, retryAttempt)
 
@@ -382,7 +361,7 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 			result.RetryAttempts = retryAttempts
 
 			// Update metrics
-		tm.updateMetrics(result)
+			tm.updateMetrics(result)
 
 			// Commit distributed transaction
 			if tm.config.EnableDistributed && tm.coordinator != nil {
@@ -415,11 +394,13 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 
 			// Rollback distributed transaction
 			if tm.config.EnableDistributed && tm.coordinator != nil {
-				tm.coordinator.RollbackTransaction(ctx, txID)
+				if rollbackErr := tm.coordinator.RollbackTransaction(ctx, txID); rollbackErr != nil {
+					result.Error = errors.Join(result.Error, fmt.Errorf("rollback distributed transaction: %w", rollbackErr))
+				}
 			}
 
 			tm.monitor.OnTransactionRollback(txID, result)
-			return result, err
+			return result, result.Error
 		}
 
 		// Notify monitor of retry
@@ -430,7 +411,7 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 		// If this wasn't the last attempt, wait before retrying
 		if attempt < tm.config.MaxRetries {
 			delay := tm.retryStrategy.GetDelay(attempt, err)
-			
+
 			// Add tracing tag
 			if span != nil {
 				span.SetTag("retry.attempt", attempt+1)
@@ -451,11 +432,13 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 
 				// Rollback distributed transaction
 				if tm.config.EnableDistributed && tm.coordinator != nil {
-					tm.coordinator.RollbackTransaction(ctx, txID)
+					if rollbackErr := tm.coordinator.RollbackTransaction(ctx, txID); rollbackErr != nil {
+						result.Error = errors.Join(result.Error, fmt.Errorf("rollback distributed transaction: %w", rollbackErr))
+					}
 				}
 
 				tm.monitor.OnTransactionRollback(txID, result)
-				return result, ctx.Err()
+				return result, result.Error
 			}
 		}
 	}
@@ -471,11 +454,13 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 
 	// Rollback distributed transaction
 	if tm.config.EnableDistributed && tm.coordinator != nil {
-		tm.coordinator.RollbackTransaction(ctx, txID)
+		if rollbackErr := tm.coordinator.RollbackTransaction(ctx, txID); rollbackErr != nil {
+			result.Error = errors.Join(result.Error, fmt.Errorf("rollback distributed transaction: %w", rollbackErr))
+		}
 	}
 
 	tm.monitor.OnTransactionRollback(txID, result)
-	return result, fmt.Errorf("transaction failed after %d attempts: %w", tm.config.MaxRetries+1, lastErr)
+	return result, result.Error
 }
 
 // WithRetry executes a function with enterprise retry logic.
@@ -541,13 +526,13 @@ func (tm *TransactionManager) WithNestedTransaction(ctx context.Context, orm *OR
 		if rollbackErr := tm.rollbackToSavepoint(ctx, orm.DB(), savepointName); rollbackErr != nil {
 			return fmt.Errorf("failed to rollback to savepoint %s: %w (original error: %w)", savepointName, rollbackErr, err)
 		}
-		
+
 		// Log slow operations
 		if tm.config.LogSlowQueries && time.Since(startTime) > tm.config.SlowQueryThreshold {
 			logWarnf("Slow nested transaction rollback: savepoint=%s, duration=%v, error=%s",
 				savepointName, time.Since(startTime), err.Error())
 		}
-		
+
 		return err
 	}
 
@@ -568,9 +553,9 @@ func (tm *TransactionManager) WithNestedTransaction(ctx context.Context, orm *OR
 // executeTransactionOnce executes a transaction function once.
 func (tm *TransactionManager) executeTransactionOnce(ctx context.Context, db DB, fn func(*ORM) error, txID string) (*TransactionResult, error) {
 	startTime := time.Now()
-	
+
 	// Begin transaction
-	tx, err := db.(*DBWrapper).DB.BeginTx(ctx, &sql.TxOptions{
+	tx, err := db.(*DBWrapper).BeginTx(ctx, &sql.TxOptions{
 		Isolation: tm.config.IsolationLevel,
 		ReadOnly:  tm.config.ReadOnly,
 	})
@@ -653,14 +638,14 @@ func (tm *TransactionManager) Close() error {
 	if tm.connectionPool != nil {
 		tm.connectionPool.Close()
 	}
-	
+
 	// Close tracer if it has a Close method
 	if tm.tracer != nil {
 		if closer, ok := tm.tracer.(interface{ Close() error }); ok {
 			closer.Close()
 		}
 	}
-	
+
 	return nil
 }
 

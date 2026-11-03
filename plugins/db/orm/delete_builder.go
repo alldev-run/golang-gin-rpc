@@ -236,9 +236,9 @@ func (db *DeleteBuilder) Build() (string, []interface{}) {
 			tableExpr = db.dialect.QuoteIdentifier(join.Table)
 		}
 		cond := replaceConditionPlaceholders(join.Condition, db.dialect, len(allArgs))
-		query += fmt.Sprintf(" %s JOIN %s ON %s", 
-			join.Type, 
-			tableExpr, 
+		query += fmt.Sprintf(" %s JOIN %s ON %s",
+			join.Type,
+			tableExpr,
 			cond)
 		allArgs = append(allArgs, join.Args...)
 	}
@@ -301,9 +301,9 @@ func (db *DeleteBuilder) DeleteReturning(ctx context.Context, returningColumns .
 	if !db.dialect.SupportsFeature(FeatureCTE) {
 		return nil, fmt.Errorf("RETURNING clause not supported by this dialect")
 	}
-	
+
 	query, args := db.Build()
-	
+
 	// Add RETURNING clause
 	if len(returningColumns) > 0 {
 		quotedColumns := QuoteIdentifiers(db.dialect, returningColumns...)
@@ -311,7 +311,7 @@ func (db *DeleteBuilder) DeleteReturning(ctx context.Context, returningColumns .
 	} else {
 		query += " RETURNING *"
 	}
-	
+
 	return db.db.Query(ctx, query, args...)
 }
 
@@ -320,9 +320,9 @@ func (db *DeleteBuilder) DeleteReturningTx(ctx context.Context, tx *sql.Tx, retu
 	if !db.dialect.SupportsFeature(FeatureCTE) {
 		return nil, fmt.Errorf("RETURNING clause not supported by this dialect")
 	}
-	
+
 	query, args := db.Build()
-	
+
 	// Add RETURNING clause
 	if len(returningColumns) > 0 {
 		quotedColumns := QuoteIdentifiers(db.dialect, returningColumns...)
@@ -330,7 +330,7 @@ func (db *DeleteBuilder) DeleteReturningTx(ctx context.Context, tx *sql.Tx, retu
 	} else {
 		query += " RETURNING *"
 	}
-	
+
 	return tx.QueryContext(ctx, query, args...)
 }
 
@@ -400,15 +400,15 @@ func (db *DeleteBuilder) Clone() *DeleteBuilder {
 		limit:   db.limit,
 		dialect: db.dialect,
 	}
-	
+
 	// Copy joins
 	copy(clone.joins, db.joins)
-	
+
 	// Copy orderBy
 	copy(clone.orderBy, db.orderBy)
-	
+
 	clone.where = db.where.Clone()
-	
+
 	return clone
 }
 

@@ -132,7 +132,7 @@ func TestSelectBuilder(t *testing.T) {
 
 	// Test LIMIT
 	sb.Limit(10)
-	query, args = sb.Build()
+	query, _ = sb.Build()
 	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? LIMIT 10"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got query='%s'", expectedQuery, query)

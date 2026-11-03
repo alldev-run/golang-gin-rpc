@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/failover"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // CacheEntry represents a cached query result.
@@ -43,7 +43,7 @@ type QueryCache interface {
 
 // RedisCache implements QueryCache using Redis.
 type RedisCache struct {
-	client *redis.Client
+	client    *redis.Client
 	keyPrefix string
 }
 
@@ -145,6 +145,7 @@ func (rc *RedisCache) Keys() []string {
 
 	return result
 }
+
 // MemcacheCache implements QueryCache using Memcached.
 type MemcacheCache struct {
 	client    *memcache.Client
@@ -221,7 +222,7 @@ func (mc *MemcacheCache) Clear() {
 
 	// Memcached doesn't support pattern-based deletion like Redis
 	// We'll need to track keys or use a different approach
-	// For now, we'll delete all cache
+	// Memcached has no pattern-delete API, so this clears the entire cache.
 	if err := mc.client.DeleteAll(ctx); err != nil {
 		logger.Errorf("Failed to clear cache", logger.Error(err))
 	}
@@ -246,7 +247,7 @@ func NewFailoverCache(primary, secondary, tertiary QueryCache) *FailoverCache {
 	// Convert existing QueryCache implementations to failover storage
 	// This is a compatibility wrapper
 	storages := make([]failover.Storage, 0)
-	
+
 	if primary != nil {
 		storages = append(storages, &queryCacheStorage{cache: primary})
 	}
@@ -256,7 +257,7 @@ func NewFailoverCache(primary, secondary, tertiary QueryCache) *FailoverCache {
 	if tertiary != nil {
 		storages = append(storages, &queryCacheStorage{cache: tertiary})
 	}
-	
+
 	var primaryStorage, secondaryStorage, tertiaryStorage failover.Storage
 	if len(storages) > 0 {
 		primaryStorage = storages[0]
@@ -267,16 +268,16 @@ func NewFailoverCache(primary, secondary, tertiary QueryCache) *FailoverCache {
 	if len(storages) > 2 {
 		tertiaryStorage = storages[2]
 	}
-	
+
 	config := failover.Config{
 		MaxRetries:          3,
 		RetryDelay:          1 * time.Second,
 		HealthCheckInterval: 30 * time.Second,
 	}
-	
+
 	failoverCache := failover.NewFailoverCache(primaryStorage, secondaryStorage, tertiaryStorage, config)
 	adapter := failover.NewQueryCacheAdapter(failoverCache)
-	
+
 	return &FailoverCache{
 		adapter: adapter,
 	}
@@ -833,7 +834,7 @@ func (cdb *CachedDB) generateCacheKey(query string, args []interface{}) string {
 	hasher.Write([]byte(query))
 
 	for _, arg := range args {
-		hasher.Write([]byte(fmt.Sprintf("%v", arg)))
+		fmt.Fprintf(hasher, "%v", arg)
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil))
@@ -847,8 +848,8 @@ func (cdb *CachedDB) isSelectQuery(query string) bool {
 
 // invalidateCacheForQuery invalidates cache entries related to a query.
 func (cdb *CachedDB) invalidateCacheForQuery(query string, args []interface{}) {
-	// Simple implementation: clear all cache on any modification
-	// In a real implementation, you'd want more sophisticated cache invalidation
+	// Cache keys are hashes of complete queries and arguments, so table-scoped
+	// invalidation cannot identify matching entries and must clear the cache.
 	cdb.cache.Clear()
 }
 
@@ -871,28 +872,28 @@ func (cdb *CachedDB) ClearCache() {
 type CacheType string
 
 const (
-	CacheTypeMemory    CacheType = "memory"
-	CacheTypeRedis     CacheType = "redis"
-	CacheTypeMemcache  CacheType = "memcache"
-	CacheTypeFile      CacheType = "file"
-	CacheTypeFailover  CacheType = "failover"
+	CacheTypeMemory   CacheType = "memory"
+	CacheTypeRedis    CacheType = "redis"
+	CacheTypeMemcache CacheType = "memcache"
+	CacheTypeFile     CacheType = "file"
+	CacheTypeFailover CacheType = "failover"
 )
 
 // CacheConfig holds cache configuration.
 type CacheConfig struct {
 	Type           CacheType
-	RedisConfig    *redis.Config     `yaml:"redis_config" json:"redis_config"`
-	MemcacheConfig *memcache.Config  `yaml:"memcache_config" json:"memcache_config"`
-	FileConfig     *FileCacheConfig  `yaml:"file_config" json:"file_config"`
-	KeyPrefix      string            `yaml:"key_prefix" json:"key_prefix"`
-	FallbackOrder  []CacheType       `yaml:"fallback_order" json:"fallback_order"`
+	RedisConfig    *redis.Config    `yaml:"redis_config" json:"redis_config"`
+	MemcacheConfig *memcache.Config `yaml:"memcache_config" json:"memcache_config"`
+	FileConfig     *FileCacheConfig `yaml:"file_config" json:"file_config"`
+	KeyPrefix      string           `yaml:"key_prefix" json:"key_prefix"`
+	FallbackOrder  []CacheType      `yaml:"fallback_order" json:"fallback_order"`
 }
 
 // FileCacheConfig holds file cache configuration.
 type FileCacheConfig struct {
-	Directory    string        `yaml:"directory" json:"directory"`         // Cache directory
-	MaxSize      int64         `yaml:"max_size" json:"max_size"`           // Maximum cache size in bytes
-	MaxFiles     int           `yaml:"max_files" json:"max_files"`         // Maximum number of cache files
+	Directory       string        `yaml:"directory" json:"directory"`               // Cache directory
+	MaxSize         int64         `yaml:"max_size" json:"max_size"`                 // Maximum cache size in bytes
+	MaxFiles        int           `yaml:"max_files" json:"max_files"`               // Maximum number of cache files
 	CleanupInterval time.Duration `yaml:"cleanup_interval" json:"cleanup_interval"` // Cleanup interval
 }
 
@@ -901,7 +902,7 @@ func NewCacheFromConfig(config CacheConfig) (QueryCache, error) {
 	switch config.Type {
 	case CacheTypeMemory:
 		return NewMemoryCache(), nil
-		
+
 	case CacheTypeRedis:
 		if config.RedisConfig == nil {
 			return nil, fmt.Errorf("redis config is required for redis cache")
@@ -911,7 +912,7 @@ func NewCacheFromConfig(config CacheConfig) (QueryCache, error) {
 			return nil, fmt.Errorf("failed to create redis client: %w", err)
 		}
 		return NewRedisCache(client, config.KeyPrefix), nil
-		
+
 	case CacheTypeMemcache:
 		if config.MemcacheConfig == nil {
 			return nil, fmt.Errorf("memcache config is required for memcache cache")
@@ -921,20 +922,20 @@ func NewCacheFromConfig(config CacheConfig) (QueryCache, error) {
 			return nil, fmt.Errorf("failed to create memcache client: %w", err)
 		}
 		return NewMemcacheCache(client, config.KeyPrefix), nil
-		
+
 	case CacheTypeFile:
 		if config.FileConfig == nil {
 			return nil, fmt.Errorf("file config is required for file cache")
 		}
 		return NewFileCache(*config.FileConfig)
-		
+
 	case CacheTypeFailover:
 		var primary, secondary, tertiary QueryCache
-		
+
 		// Create fallback caches based on order
 		for i, cacheType := range config.FallbackOrder {
 			var cache QueryCache
-			
+
 			switch cacheType {
 			case CacheTypeMemory:
 				cache = NewMemoryCache()
@@ -960,7 +961,7 @@ func NewCacheFromConfig(config CacheConfig) (QueryCache, error) {
 					}
 				}
 			}
-			
+
 			if cache != nil {
 				switch i {
 				case 0:
@@ -972,13 +973,13 @@ func NewCacheFromConfig(config CacheConfig) (QueryCache, error) {
 				}
 			}
 		}
-		
+
 		if primary == nil {
 			return nil, fmt.Errorf("at least one primary cache is required for failover")
 		}
-		
+
 		return NewFailoverCache(primary, secondary, tertiary), nil
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported cache type: %s", config.Type)
 	}
@@ -1006,28 +1007,28 @@ func NewMemcacheCacheWithConfig(config memcache.Config, keyPrefix ...string) (Qu
 // Order: Redis -> Memcache -> Memory
 func NewDefaultFailoverCache(redisConfig *redis.Config, memcacheConfig *memcache.Config, keyPrefix ...string) (QueryCache, error) {
 	var caches []QueryCache
-	
+
 	// Try Redis first
 	if redisConfig != nil {
 		if client, err := redis.New(*redisConfig); err == nil {
 			caches = append(caches, NewRedisCache(client, keyPrefix...))
 		}
 	}
-	
+
 	// Try Memcache second
 	if memcacheConfig != nil {
 		if client, err := memcache.New(*memcacheConfig); err == nil {
 			caches = append(caches, NewMemcacheCache(client, keyPrefix...))
 		}
 	}
-	
+
 	// Memory cache as last resort
 	caches = append(caches, NewMemoryCache())
-	
+
 	if len(caches) < 2 {
 		return nil, fmt.Errorf("need at least 2 cache backends for failover")
 	}
-	
+
 	var primary, secondary, tertiary QueryCache
 	primary = caches[0]
 	if len(caches) > 1 {
@@ -1036,7 +1037,7 @@ func NewDefaultFailoverCache(redisConfig *redis.Config, memcacheConfig *memcache
 	if len(caches) > 2 {
 		tertiary = caches[2]
 	}
-	
+
 	return NewFailoverCache(primary, secondary, tertiary), nil
 }
 
@@ -1053,11 +1054,11 @@ func NewDefaultFileCache(directory ...string) (QueryCache, error) {
 		MaxFiles:        10000,
 		CleanupInterval: 10 * time.Minute,
 	}
-	
+
 	if len(directory) > 0 {
 		config.Directory = directory[0]
 	}
-	
+
 	return NewFileCache(config)
 }
 
@@ -1067,7 +1068,7 @@ func NewFailoverCacheWithConfig(directory, fileSuffix string) (*FailoverCache, e
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &FailoverCache{
 		adapter: adapter.(*failover.QueryCacheAdapter),
 	}, nil
@@ -1079,7 +1080,7 @@ func NewMemoryFileFailoverCache(directory, fileSuffix string) (*FailoverCache, e
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &FailoverCache{
 		adapter: adapter.(*failover.QueryCacheAdapter),
 	}, nil
@@ -1091,7 +1092,7 @@ func NewFailoverCacheFromPackage() (*FailoverCache, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &FailoverCache{
 		adapter: adapter.(*failover.QueryCacheAdapter),
 	}, nil

@@ -185,23 +185,6 @@ func TestPoolMethodsWithNilRWClient(t *testing.T) {
 	}
 }
 
-// TestForceMasterWithNilRWClient tests ForceMaster with nil rwClient
-type mockPoolWithStats struct {
-	rwClient *mockRWClient
-}
-
-type mockRWClient struct {
-	forceMaster bool
-}
-
-func (m *mockRWClient) ForceMaster(force bool) {
-	m.forceMaster = force
-}
-
-func (m *mockRWClient) IsMasterForced() bool {
-	return m.forceMaster
-}
-
 // TestPoolConcurrency tests thread safety of pool operations
 func TestPoolConcurrency(t *testing.T) {
 	pool := &Pool{

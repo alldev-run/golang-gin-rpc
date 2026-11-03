@@ -105,7 +105,8 @@ func (c *Client) Exec(ctx context.Context, query string, args ...any) error {
 
 // AsyncInsert performs an asynchronous insert for better performance.
 func (c *Client) AsyncInsert(ctx context.Context, query string, wait bool, args ...any) error {
-	return c.conn.AsyncInsert(ctx, query, wait, args...)
+	ctx = clickhouse.Context(ctx, clickhouse.WithAsync(wait))
+	return c.conn.Exec(ctx, query, args...)
 }
 
 // BatchCreate creates a new batch for bulk inserts.

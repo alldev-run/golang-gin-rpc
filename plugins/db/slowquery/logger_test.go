@@ -75,11 +75,6 @@ func mockSlowQuery(ctx context.Context, query string, args ...any) (*sql.Rows, e
 	return nil, nil
 }
 
-// mockErrorQuery simulates a query with error.
-func mockErrorQuery(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	return nil, errors.New("query failed")
-}
-
 // TestWrapQueryFastNotLogged tests that fast queries are not logged.
 func TestWrapQueryFastNotLogged(t *testing.T) {
 	logger := New(Config{

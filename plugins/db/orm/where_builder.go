@@ -95,56 +95,56 @@ func (wb *WhereBuilder) OrRaw(condition string, args ...interface{}) *WhereBuild
 
 // Eq adds an equality condition (column = value).
 func (wb *WhereBuilder) Eq(column string, value interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s = %s", 
-		wb.dialect.QuoteIdentifier(column), 
+	condition := fmt.Sprintf("%s = %s",
+		wb.dialect.QuoteIdentifier(column),
 		wb.dialect.Placeholder(len(wb.args)))
 	return wb.Where(condition, value)
 }
 
 // Ne adds a not equal condition (column != value).
 func (wb *WhereBuilder) Ne(column string, value interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s != %s", 
-		wb.dialect.QuoteIdentifier(column), 
+	condition := fmt.Sprintf("%s != %s",
+		wb.dialect.QuoteIdentifier(column),
 		wb.dialect.Placeholder(len(wb.args)))
 	return wb.Where(condition, value)
 }
 
 // Gt adds a greater than condition (column > value).
 func (wb *WhereBuilder) Gt(column string, value interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s > %s", 
-		wb.dialect.QuoteIdentifier(column), 
+	condition := fmt.Sprintf("%s > %s",
+		wb.dialect.QuoteIdentifier(column),
 		wb.dialect.Placeholder(len(wb.args)))
 	return wb.Where(condition, value)
 }
 
 // Gte adds a greater than or equal condition (column >= value).
 func (wb *WhereBuilder) Gte(column string, value interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s >= %s", 
-		wb.dialect.QuoteIdentifier(column), 
+	condition := fmt.Sprintf("%s >= %s",
+		wb.dialect.QuoteIdentifier(column),
 		wb.dialect.Placeholder(len(wb.args)))
 	return wb.Where(condition, value)
 }
 
 // Lt adds a less than condition (column < value).
 func (wb *WhereBuilder) Lt(column string, value interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s < %s", 
-		wb.dialect.QuoteIdentifier(column), 
+	condition := fmt.Sprintf("%s < %s",
+		wb.dialect.QuoteIdentifier(column),
 		wb.dialect.Placeholder(len(wb.args)))
 	return wb.Where(condition, value)
 }
 
 // Lte adds a less than or equal condition (column <= value).
 func (wb *WhereBuilder) Lte(column string, value interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s <= %s", 
-		wb.dialect.QuoteIdentifier(column), 
+	condition := fmt.Sprintf("%s <= %s",
+		wb.dialect.QuoteIdentifier(column),
 		wb.dialect.Placeholder(len(wb.args)))
 	return wb.Where(condition, value)
 }
 
 // Like adds a LIKE condition.
 func (wb *WhereBuilder) Like(column string, value interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s LIKE %s", 
-		wb.dialect.QuoteIdentifier(column), 
+	condition := fmt.Sprintf("%s LIKE %s",
+		wb.dialect.QuoteIdentifier(column),
 		wb.dialect.Placeholder(len(wb.args)))
 	return wb.Where(condition, value)
 }
@@ -154,13 +154,13 @@ func (wb *WhereBuilder) ILike(column string, value interface{}) *WhereBuilder {
 	var condition string
 	switch wb.dialect.(type) {
 	case *PostgreSQLDialect:
-		condition = fmt.Sprintf("%s ILIKE %s", 
-			wb.dialect.QuoteIdentifier(column), 
+		condition = fmt.Sprintf("%s ILIKE %s",
+			wb.dialect.QuoteIdentifier(column),
 			wb.dialect.Placeholder(len(wb.args)))
 	default:
 		// Fallback to LIKE for databases that don't support ILIKE
-		condition = fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", 
-			wb.dialect.QuoteIdentifier(column), 
+		condition = fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)",
+			wb.dialect.QuoteIdentifier(column),
 			wb.dialect.Placeholder(len(wb.args)))
 	}
 	return wb.Where(condition, value)
@@ -171,16 +171,16 @@ func (wb *WhereBuilder) In(column string, values ...interface{}) *WhereBuilder {
 	if len(values) == 0 {
 		return wb.Where("1=0") // Always false
 	}
-	
+
 	placeholders := make([]string, len(values))
 	for i := range values {
 		placeholders[i] = wb.dialect.Placeholder(len(wb.args) + i)
 	}
-	
-	condition := fmt.Sprintf("%s IN (%s)", 
-		wb.dialect.QuoteIdentifier(column), 
+
+	condition := fmt.Sprintf("%s IN (%s)",
+		wb.dialect.QuoteIdentifier(column),
 		strings.Join(placeholders, ", "))
-	
+
 	wb.args = append(wb.args, values...)
 	return wb.Where(condition)
 }
@@ -190,16 +190,16 @@ func (wb *WhereBuilder) NotIn(column string, values ...interface{}) *WhereBuilde
 	if len(values) == 0 {
 		return wb.Where("1=1") // Always true
 	}
-	
+
 	placeholders := make([]string, len(values))
 	for i := range values {
 		placeholders[i] = wb.dialect.Placeholder(len(wb.args) + i)
 	}
-	
-	condition := fmt.Sprintf("%s NOT IN (%s)", 
-		wb.dialect.QuoteIdentifier(column), 
+
+	condition := fmt.Sprintf("%s NOT IN (%s)",
+		wb.dialect.QuoteIdentifier(column),
 		strings.Join(placeholders, ", "))
-	
+
 	wb.args = append(wb.args, values...)
 	return wb.Where(condition)
 }
@@ -218,22 +218,22 @@ func (wb *WhereBuilder) IsNotNull(column string) *WhereBuilder {
 
 // Between adds a BETWEEN condition.
 func (wb *WhereBuilder) Between(column string, start, end interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s BETWEEN %s AND %s", 
-		wb.dialect.QuoteIdentifier(column), 
-		wb.dialect.Placeholder(len(wb.args)), 
+	condition := fmt.Sprintf("%s BETWEEN %s AND %s",
+		wb.dialect.QuoteIdentifier(column),
+		wb.dialect.Placeholder(len(wb.args)),
 		wb.dialect.Placeholder(len(wb.args)+1))
-	
+
 	wb.args = append(wb.args, start, end)
 	return wb.Where(condition)
 }
 
 // NotBetween adds a NOT BETWEEN condition.
 func (wb *WhereBuilder) NotBetween(column string, start, end interface{}) *WhereBuilder {
-	condition := fmt.Sprintf("%s NOT BETWEEN %s AND %s", 
-		wb.dialect.QuoteIdentifier(column), 
-		wb.dialect.Placeholder(len(wb.args)), 
+	condition := fmt.Sprintf("%s NOT BETWEEN %s AND %s",
+		wb.dialect.QuoteIdentifier(column),
+		wb.dialect.Placeholder(len(wb.args)),
 		wb.dialect.Placeholder(len(wb.args)+1))
-	
+
 	wb.args = append(wb.args, start, end)
 	return wb.Where(condition)
 }
@@ -256,7 +256,7 @@ func (wb *WhereBuilder) NotExists(subquery string, args ...interface{}) *WhereBu
 func (wb *WhereBuilder) AndWhere(fn func(*WhereBuilder)) *WhereBuilder {
 	subBuilder := NewWhereBuilder(wb.dialect)
 	fn(subBuilder)
-	
+
 	if len(subBuilder.conditions) > 0 {
 		subCondition := strings.Join(subBuilder.conditions, " ")
 		if len(wb.conditions) > 0 {
@@ -273,7 +273,7 @@ func (wb *WhereBuilder) AndWhere(fn func(*WhereBuilder)) *WhereBuilder {
 func (wb *WhereBuilder) OrWhere(fn func(*WhereBuilder)) *WhereBuilder {
 	subBuilder := NewWhereBuilder(wb.dialect)
 	fn(subBuilder)
-	
+
 	if len(subBuilder.conditions) > 0 {
 		subCondition := strings.Join(subBuilder.conditions, " ")
 		if len(wb.conditions) > 0 {
@@ -341,7 +341,7 @@ func (wb *WhereBuilder) BuildWithOffset(startIndex int) (string, []interface{}) 
 	if len(wb.conditions) == 0 {
 		return "", nil
 	}
-	
+
 	// Replace placeholders with dialect-specific ones
 	conditions := make([]string, len(wb.conditions))
 	argIndex := startIndex
@@ -353,7 +353,7 @@ func (wb *WhereBuilder) BuildWithOffset(startIndex int) (string, []interface{}) 
 			argIndex++
 		}
 	}
-	
+
 	return "WHERE " + strings.Join(conditions, " "), wb.args
 }
 
@@ -369,10 +369,10 @@ func (wb *WhereBuilder) Clone() *WhereBuilder {
 		args:       make([]interface{}, len(wb.args)),
 		dialect:    wb.dialect,
 	}
-	
+
 	copy(clone.conditions, wb.conditions)
 	copy(clone.args, wb.args)
-	
+
 	return clone
 }
 

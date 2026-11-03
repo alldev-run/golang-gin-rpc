@@ -30,27 +30,27 @@ func NewDBWrapper(db *sql.DB) *DBWrapper {
 
 // Query executes a query with context.
 func (w *DBWrapper) Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	return w.DB.QueryContext(ctx, query, args...)
+	return w.QueryContext(ctx, query, args...)
 }
 
 // QueryRow executes a query that returns a single row with context.
 func (w *DBWrapper) QueryRow(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	return w.DB.QueryRowContext(ctx, query, args...)
+	return w.QueryRowContext(ctx, query, args...)
 }
 
 // Exec executes a query without returning rows with context.
 func (w *DBWrapper) Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return w.DB.ExecContext(ctx, query, args...)
+	return w.ExecContext(ctx, query, args...)
 }
 
 // Begin begins a transaction with context.
 func (w *DBWrapper) Begin(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
-	return w.DB.BeginTx(ctx, opts)
+	return w.BeginTx(ctx, opts)
 }
 
 // Ping checks the database connection health.
 func (w *DBWrapper) Ping(ctx context.Context) error {
-	return w.DB.PingContext(ctx)
+	return w.PingContext(ctx)
 }
 
 // Stats returns database connection statistics.
@@ -75,17 +75,17 @@ func NewTxWrapper(tx *sql.Tx) *TxWrapper {
 
 // Query executes a query within the transaction.
 func (t *TxWrapper) Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	return t.Tx.QueryContext(ctx, query, args...)
+	return t.QueryContext(ctx, query, args...)
 }
 
 // QueryRow executes a query that returns a single row within the transaction.
 func (t *TxWrapper) QueryRow(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	return t.Tx.QueryRowContext(ctx, query, args...)
+	return t.QueryRowContext(ctx, query, args...)
 }
 
 // Exec executes a query without returning rows within the transaction.
 func (t *TxWrapper) Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return t.Tx.ExecContext(ctx, query, args...)
+	return t.ExecContext(ctx, query, args...)
 }
 
 // Begin is not supported for transactions.

@@ -106,7 +106,7 @@ func TestTableBuilder_DropTable(t *testing.T) {
 
 func TestTableBuilder_ColumnTypes(t *testing.T) {
 	dialect := NewMySQLDialect()
-	
+
 	tests := []struct {
 		name     string
 		col      ColumnDef
@@ -162,7 +162,7 @@ func TestTableBuilder_ColumnTypes(t *testing.T) {
 
 func TestTableBuilder_PostgreSQLTypes(t *testing.T) {
 	dialect := NewPostgreSQLDialect()
-	
+
 	tests := []struct {
 		name     string
 		col      ColumnDef

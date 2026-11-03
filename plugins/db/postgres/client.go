@@ -344,11 +344,101 @@ func (c *Client) Prepare(ctx context.Context, query string) (*sql.Stmt, error) {
 	return c.db.PrepareContext(ctx, query)
 }
 
-// CopyFrom performs a bulk copy operation using COPY FROM.
-// This is more efficient than multiple INSERT statements.
+// CopyFrom inserts rows in parameter-limit-safe batches within one transaction.
+// The database/sql client uses lib/pq and does not expose a pgx connection, so
+// this implementation uses multi-row INSERT statements rather than pgx.CopyFrom.
 func (c *Client) CopyFrom(ctx context.Context, tableName string, columns []string, rows [][]any) error {
-	// For bulk operations, use COPY protocol
-	// This is a placeholder - actual implementation would use pgx.CopyFrom
-	// or similar for maximum efficiency
-	return fmt.Errorf("bulk copy not implemented in base client")
+	if tableName == "" {
+		return fmt.Errorf("bulk copy table name is required")
+	}
+	if len(columns) == 0 {
+		return fmt.Errorf("bulk copy requires at least one column")
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	quotedTable, err := quotePostgresIdentifier(tableName, true)
+	if err != nil {
+		return fmt.Errorf("invalid bulk copy table name: %w", err)
+	}
+	quotedColumns := make([]string, len(columns))
+	for i, column := range columns {
+		quotedColumns[i], err = quotePostgresIdentifier(column, false)
+		if err != nil {
+			return fmt.Errorf("invalid bulk copy column %q: %w", column, err)
+		}
+	}
+	for i, row := range rows {
+		if len(row) != len(columns) {
+			return fmt.Errorf("bulk copy row %d has %d values; expected %d", i, len(row), len(columns))
+		}
+	}
+
+	const maxParameters = 65535
+	batchSize := maxParameters / len(columns)
+	if batchSize == 0 {
+		return fmt.Errorf("bulk copy has too many columns: %d", len(columns))
+	}
+
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin bulk copy transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for start := 0; start < len(rows); start += batchSize {
+		end := start + batchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		query, args := buildBulkInsert(quotedTable, quotedColumns, rows[start:end])
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("execute bulk copy batch starting at row %d: %w", start, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit bulk copy transaction: %w", err)
+	}
+	return nil
+}
+
+func quotePostgresIdentifier(identifier string, qualified bool) (string, error) {
+	parts := []string{identifier}
+	if qualified {
+		parts = strings.Split(identifier, ".")
+	}
+	for i, part := range parts {
+		if part == "" || strings.ContainsRune(part, '\x00') {
+			return "", fmt.Errorf("identifier components must be non-empty and contain no NUL")
+		}
+		parts[i] = `"` + strings.ReplaceAll(part, `"`, `""`) + `"`
+	}
+	return strings.Join(parts, "."), nil
+}
+
+func buildBulkInsert(table string, columns []string, rows [][]any) (string, []any) {
+	var query strings.Builder
+	query.WriteString("INSERT INTO ")
+	query.WriteString(table)
+	query.WriteString(" (")
+	query.WriteString(strings.Join(columns, ", "))
+	query.WriteString(") VALUES ")
+
+	args := make([]any, 0, len(rows)*len(columns))
+	for rowIndex, row := range rows {
+		if rowIndex > 0 {
+			query.WriteString(", ")
+		}
+		query.WriteByte('(')
+		for columnIndex, value := range row {
+			if columnIndex > 0 {
+				query.WriteString(", ")
+			}
+			fmt.Fprintf(&query, "$%d", len(args)+1)
+			args = append(args, value)
+		}
+		query.WriteByte(')')
+	}
+	return query.String(), args
 }

@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -59,13 +60,15 @@ func BatchInsert(ctx context.Context, db DB, table string, data []map[string]int
 	// Start transaction if requested
 	if config.UseTransaction {
 		var err error
-		tx, err = db.(*DBWrapper).DB.BeginTx(ctx, nil)
+		tx, err = db.(*DBWrapper).BeginTx(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
 		defer func() {
 			if p := recover(); p != nil {
-				tx.Rollback()
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					panic(fmt.Errorf("panic: %v; rollback transaction: %w", p, rollbackErr))
+				}
 				panic(p)
 			}
 		}()
@@ -83,10 +86,13 @@ func BatchInsert(ctx context.Context, db DB, table string, data []map[string]int
 		batch := data[i:end]
 		batchResult, err := insertBatch(ctx, db, table, batch, dialect, config.ReturnIDs)
 		if err != nil {
+			batchErr := fmt.Errorf("batch insert failed at offset %d: %w", i, err)
 			if config.UseTransaction && tx != nil {
-				tx.Rollback()
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					batchErr = errors.Join(batchErr, fmt.Errorf("rollback transaction: %w", rollbackErr))
+				}
 			}
-			return nil, fmt.Errorf("batch insert failed at offset %d: %w", i, err)
+			return nil, batchErr
 		}
 
 		result.RowsAffected += batchResult.RowsAffected
@@ -138,13 +144,15 @@ func BatchInsertWithReturning(ctx context.Context, db DB, table string, data []m
 	// Start transaction if requested
 	if config.UseTransaction {
 		var err error
-		tx, err = db.(*DBWrapper).DB.BeginTx(ctx, nil)
+		tx, err = db.(*DBWrapper).BeginTx(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
 		defer func() {
 			if p := recover(); p != nil {
-				tx.Rollback()
+				if rollbackErr := tx.Rollback(); rollbackErr != nil {
+					panic(fmt.Errorf("panic: %v; rollback transaction: %w", p, rollbackErr))
+				}
 				panic(p)
 			}
 		}()
@@ -156,7 +164,9 @@ func BatchInsertWithReturning(ctx context.Context, db DB, table string, data []m
 	query, args, err := buildBatchInsertQueryWithReturning(table, data, returningColumns, dialect)
 	if err != nil {
 		if config.UseTransaction && tx != nil {
-			tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+			}
 		}
 		return nil, err
 	}
@@ -164,7 +174,9 @@ func BatchInsertWithReturning(ctx context.Context, db DB, table string, data []m
 	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
 		if config.UseTransaction && tx != nil {
-			tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+			}
 		}
 		return nil, err
 	}

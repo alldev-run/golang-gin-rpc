@@ -2,8 +2,11 @@ package postgres
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -151,6 +154,49 @@ func TestLogLevelString(t *testing.T) {
 				t.Errorf("LogLevel(%v).String() = %q, want %q", tt.level, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestCopyFromUsesBatchedInsertTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer db.Close()
+
+	query := `INSERT INTO "public"."users" ("id", "name") VALUES ($1, $2), ($3, $4)`
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(query)).
+		WithArgs(1, "one", 2, "two").
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectCommit()
+
+	client := &Client{db: db}
+	if err := client.CopyFrom(t.Context(), "public.users", []string{"id", "name"}, [][]any{
+		{1, "one"},
+		{2, "two"},
+	}); err != nil {
+		t.Fatalf("CopyFrom() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet SQL expectations: %v", err)
+	}
+}
+
+func TestCopyFromRejectsInvalidRowsBeforeStartingTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer db.Close()
+
+	client := &Client{db: db}
+	err = client.CopyFrom(t.Context(), "users", []string{"id", "name"}, [][]any{{1}})
+	if err == nil {
+		t.Fatal("CopyFrom() with mismatched row width returned nil")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unexpected SQL interaction: %v", err)
 	}
 }
 

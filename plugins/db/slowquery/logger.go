@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // Config holds slow query logger configuration.

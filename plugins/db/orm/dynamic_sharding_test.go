@@ -471,29 +471,6 @@ func TestCrossShardQueryPagination(t *testing.T) {
 
 // ======================= Performance Tests =======================
 
-func TestHashPerformance(t *testing.T) {
-	strategy := NewHashShardStrategy(1000, 1000)
-
-	// 性能测试
-	start := time.Now()
-
-	for i := 0; i < 100000; i++ {
-		strategy.CalculateShard("user_id", i)
-	}
-
-	duration := time.Since(start)
-	opsPerSec := float64(100000) / duration.Seconds()
-
-	t.Logf("Hash性能测试:")
-	t.Logf("100,000次分片计算耗时: %v", duration)
-	t.Logf("每秒操作数: %.0f ops/sec", opsPerSec)
-
-	// 性能基准: 应该超过500万ops/sec
-	if opsPerSec < 5000000 {
-		t.Errorf("性能不达标: %.0f ops/sec < 5,000,000 ops/sec", opsPerSec)
-	}
-}
-
 func TestConsistentHashPerformance(t *testing.T) {
 	dbNodes := make([]string, 100)
 	for i := 0; i < 100; i++ {

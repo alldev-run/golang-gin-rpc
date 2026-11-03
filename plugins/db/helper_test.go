@@ -4,51 +4,7 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
 )
-
-// mockFactory is a test mock that implements the minimal factory interface
-
-type mockFactory struct {
-	mysqlClient      *mysql.Client
-	redisClient      interface{}
-	postgresClient   interface{}
-	getMySQLError    error
-	getRedisError    error
-	getPostgresError error
-}
-
-func (m *mockFactory) GetMySQL() (*mysql.Client, error) {
-	if m.getMySQLError != nil {
-		return nil, m.getMySQLError
-	}
-	return m.mysqlClient, nil
-}
-
-func (m *mockFactory) GetMySQLSQLClient() (SQLClient, error) {
-	if m.getMySQLError != nil {
-		return nil, m.getMySQLError
-	}
-	// In real scenario, mysql.Client implements SQLClient
-	return m.mysqlClient, nil
-}
-
-func (m *mockFactory) GetRedis() (*redis.Client, error) {
-	if m.getRedisError != nil {
-		return nil, m.getRedisError
-	}
-	return m.redisClient.(*redis.Client), nil
-}
-
-func (m *mockFactory) GetPostgres() (*postgres.Client, error) {
-	if m.getPostgresError != nil {
-		return nil, m.getPostgresError
-	}
-	return m.postgresClient.(*postgres.Client), nil
-}
 
 // ==================== Test Global Factory ====================
 

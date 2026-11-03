@@ -125,9 +125,9 @@ func TestClientMethods(t *testing.T) {
 	// This is a compile-time check via method references.
 	client := &Client{}
 
-	var _ func(context.Context, string, ...any) (int64, error) = client.InsertGetID
-	var _ func(context.Context, string, ...any) (int64, error) = client.Update
-	var _ func(context.Context, string, string, interface{}, string, interface{}) (int64, error) = client.SetFieldByID
+	var _ = client.InsertGetID
+	var _ = client.Update
+	var _ = client.SetFieldByID
 
 	t.Log("Client methods compile successfully")
 }
@@ -261,7 +261,7 @@ func TestSelectBuilder(t *testing.T) {
 
 	// Test with columns
 	sb.Columns("id", "name", "email")
-	query, args = sb.Build()
+	query, _ = sb.Build()
 	expectedQuery = "SELECT `id`, `name`, `email` FROM `users`"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)
@@ -278,7 +278,7 @@ func TestSelectBuilder(t *testing.T) {
 
 	// Test with ORDER BY
 	sb.OrderBy("created_at DESC")
-	query, args = sb.Build()
+	query, _ = sb.Build()
 	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? AND status = ? ORDER BY created_at DESC"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)
@@ -286,7 +286,7 @@ func TestSelectBuilder(t *testing.T) {
 
 	// Test with LIMIT
 	sb.Limit(10)
-	query, args = sb.Build()
+	query, _ = sb.Build()
 	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? AND status = ? ORDER BY created_at DESC LIMIT 10"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)
@@ -294,7 +294,7 @@ func TestSelectBuilder(t *testing.T) {
 
 	// Test with OFFSET
 	sb.Offset(20)
-	query, args = sb.Build()
+	query, _ = sb.Build()
 	expectedQuery = "SELECT `id`, `name`, `email` FROM `users` WHERE id = ? AND status = ? ORDER BY created_at DESC LIMIT 10 OFFSET 20"
 	if query != expectedQuery {
 		t.Errorf("Expected query='%s', got '%s'", expectedQuery, query)

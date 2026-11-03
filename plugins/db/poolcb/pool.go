@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sync"
 
 	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/circuitbreaker"
@@ -32,7 +31,6 @@ func DefaultConfig() Config {
 type PoolWithBreaker struct {
 	pool    *pool.Pool
 	breaker *circuitbreaker.CircuitBreaker
-	mutex   sync.RWMutex
 }
 
 // New creates a new pool with circuit breaker.

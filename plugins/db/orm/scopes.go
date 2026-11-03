@@ -168,11 +168,11 @@ func (b *Builder) Build() (string, []interface{}) {
 	}
 
 	if b.limit != nil {
-		sb.WriteString(fmt.Sprintf(" LIMIT %d", *b.limit))
+		fmt.Fprintf(&sb, " LIMIT %d", *b.limit)
 	}
 
 	if b.offset != nil {
-		sb.WriteString(fmt.Sprintf(" OFFSET %d", *b.offset))
+		fmt.Fprintf(&sb, " OFFSET %d", *b.offset)
 	}
 
 	return sb.String(), b.args

@@ -49,9 +49,7 @@ func (ol *OptimisticLock) UpdateWithVersion(ctx context.Context, db DB, table, i
 	}
 
 	// Ensure version is not in the update data (it will be handled separately)
-	if _, hasVersion := data[ol.VersionColumn]; hasVersion {
-		delete(data, ol.VersionColumn)
-	}
+	delete(data, ol.VersionColumn)
 
 	if len(data) == 0 {
 		return nil, ErrEmptyData

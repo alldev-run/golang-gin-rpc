@@ -8,17 +8,17 @@ import (
 
 // ColumnDef 定义表字段
 type ColumnDef struct {
-	Name         string
-	Type         string
-	Length       int      // 用于 varchar/char 等
-	Precision    int      // 用于 decimal
-	Scale        int      // 用于 decimal
-	Nullable     bool
-	Default      string
+	Name          string
+	Type          string
+	Length        int // 用于 varchar/char 等
+	Precision     int // 用于 decimal
+	Scale         int // 用于 decimal
+	Nullable      bool
+	Default       string
 	AutoIncrement bool
-	PrimaryKey   bool
-	Unique       bool
-	Comment      string
+	PrimaryKey    bool
+	Unique        bool
+	Comment       string
 }
 
 // IndexDef 定义索引
@@ -32,19 +32,19 @@ type IndexDef struct {
 type TableBuilder struct {
 	dialect Dialect
 	db      DB
-	
+
 	// 建表模式
-	createMode bool
-	tableName  string
+	createMode  bool
+	tableName   string
 	ifNotExists bool
-	columns    []ColumnDef
-	indexes    []IndexDef
+	columns     []ColumnDef
+	indexes     []IndexDef
 	primaryKeys []string
-	
+
 	// 删表模式
-	dropMode      bool
-	ifExists      bool
-	cascade       bool
+	dropMode bool
+	ifExists bool
+	cascade  bool
 }
 
 // CreateTable 创建建表构造器
@@ -63,10 +63,10 @@ func (o *ORM) CreateTable(table string) *TableBuilder {
 // DropTable 创建删表构造器
 func (o *ORM) DropTable(table string) *TableBuilder {
 	return &TableBuilder{
-		dialect:    o.dialect,
-		db:         o.db,
-		dropMode:   true,
-		tableName:  table,
+		dialect:   o.dialect,
+		db:        o.db,
+		dropMode:  true,
+		tableName: table,
 	}
 }
 
@@ -92,10 +92,10 @@ func DropTable(db DB, dialect Dialect, table string) *TableBuilder {
 		dialect = NewDefaultDialect()
 	}
 	return &TableBuilder{
-		dialect:    dialect,
-		db:         db,
-		dropMode:   true,
-		tableName:  table,
+		dialect:   dialect,
+		db:        db,
+		dropMode:  true,
+		tableName: table,
 	}
 }
 
@@ -250,17 +250,17 @@ func (tb *TableBuilder) buildCreate() (string, error) {
 	if len(tb.columns) == 0 {
 		return "", fmt.Errorf("no columns defined for table %s", tb.tableName)
 	}
-	
+
 	var sb strings.Builder
 	sb.WriteString("CREATE TABLE ")
-	
+
 	if tb.ifNotExists {
 		sb.WriteString("IF NOT EXISTS ")
 	}
-	
+
 	sb.WriteString(tb.dialect.QuoteIdentifier(tb.tableName))
 	sb.WriteString(" (")
-	
+
 	// 字段定义
 	for i, col := range tb.columns {
 		if i > 0 {
@@ -268,7 +268,7 @@ func (tb *TableBuilder) buildCreate() (string, error) {
 		}
 		sb.WriteString(tb.buildColumnDef(col))
 	}
-	
+
 	// 主键约束
 	if len(tb.primaryKeys) > 0 {
 		sb.WriteString(", PRIMARY KEY (")
@@ -280,7 +280,7 @@ func (tb *TableBuilder) buildCreate() (string, error) {
 		}
 		sb.WriteString(")")
 	}
-	
+
 	// 索引（MySQL 支持在建表时定义索引）
 	if _, ok := tb.dialect.(*MySQLDialect); ok {
 		for _, idx := range tb.indexes {
@@ -300,40 +300,40 @@ func (tb *TableBuilder) buildCreate() (string, error) {
 			sb.WriteString(")")
 		}
 	}
-	
+
 	sb.WriteString(")")
-	
+
 	// MySQL 表注释
 	if _, ok := tb.dialect.(*MySQLDialect); ok {
 		sb.WriteString(" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")
 	}
-	
+
 	return sb.String(), nil
 }
 
 func (tb *TableBuilder) buildColumnDef(col ColumnDef) string {
 	var sb strings.Builder
-	
+
 	sb.WriteString(tb.dialect.QuoteIdentifier(col.Name))
 	sb.WriteString(" ")
-	
+
 	// 类型处理
 	typeStr := tb.buildColumnType(col)
 	sb.WriteString(typeStr)
-	
+
 	// NULL/NOT NULL
 	if !col.Nullable {
 		sb.WriteString(" NOT NULL")
 	} else {
 		sb.WriteString(" NULL")
 	}
-	
+
 	// 默认值
 	if col.Default != "" {
 		sb.WriteString(" DEFAULT ")
 		sb.WriteString(col.Default)
 	}
-	
+
 	// 自增
 	if col.AutoIncrement {
 		if _, ok := tb.dialect.(*MySQLDialect); ok {
@@ -342,20 +342,20 @@ func (tb *TableBuilder) buildColumnDef(col ColumnDef) string {
 			sb.WriteString(" GENERATED ALWAYS AS IDENTITY")
 		}
 	}
-	
+
 	// 注释（MySQL）
 	if col.Comment != "" {
 		if _, ok := tb.dialect.(*MySQLDialect); ok {
-			sb.WriteString(fmt.Sprintf(" COMMENT '%s'", col.Comment))
+			fmt.Fprintf(&sb, " COMMENT '%s'", col.Comment)
 		}
 	}
-	
+
 	return sb.String()
 }
 
 func (tb *TableBuilder) buildColumnType(col ColumnDef) string {
 	typeName := strings.ToUpper(col.Type)
-	
+
 	switch typeName {
 	case "VARCHAR":
 		length := col.Length
@@ -398,17 +398,17 @@ func (tb *TableBuilder) buildColumnType(col ColumnDef) string {
 func (tb *TableBuilder) buildDrop() (string, error) {
 	var sb strings.Builder
 	sb.WriteString("DROP TABLE ")
-	
+
 	if tb.ifExists {
 		sb.WriteString("IF EXISTS ")
 	}
-	
+
 	sb.WriteString(tb.dialect.QuoteIdentifier(tb.tableName))
-	
+
 	if tb.cascade {
 		sb.WriteString(" CASCADE")
 	}
-	
+
 	return sb.String(), nil
 }
 
@@ -425,18 +425,18 @@ func (tb *TableBuilder) Exec(ctx context.Context) error {
 // CreateIndex 创建单独的索引（用于 PostgreSQL 或后续添加索引）
 func (o *ORM) CreateIndex(table, name string, unique bool, columns ...string) error {
 	var sb strings.Builder
-	
+
 	if unique {
 		sb.WriteString("CREATE UNIQUE INDEX ")
 	} else {
 		sb.WriteString("CREATE INDEX ")
 	}
-	
+
 	sb.WriteString(o.dialect.QuoteIdentifier(name))
 	sb.WriteString(" ON ")
 	sb.WriteString(o.dialect.QuoteIdentifier(table))
 	sb.WriteString(" (")
-	
+
 	for i, col := range columns {
 		if i > 0 {
 			sb.WriteString(", ")
@@ -444,7 +444,7 @@ func (o *ORM) CreateIndex(table, name string, unique bool, columns ...string) er
 		sb.WriteString(o.dialect.QuoteIdentifier(col))
 	}
 	sb.WriteString(")")
-	
+
 	_, err := o.db.Exec(context.Background(), sb.String())
 	return err
 }
@@ -452,7 +452,7 @@ func (o *ORM) CreateIndex(table, name string, unique bool, columns ...string) er
 // DropIndex 删除索引
 func (o *ORM) DropIndex(table, name string) error {
 	var query string
-	
+
 	if _, ok := o.dialect.(*MySQLDialect); ok {
 		// MySQL: DROP INDEX name ON table
 		query = fmt.Sprintf("DROP INDEX %s ON %s",
@@ -462,7 +462,7 @@ func (o *ORM) DropIndex(table, name string) error {
 		// PostgreSQL: DROP INDEX name
 		query = fmt.Sprintf("DROP INDEX %s", o.dialect.QuoteIdentifier(name))
 	}
-	
+
 	_, err := o.db.Exec(context.Background(), query)
 	return err
 }
@@ -471,7 +471,7 @@ func (o *ORM) DropIndex(table, name string) error {
 func (o *ORM) HasTable(ctx context.Context, table string) (bool, error) {
 	var query string
 	var args []interface{}
-	
+
 	if _, ok := o.dialect.(*MySQLDialect); ok {
 		query = "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?"
 		args = []interface{}{table}
@@ -483,13 +483,13 @@ func (o *ORM) HasTable(ctx context.Context, table string) (bool, error) {
 		query = fmt.Sprintf("SELECT 1 FROM %s LIMIT 1", o.dialect.QuoteIdentifier(table))
 		args = nil
 	}
-	
+
 	rows, err := o.db.Query(ctx, query, args...)
 	if err != nil {
 		return false, nil // 表不存在或查询失败
 	}
 	defer rows.Close()
-	
+
 	return rows.Next(), nil
 }
 
@@ -498,11 +498,11 @@ func (o *ORM) TruncateTable(ctx context.Context, table string, cascade ...bool) 
 	var sb strings.Builder
 	sb.WriteString("TRUNCATE TABLE ")
 	sb.WriteString(o.dialect.QuoteIdentifier(table))
-	
+
 	if len(cascade) > 0 && cascade[0] {
 		sb.WriteString(" CASCADE")
 	}
-	
+
 	_, err := o.db.Exec(ctx, sb.String())
 	return err
 }

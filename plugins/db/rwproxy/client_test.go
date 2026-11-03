@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// mockDB is a mock for testing (we can't use real DB in unit tests)
-type mockDB struct {
-	*sql.DB
-}
-
 func TestQueryTypeDetection(t *testing.T) {
 	client := &Client{
 		queryChecker: &queryTypeChecker{

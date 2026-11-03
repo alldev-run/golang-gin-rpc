@@ -16,7 +16,7 @@ type SoftDelete struct {
 
 // SoftDeleteResult contains the result of a soft delete operation.
 type SoftDeleteResult struct {
-	RowsAffected int64 // Number of rows affected
+	RowsAffected int64     // Number of rows affected
 	DeletedAt    time.Time // When the records were marked as deleted
 }
 

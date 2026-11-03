@@ -1,6 +1,7 @@
 package mongodb
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -59,7 +60,7 @@ func TestNewWithInvalidHost(t *testing.T) {
 	client, err := New(cfg)
 	if err == nil {
 		if client != nil {
-			_ = client.Close(nil)
+			_ = client.Close(context.Background())
 		}
 		t.Log("Connection succeeded unexpectedly")
 	} else {
@@ -78,7 +79,7 @@ func TestNewWithEmptyURI(t *testing.T) {
 	if err == nil {
 		// Might connect to localhost if MongoDB is running
 		if client != nil {
-			_ = client.Close(nil)
+			_ = client.Close(context.Background())
 		}
 		t.Log("Connected to default URI")
 	} else {

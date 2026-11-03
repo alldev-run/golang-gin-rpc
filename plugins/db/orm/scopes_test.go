@@ -23,7 +23,8 @@ func TestNewBuilder(t *testing.T) {
 }
 
 func TestBuilderNilContext(t *testing.T) {
-	b := NewBuilder(nil, "users")
+	var ctx context.Context
+	b := NewBuilder(ctx, "users")
 
 	if b.ctx == nil {
 		t.Error("Expected context to be set even when nil provided")

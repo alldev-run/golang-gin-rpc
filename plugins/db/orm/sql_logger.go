@@ -38,7 +38,6 @@ func (l LogLevel) String() string {
 	}
 }
 
-
 // SQLLogger provides configurable logging for SQL operations.
 type SQLLogger struct {
 	level              LogLevel
@@ -79,7 +78,6 @@ func (sl *SQLLogger) SetLevel(level LogLevel) {
 func (sl *SQLLogger) SetSlowQueryThreshold(threshold time.Duration) {
 	sl.slowQueryThreshold = threshold
 }
-
 
 // LogQuery logs a query execution.
 func (sl *SQLLogger) LogQuery(queryLog *QueryLog) {

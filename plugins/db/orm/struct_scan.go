@@ -14,7 +14,13 @@ import (
 var fieldCache sync.Map
 
 type structMeta struct {
-	fieldMap map[string]int
+	fieldMap      map[string]int
+	orderedFields []orderedField
+}
+
+type orderedField struct {
+	column string
+	index  int
 }
 
 func getStructMeta(t reflect.Type) *structMeta {
@@ -28,11 +34,21 @@ func getStructMeta(t reflect.Type) *structMeta {
 			continue
 		}
 		tag := f.Tag.Get("db")
+		column := ToSnakeCase(f.Name)
 		if tag != "" {
-			meta.fieldMap[tag] = i
-		} else {
-			meta.fieldMap[ToSnakeCase(f.Name)] = i
+			column = tag
 		}
+		if _, exists := meta.fieldMap[column]; !exists {
+			meta.orderedFields = append(meta.orderedFields, orderedField{column: column, index: i})
+		} else {
+			for j := range meta.orderedFields {
+				if meta.orderedFields[j].column == column {
+					meta.orderedFields[j].index = i
+					break
+				}
+			}
+		}
+		meta.fieldMap[column] = i
 	}
 	fieldCache.Store(t, meta)
 	return meta
@@ -42,7 +58,7 @@ func getStructMeta(t reflect.Type) *structMeta {
 
 func StructScan(rows *sql.Rows, dest interface{}) error {
 	v := reflect.ValueOf(dest)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return errors.New("dest must be a non-nil pointer to a struct")
 	}
 
@@ -74,11 +90,12 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 	return scanRowToStruct(columns, values, v)
 }
 
-// StructScanRow scans a single row from *sql.Row into a struct.
-// This is similar to StructScan but works with QueryRow instead of Query.
+// StructScanRow scans a single row from *sql.Row into a struct. The SELECT
+// column order must match the struct field declaration order. Use StructScanAll
+// with *sql.Rows when columns should be matched by name.
 func StructScanRow(row *sql.Row, dest interface{}) error {
 	v := reflect.ValueOf(dest)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return errors.New("dest must be a non-nil pointer to a struct")
 	}
 
@@ -91,15 +108,12 @@ func StructScanRow(row *sql.Row, dest interface{}) error {
 	meta := getStructMeta(v.Type())
 
 	// Prepare columns and values based on struct fields
-	columns := make([]string, 0, len(meta.fieldMap))
-	values := make([]interface{}, 0, len(meta.fieldMap))
-	valuePtrs := make([]interface{}, 0, len(meta.fieldMap))
-
-	for col := range meta.fieldMap {
-		columns = append(columns, col)
-		val := new(interface{})
-		values = append(values, val)
-		valuePtrs = append(valuePtrs, val)
+	columns := make([]string, len(meta.orderedFields))
+	values := make([]interface{}, len(meta.orderedFields))
+	valuePtrs := make([]interface{}, len(meta.orderedFields))
+	for i, field := range meta.orderedFields {
+		columns[i] = field.column
+		valuePtrs[i] = &values[i]
 	}
 
 	// Scan the row
@@ -113,7 +127,7 @@ func StructScanRow(row *sql.Row, dest interface{}) error {
 
 func StructScanAll(rows *sql.Rows, dest interface{}) error {
 	v := reflect.ValueOf(dest)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return errors.New("dest must be a non-nil pointer to a slice")
 	}
 
@@ -123,7 +137,7 @@ func StructScanAll(rows *sql.Rows, dest interface{}) error {
 	}
 
 	elemType := sliceV.Type().Elem()
-	if elemType.Kind() != reflect.Ptr || elemType.Elem().Kind() != reflect.Struct {
+	if elemType.Kind() != reflect.Pointer || elemType.Elem().Kind() != reflect.Struct {
 		return errors.New("slice elements must be pointers to structs")
 	}
 
@@ -200,7 +214,7 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 	fieldType := field.Type()
 
 	// 2. 处理指针类型字段
-	if field.Kind() == reflect.Ptr {
+	if field.Kind() == reflect.Pointer {
 		// 创建一个新的指针值
 		ptrValue := reflect.New(fieldType.Elem())
 		// 递归设置指针指向的值
@@ -219,7 +233,7 @@ func setFieldValue(field reflect.Value, val interface{}) error {
 	}
 
 	// 4. 处理指针解引用（database/sql 有时返回 *interface{}）
-	if valV.Kind() == reflect.Ptr {
+	if valV.Kind() == reflect.Pointer {
 		if valV.IsNil() {
 			field.Set(reflect.Zero(fieldType))
 			return nil

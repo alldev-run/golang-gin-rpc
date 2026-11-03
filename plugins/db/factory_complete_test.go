@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
 )
 
@@ -141,7 +141,7 @@ mysql:
 	// 子测试 7: 客户端存储和检索测试
 	t.Run("ClientStorageAndRetrieval", func(t *testing.T) {
 		factory := NewFactory()
-		
+
 		// 测试在没有客户端时的错误处理
 		testCases := []struct {
 			name     string
@@ -189,7 +189,7 @@ mysql:
 				expected: "client for type mysql not found",
 			},
 		}
-		
+
 		for _, tc := range testCases {
 			t.Run(tc.name+"NotFound", func(t *testing.T) {
 				err := tc.testFunc()
@@ -330,7 +330,7 @@ secondary:
 	// 子测试 11: 模拟客户端创建测试（不依赖真实数据库）
 	t.Run("MockClientCreation", func(t *testing.T) {
 		factory := NewFactory()
-		
+
 		// 创建各种数据库配置
 		configs := []Config{
 			{
@@ -386,17 +386,17 @@ secondary:
 // TestFactoryClientStorageDetailed 详细测试客户端存储功能
 func TestFactoryClientStorageDetailed(t *testing.T) {
 	factory := NewFactory()
-	
+
 	// 验证所有数据库类型的 Get 方法在没有客户端时的行为
 	databaseTypes := []struct {
-		name         string
-		dbType       Type
-		getFunc      func() error
-		expectedErr  string
+		name        string
+		dbType      Type
+		getFunc     func() error
+		expectedErr string
 	}{
 		{
-			name:    "MySQL",
-			dbType:  TypeMySQL,
+			name:   "MySQL",
+			dbType: TypeMySQL,
 			getFunc: func() error {
 				_, err := factory.GetMySQL()
 				return err
@@ -404,8 +404,8 @@ func TestFactoryClientStorageDetailed(t *testing.T) {
 			expectedErr: "MySQL client not found",
 		},
 		{
-			name:    "MySQLSQL",
-			dbType:  TypeMySQL,
+			name:   "MySQLSQL",
+			dbType: TypeMySQL,
 			getFunc: func() error {
 				_, err := factory.GetMySQLSQLClient()
 				return err
@@ -413,8 +413,8 @@ func TestFactoryClientStorageDetailed(t *testing.T) {
 			expectedErr: "MySQL SQL client not found",
 		},
 		{
-			name:    "Redis",
-			dbType:  TypeRedis,
+			name:   "Redis",
+			dbType: TypeRedis,
 			getFunc: func() error {
 				_, err := factory.GetRedis()
 				return err
@@ -422,8 +422,8 @@ func TestFactoryClientStorageDetailed(t *testing.T) {
 			expectedErr: "Redis client not found",
 		},
 		{
-			name:    "Postgres",
-			dbType:  TypePostgres,
+			name:   "Postgres",
+			dbType: TypePostgres,
 			getFunc: func() error {
 				_, err := factory.GetPostgres()
 				return err
@@ -485,9 +485,9 @@ func TestFactoryErrorHandling(t *testing.T) {
 
 // 辅助函数
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr || 
-		   (len(s) > len(substr) && s[len(s)-len(substr):] == substr) ||
-		   (len(s) > len(substr) && findSubstring(s, substr))
+	return len(s) >= len(substr) && s[:len(substr)] == substr ||
+		(len(s) > len(substr) && s[len(s)-len(substr):] == substr) ||
+		(len(s) > len(substr) && findSubstring(s, substr))
 }
 
 func findSubstring(s, substr string) bool {

@@ -8,12 +8,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // State represents the circuit breaker state.
@@ -82,7 +81,6 @@ type CircuitBreaker struct {
 	// last failure time (atomic)
 	lastFailureTime int64
 
-	mutex sync.RWMutex
 	// custom error for open circuit
 	openError error
 }

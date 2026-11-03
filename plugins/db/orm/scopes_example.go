@@ -369,10 +369,10 @@ func Example_chainingScopes() {
 
 	// Build a complex query with multiple scopes
 	builder := NewBuilder(ctx, "articles").
-		Scope(Active("status")).                    // Filter active
-		Scope(NotDeleted()).                       // Exclude deleted
-		Scope(OrderByDesc("published_at")).         // Sort by date
-		Scope(Paginate(1, 20)).                     // Paginate
+		Scope(Active("status")).            // Filter active
+		Scope(NotDeleted()).                // Exclude deleted
+		Scope(OrderByDesc("published_at")). // Sort by date
+		Scope(Paginate(1, 20)).             // Paginate
 		ApplyScopes()
 
 	sql, args := builder.Build()

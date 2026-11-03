@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"math"
@@ -26,7 +25,7 @@ func (tm *TransactionManager) updateMetrics(result *TransactionResult) {
 	defer tm.metrics.mu.Unlock()
 
 	tm.metrics.TotalTransactions++
-	
+
 	if result.Success {
 		tm.metrics.SuccessfulTransactions++
 	} else {
@@ -52,18 +51,18 @@ func (tm *TransactionManager) updateMetrics(result *TransactionResult) {
 	// Update Prometheus metrics if available
 	// TODO: Implement metrics integration when metrics package is available
 	/*
-	if metrics.DefaultRegistry != nil {
-		metrics.DefaultRegistry.Counter("orm_transactions_total").Inc()
-		if result.Success {
-			metrics.DefaultRegistry.Counter("orm_transactions_success_total").Inc()
-		} else {
-			metrics.DefaultRegistry.Counter("orm_transactions_failed_total").Inc()
+		if metrics.DefaultRegistry != nil {
+			metrics.DefaultRegistry.Counter("orm_transactions_total").Inc()
+			if result.Success {
+				metrics.DefaultRegistry.Counter("orm_transactions_success_total").Inc()
+			} else {
+				metrics.DefaultRegistry.Counter("orm_transactions_failed_total").Inc()
+			}
+			metrics.DefaultRegistry.Histogram("orm_transaction_duration_seconds").Observe(result.Duration.Seconds())
+			if result.Retries > 0 {
+				metrics.DefaultRegistry.Counter("orm_transactions_retried_total").Add(float64(result.Retries))
+			}
 		}
-		metrics.DefaultRegistry.Histogram("orm_transaction_duration_seconds").Observe(result.Duration.Seconds())
-		if result.Retries > 0 {
-			metrics.DefaultRegistry.Counter("orm_transactions_retried_total").Add(float64(result.Retries))
-		}
-	}
 	*/
 }
 
@@ -71,19 +70,19 @@ func (tm *TransactionManager) updateMetrics(result *TransactionResult) {
 func (tm *TransactionManager) GetMetrics() *TransactionMetrics {
 	tm.metrics.mu.RLock()
 	defer tm.metrics.mu.RUnlock()
-	
+
 	// Create a copy to avoid race conditions
 	metrics := &TransactionMetrics{
-		TotalTransactions:     tm.metrics.TotalTransactions,
+		TotalTransactions:      tm.metrics.TotalTransactions,
 		SuccessfulTransactions: tm.metrics.SuccessfulTransactions,
 		FailedTransactions:     tm.metrics.FailedTransactions,
 		RetriedTransactions:    tm.metrics.RetriedTransactions,
-		AvgDuration:           tm.metrics.AvgDuration,
-		MaxDuration:           tm.metrics.MaxDuration,
-		MinDuration:           tm.metrics.MinDuration,
-		LastReset:             tm.metrics.LastReset,
+		AvgDuration:            tm.metrics.AvgDuration,
+		MaxDuration:            tm.metrics.MaxDuration,
+		MinDuration:            tm.metrics.MinDuration,
+		LastReset:              tm.metrics.LastReset,
 	}
-	
+
 	return metrics
 }
 
@@ -91,20 +90,20 @@ func (tm *TransactionManager) GetMetrics() *TransactionMetrics {
 func (tm *TransactionManager) ResetMetrics() {
 	tm.metrics.mu.Lock()
 	defer tm.metrics.mu.Unlock()
-	
+
 	tm.metrics = &TransactionMetrics{LastReset: time.Now()}
 }
 
 // DefaultErrorClassifier provides default error classification.
 type DefaultErrorClassifier struct {
-	retryablePatterns    []*regexp.Regexp
-	transientPatterns    []*regexp.Regexp
-	deadlockPatterns     []*regexp.Regexp
-	timeoutPatterns      []*regexp.Regexp
-	connectionPatterns   []*regexp.Regexp
-	constraintPatterns   []*regexp.Regexp
-	permissionPatterns   []*regexp.Regexp
-	resourcePatterns     []*regexp.Regexp
+	retryablePatterns  []*regexp.Regexp
+	transientPatterns  []*regexp.Regexp
+	deadlockPatterns   []*regexp.Regexp
+	timeoutPatterns    []*regexp.Regexp
+	connectionPatterns []*regexp.Regexp
+	constraintPatterns []*regexp.Regexp
+	permissionPatterns []*regexp.Regexp
+	resourcePatterns   []*regexp.Regexp
 }
 
 // NewDefaultErrorClassifier creates a new default error classifier.
@@ -184,7 +183,7 @@ func (ec *DefaultErrorClassifier) ClassifyError(err error) ErrorClassification {
 	}
 
 	errStr := err.Error()
-	
+
 	// Check for deadlock errors (highest severity)
 	for _, pattern := range ec.deadlockPatterns {
 		if pattern.MatchString(errStr) {
@@ -301,7 +300,7 @@ func (ec *DefaultErrorClassifier) IsTransient(err error) bool {
 // GetRetryDelay returns the recommended retry delay for the error.
 func (ec *DefaultErrorClassifier) GetRetryDelay(attempt int, err error) time.Duration {
 	classification := ec.ClassifyError(err)
-	
+
 	switch classification.Type {
 	case ErrorTypeDeadlock:
 		// Exponential backoff for deadlocks
@@ -333,7 +332,7 @@ func (ebs *ExponentialBackoffStrategy) ShouldRetry(attempt int, err error) bool 
 	if attempt >= ebs.config.MaxRetries {
 		return false
 	}
-	
+
 	// Use error classifier to determine if retryable
 	classifier := NewDefaultErrorClassifier()
 	return classifier.IsRetryable(err)
@@ -343,19 +342,19 @@ func (ebs *ExponentialBackoffStrategy) ShouldRetry(attempt int, err error) bool 
 func (ebs *ExponentialBackoffStrategy) GetDelay(attempt int, err error) time.Duration {
 	classifier := NewDefaultErrorClassifier()
 	baseDelay := classifier.GetRetryDelay(attempt, err)
-	
+
 	// Apply exponential backoff with jitter
 	delay := time.Duration(float64(baseDelay) * math.Pow(ebs.config.RetryBackoffFactor, float64(attempt)))
-	
+
 	// Add jitter to prevent thundering herd
 	jitter := time.Duration(float64(delay) * 0.1 * (2.0*float64(time.Now().UnixNano()%1000)/1000.0 - 1.0))
 	delay += jitter
-	
+
 	// Cap at maximum delay
 	if delay > ebs.config.MaxRetryDelay {
 		delay = ebs.config.MaxRetryDelay
 	}
-	
+
 	return delay
 }
 
@@ -432,15 +431,15 @@ func NewConnectionPool(config TransactionConfig) *ConnectionPool {
 func (cp *ConnectionPool) Initialize(db *sql.DB) error {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
-	
+
 	cp.db = db
-	
+
 	// Configure connection pool
 	db.SetMaxOpenConns(cp.config.MaxOpenConns)
 	db.SetMaxIdleConns(cp.config.MaxIdleConns)
 	db.SetConnMaxLifetime(cp.config.ConnMaxLifetime)
 	db.SetConnMaxIdleTime(cp.config.ConnMaxIdleTime)
-	
+
 	return nil
 }
 
@@ -455,125 +454,9 @@ func (cp *ConnectionPool) GetDB() *sql.DB {
 func (cp *ConnectionPool) Close() error {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
-	
+
 	if cp.db != nil {
 		return cp.db.Close()
 	}
 	return nil
-}
-
-// HTTPCoordinator provides HTTP-based distributed transaction coordination.
-type HTTPCoordinator struct {
-	baseURL string
-}
-
-// NewHTTPCoordinator creates a new HTTP coordinator.
-func NewHTTPCoordinator(baseURL string) *HTTPCoordinator {
-	return &HTTPCoordinator{baseURL: baseURL}
-}
-
-// BeginTransaction begins a distributed transaction.
-func (hc *HTTPCoordinator) BeginTransaction(ctx context.Context, txID string) error {
-	// Placeholder implementation
-	// In a real implementation, this would make an HTTP request to the coordinator
-	logDebugf("Beginning distributed transaction: tx_id=%s", txID)
-	return nil
-}
-
-// CommitTransaction commits a distributed transaction.
-func (hc *HTTPCoordinator) CommitTransaction(ctx context.Context, txID string) error {
-	// Placeholder implementation
-	logDebugf("Committing distributed transaction: tx_id=%s", txID)
-	return nil
-}
-
-// RollbackTransaction rolls back a distributed transaction.
-func (hc *HTTPCoordinator) RollbackTransaction(ctx context.Context, txID string) error {
-	// Placeholder implementation
-	logDebugf("Rolling back distributed transaction: tx_id=%s", txID)
-	return nil
-}
-
-// GetTransactionStatus gets the status of a distributed transaction.
-func (hc *HTTPCoordinator) GetTransactionStatus(ctx context.Context, txID string) (TransactionStatus, error) {
-	// Placeholder implementation
-	return TxStatusActive, nil
-}
-
-// JaegerTracer provides Jaeger-based distributed tracing.
-type JaegerTracer struct {
-	serviceName string
-}
-
-// NewJaegerTracer creates a new Jaeger tracer.
-func NewJaegerTracer(serviceName string) *JaegerTracer {
-	return &JaegerTracer{serviceName: serviceName}
-}
-
-// StartSpan starts a new trace span.
-func (jt *JaegerTracer) StartSpan(ctx context.Context, operationName string) (context.Context, Span) {
-	// Placeholder implementation
-	// In a real implementation, this would use the Jaeger client
-	return ctx, &MockSpan{operationName: operationName}
-}
-
-// FinishSpan finishes a trace span.
-func (jt *JaegerTracer) FinishSpan(span Span) {
-	// Placeholder implementation
-}
-
-// InjectContext injects trace context into headers.
-func (jt *JaegerTracer) InjectContext(ctx context.Context, headers map[string]string) {
-	// Placeholder implementation
-}
-
-// ExtractContext extracts trace context from headers.
-func (jt *JaegerTracer) ExtractContext(headers map[string]string) (context.Context, error) {
-	// Placeholder implementation
-	return context.Background(), nil
-}
-
-// MockSpan provides a mock implementation of Span interface.
-type MockSpan struct {
-	operationName string
-	tags          map[string]interface{}
-	baggage       map[string]string
-}
-
-// SetTag sets a tag on the span.
-func (ms *MockSpan) SetTag(key string, value interface{}) {
-	if ms.tags == nil {
-		ms.tags = make(map[string]interface{})
-	}
-	ms.tags[key] = value
-}
-
-// SetBaggageItem sets a baggage item on the span.
-func (ms *MockSpan) SetBaggageItem(key, value string) {
-	if ms.baggage == nil {
-		ms.baggage = make(map[string]string)
-	}
-	ms.baggage[key] = value
-}
-
-// Finish finishes the span.
-func (ms *MockSpan) Finish() {
-	logDebugf("Span finished: operation=%s, tags=%+v", ms.operationName, ms.tags)
-}
-
-// Context returns the span context.
-func (ms *MockSpan) Context() SpanContext {
-	return &MockSpanContext{baggage: ms.baggage}
-}
-
-// MockSpanContext provides a mock implementation of SpanContext interface.
-type MockSpanContext struct {
-	baggage map[string]string
-}
-
-// ForeachBaggageItem iterates over baggage items.
-func (msc *MockSpanContext) ForeachBaggageItem(handler func(key, value string) string) {
-	for k, v := range msc.baggage {
-		handler(k, v)
-	}
 }

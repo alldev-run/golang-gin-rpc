@@ -390,14 +390,14 @@ func TestSecurityHelper(t *testing.T) {
 
 	// Test ValidateAndSanitize
 	input := "' OR '1'='1"
-	sanitized, err := sh.ValidateAndSanitize(input)
+	_, err := sh.ValidateAndSanitize(input)
 	if err == nil {
 		t.Error("Should detect SQL injection in strict mode")
 	}
 
 	// Test with safe input
 	safeInput := "john_doe"
-	sanitized, err = sh.ValidateAndSanitize(safeInput)
+	sanitized, err := sh.ValidateAndSanitize(safeInput)
 	if err != nil {
 		t.Errorf("Safe input should pass, got: %v", err)
 	}

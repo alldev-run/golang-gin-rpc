@@ -337,11 +337,11 @@ func BuildPlaceholders(dialect Dialect, count int) string {
 	if count <= 0 {
 		return ""
 	}
-	
+
 	placeholders := make([]string, count)
 	for i := 0; i < count; i++ {
 		placeholders[i] = dialect.Placeholder(i)
 	}
-	
+
 	return strings.Join(placeholders, ", ")
 }

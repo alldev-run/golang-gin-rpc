@@ -252,12 +252,12 @@ func TestMetricsWithDifferentLabels(t *testing.T) {
 		metricChan := make(chan prometheus.Metric, 10)
 		metric.Collect(metricChan)
 		close(metricChan)
-		
+
 		count := 0
 		for range metricChan {
 			count++
 		}
-		
+
 		if count == 0 {
 			t.Errorf("Expected at least one metric for %T", metric)
 		}
