@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.25.7"
+  GOLANGCI_LINT_VERSION: "v2.15.0"
+
+jobs:
+  root:
+    name: root module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -count=1 -race -cover ./...
+      - name: Tidy check
+        run: |
+          GOWORK=off go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+
+  plugins:
+    name: plugin ${{ matrix.plugin }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin:
+          - actor
+          - alert
+          - audit
+          - auth
+          - bloomfilter
+          - cache
+          - circuitbreaker
+          - configcenter
+          - db
+          - discovery
+          - gameserver
+          - gateway
+          - geoip
+          - health
+          - loadbalancer
+          - messaging
+          - metrics
+          - middleware
+          - push
+          - ratelimit
+          - rbac
+          - rpc
+          - scheduler
+          - search
+          - tracing
+          - upload
+          - websocket
+    defaults:
+      run:
+        working-directory: plugins/${{ matrix.plugin }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: plugins/${{ matrix.plugin }}/go.sum
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -count=1 -race -cover ./...
+      - name: Tidy check
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: plugins/${{ matrix.plugin }}
+          args: --config=${{ github.workspace }}/.golangci.yml
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t golang-gin-rpc:ci .
