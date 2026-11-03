@@ -53,11 +53,11 @@ func StartFramework(ctx context.Context, boot *Bootstrap, options FrameworkOptio
 }
 
 // StopFramework stops managed services and the plugin app in reverse start order.
-func StopFramework(ctx context.Context, boot *Bootstrap, services ...string) {
+func StopFramework(ctx context.Context, boot *Bootstrap, services ...string) error {
 	if boot == nil {
-		return
+		return nil
 	}
-	boot.StopFramework(ctx, services...)
+	return boot.StopFramework(ctx, services...)
 }
 
 // RegisterAPIGatewayServiceFactory registers API gateway service factory via package helper.

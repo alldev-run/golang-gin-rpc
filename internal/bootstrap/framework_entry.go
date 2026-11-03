@@ -39,16 +39,16 @@ type FrameworkOptions struct {
 // DefaultFrameworkOptions returns a production-friendly default.
 func DefaultFrameworkOptions() FrameworkOptions {
 	return FrameworkOptions{
-		InitDatabases: true,
-		InitCache:     true,
-		InitDiscovery: true,
-		InitTracing:   true,
-		InitAuth:      true,
-		InitMetrics:   true,
-		InitHealth:    true,
-		InitErrors:    true,
+		InitDatabases:              true,
+		InitCache:                  true,
+		InitDiscovery:              true,
+		InitTracing:                true,
+		InitAuth:                   true,
+		InitMetrics:                true,
+		InitHealth:                 true,
+		InitErrors:                 true,
 		ValidateDependencyCoverage: true,
-		Services:      []string{ServiceRPC, ServiceAPIGateway},
+		Services:                   []string{ServiceRPC, ServiceAPIGateway},
 	}
 }
 
@@ -58,16 +58,16 @@ func (b *Bootstrap) FrameworkOptionsFromConfig() FrameworkOptions {
 		return DefaultFrameworkOptions()
 	}
 	return FrameworkOptions{
-		InitDatabases:             b.config.Framework.InitDatabases,
-		InitCache:                 b.config.Framework.InitCache,
-		InitDiscovery:             b.config.Framework.InitDiscovery,
-		InitTracing:               b.config.Framework.InitTracing,
-		InitAuth:                  b.config.Framework.InitAuth,
-		InitMetrics:               b.config.Framework.InitMetrics,
-		InitHealth:                b.config.Framework.InitHealth,
-		InitErrors:                b.config.Framework.InitErrors,
+		InitDatabases:              b.config.Framework.InitDatabases,
+		InitCache:                  b.config.Framework.InitCache,
+		InitDiscovery:              b.config.Framework.InitDiscovery,
+		InitTracing:                b.config.Framework.InitTracing,
+		InitAuth:                   b.config.Framework.InitAuth,
+		InitMetrics:                b.config.Framework.InitMetrics,
+		InitHealth:                 b.config.Framework.InitHealth,
+		InitErrors:                 b.config.Framework.InitErrors,
 		ValidateDependencyCoverage: b.config.Framework.ValidateDependencyCoverage,
-		Services:                  append([]string(nil), b.config.Framework.Services...),
+		Services:                   append([]string(nil), b.config.Framework.Services...),
 	}
 }
 

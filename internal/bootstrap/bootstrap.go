@@ -20,12 +20,9 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/plugins/auth/jwtx"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	cacheredis "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
-	mysqlpkg "github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
-	pg "github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
 	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 	"github.com/alldev-run/golang-gin-rpc/plugins/health"
@@ -439,7 +436,7 @@ func (b *Bootstrap) InitializeCache() error {
 		return nil
 	}
 
-	cacheCfg := cacheredis.DefaultConfig()
+	cacheCfg := redis.DefaultConfig()
 	cacheCfg.Host = b.config.Redis.Host
 	cacheCfg.Port = b.config.Redis.Port
 	cacheCfg.Password = b.config.Redis.Password
@@ -825,7 +822,7 @@ func (b *Bootstrap) InitializeGateway() error {
 func buildDBConfig(dbConfig config.DBConfig, poolCfg config.DBPoolConfig) (db.Config, error) {
 	switch dbConfig.Driver {
 	case "mysql":
-		cfg := mysqlpkg.DefaultConfig()
+		cfg := mysql.DefaultConfig()
 		cfg.Host = dbConfig.Host
 		cfg.Port = dbConfig.Port
 		cfg.Database = dbConfig.Database
@@ -855,7 +852,7 @@ func buildDBConfig(dbConfig config.DBConfig, poolCfg config.DBPoolConfig) (db.Co
 		}
 		return db.Config{Type: db.TypeMySQL, MySQL: cfg}, nil
 	case "postgres", "postgresql":
-		cfg := pg.DefaultConfig()
+		cfg := postgres.DefaultConfig()
 		cfg.Host = dbConfig.Host
 		cfg.Port = dbConfig.Port
 		cfg.Database = dbConfig.Database
@@ -1044,11 +1041,6 @@ func (b *Bootstrap) Close() error {
 		}
 	}
 
-	if b.db != nil {
-		// Database factory doesn't need explicit close
-		// Clients are managed individually
-	}
-
 	if b.rpcManager != nil && !b.pluginStopped("rpc") {
 		if err := b.rpcManager.Stop(); err != nil {
 			errors = append(errors, fmt.Errorf("rpc manager close error: %w", err))
@@ -1067,18 +1059,6 @@ func (b *Bootstrap) Close() error {
 		if err := b.discoveryManager.Stop(); err != nil {
 			errors = append(errors, fmt.Errorf("discovery manager close error: %w", err))
 		}
-	}
-
-	if b.healthManager != nil {
-		// Health manager doesn't need explicit close
-	}
-
-	if b.metricsCollector != nil {
-		// Metrics collector doesn't need explicit close
-	}
-
-	if b.authManager != nil {
-		// Auth manager doesn't need explicit close
 	}
 
 	if b.tracer != nil && !b.pluginStopped("tracing") {

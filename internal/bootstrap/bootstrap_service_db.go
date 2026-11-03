@@ -10,11 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 	mysqlpkg "github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	pg "github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
-	cacheredis "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 )
 
 // initializeServiceDatabases initializes databases from service-level configuration format.
@@ -272,7 +271,7 @@ func (b *Bootstrap) createPostgresFromServiceConfig(role string, config map[stri
 
 // createRedisFromServiceConfig creates Redis client from service configuration.
 func (b *Bootstrap) createRedisFromServiceConfig(role string, config map[string]interface{}, factory *db.Factory) error {
-	redisConfig := cacheredis.DefaultConfig()
+	redisConfig := redis.DefaultConfig()
 
 	if host, ok := config["host"].(string); ok {
 		redisConfig.Host = host
