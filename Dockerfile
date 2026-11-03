@@ -9,13 +9,10 @@ FROM golang:1.25-alpine AS builder
 ARG APP_PATH=.
 WORKDIR /src
 
-# 先拷贝模块定义,利用层缓存加速依赖下载
-COPY go.mod go.sum ./
-COPY go.work go.work.sum ./
-COPY plugins/*/go.mod plugins/*/
+# Workspace module paths and replace targets must exist before dependency resolution.
+COPY . .
 RUN go mod download
 
-COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/app ${APP_PATH}
 
 FROM alpine:3.20
