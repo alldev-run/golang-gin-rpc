@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
 	"github.com/alldev-run/golang-gin-rpc/plugins/cache/failover"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -167,7 +167,7 @@ func (m *memcacheAdapter) Set(ctx context.Context, key string, value interface{}
 	if ttl > 0 {
 		expiration = int32(ttl.Seconds())
 	}
-	
+
 	var valueBytes []byte
 	switch v := value.(type) {
 	case []byte:
@@ -178,7 +178,7 @@ func (m *memcacheAdapter) Set(ctx context.Context, key string, value interface{}
 		m.stats.recordError()
 		return fmt.Errorf("unsupported value type: %T", value)
 	}
-	
+
 	item := &memcache.Item{
 		Key:        key,
 		Value:      valueBytes,
@@ -251,21 +251,21 @@ type Cache interface {
 
 // CacheStats provides cache statistics
 type CacheStats struct {
-	Hits        uint64
-	Misses      uint64
-	Sets        uint64
-	Deletes     uint64
-	Errors      uint64	
-	LastAccess  time.Time
+	Hits       uint64
+	Misses     uint64
+	Sets       uint64
+	Deletes    uint64
+	Errors     uint64
+	LastAccess time.Time
 }
 
 // BreakdownCache prevents cache breakdown with singleflight
 type BreakdownCache struct {
-	cache    Cache
-	groups   map[string]*singleGroup
-	mu       sync.RWMutex
-	stats    CacheStats
-	statsMu  sync.RWMutex
+	cache   Cache
+	groups  map[string]*singleGroup
+	mu      sync.RWMutex
+	stats   CacheStats
+	statsMu sync.RWMutex
 }
 
 // singleGroup prevents duplicate requests for the same key
@@ -296,9 +296,9 @@ func (bc *BreakdownCache) GetWithLock(ctx context.Context, key string) (interfac
 		bc.recordHit()
 		return val, nil
 	}
-	
+
 	bc.recordMiss()
-	
+
 	// Use singleflight to prevent duplicate requests
 	g := bc.groupForKey(key)
 	c, ok := g.loadOrStore(key)
@@ -307,21 +307,20 @@ func (bc *BreakdownCache) GetWithLock(ctx context.Context, key string) (interfac
 		c.wg.Wait()
 		return c.val, c.err
 	}
-	
+
 	// This goroutine is responsible for loading the value
-	c.wg.Add(1)
 	defer func() {
 		c.wg.Done()
 		g.delete(key)
 	}()
-	
+
 	// Try cache again in case it was populated while we were waiting
 	val, err = bc.cache.Get(ctx, key)
 	if err == nil && val != nil {
 		c.val = val
 		return val, nil
 	}
-	
+
 	// Return nil to let caller handle cache miss
 	c.err = fmt.Errorf("cache miss")
 	return nil, c.err
@@ -330,15 +329,15 @@ func (bc *BreakdownCache) GetWithLock(ctx context.Context, key string) (interfac
 // SetWithRandomTTL prevents cache avalanche by adding random jitter
 func (bc *BreakdownCache) SetWithRandomTTL(ctx context.Context, key string, value interface{}, baseTTL time.Duration) error {
 	// Add random jitter to prevent avalanche (±25% of base TTL)
-	jitter := time.Duration(rand.Float64() * 0.5 - 0.25) * baseTTL
+	jitter := time.Duration(rand.Float64()*0.5-0.25) * baseTTL
 	finalTTL := baseTTL + jitter
-	
+
 	err := bc.cache.Set(ctx, key, value, finalTTL)
 	if err != nil {
 		bc.recordError()
 		return err
 	}
-	
+
 	bc.recordSet()
 	return nil
 }
@@ -347,22 +346,22 @@ func (bc *BreakdownCache) SetWithRandomTTL(ctx context.Context, key string, valu
 func (bc *BreakdownCache) groupForKey(key string) *singleGroup {
 	hash := simpleHash(key) % 32 // Use 32 groups to reduce contention
 	groupKey := fmt.Sprintf("group_%d", hash)
-	
+
 	bc.mu.RLock()
 	g, exists := bc.groups[groupKey]
 	bc.mu.RUnlock()
-	
+
 	if !exists {
 		bc.mu.Lock()
 		defer bc.mu.Unlock()
-		
+
 		// Double-check after acquiring write lock
 		if g, exists = bc.groups[groupKey]; !exists {
 			g = &singleGroup{m: make(map[string]*call)}
 			bc.groups[groupKey] = g
 		}
 	}
-	
+
 	return g
 }
 
@@ -370,12 +369,13 @@ func (bc *BreakdownCache) groupForKey(key string) *singleGroup {
 func (g *singleGroup) loadOrStore(key string) (*call, bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	
+
 	if c, ok := g.m[key]; ok {
 		return c, true
 	}
-	
+
 	c := &call{}
+	c.wg.Add(1)
 	g.m[key] = c
 	return c, false
 }
@@ -479,7 +479,7 @@ func NewRedisCache(config RedisConfig) (Cache, error) {
 	return &redisAdapter{client: client}, nil
 }
 
-// MemcacheConfig holds Memcache configuration  
+// MemcacheConfig holds Memcache configuration
 type MemcacheConfig = memcache.Config
 
 // NewMemcacheCache creates a new Memcache cache instance
