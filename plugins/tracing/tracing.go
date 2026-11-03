@@ -4,24 +4,21 @@ package tracing
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"strings"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/zap"
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 )
 
 // TracerType represents the type of tracing backend
@@ -31,22 +28,22 @@ type TracerType string
 const (
 	// Zipkin tracing backend
 	Zipkin TracerType = "zipkin"
-	
+
 	// Jaeger tracing backend
 	Jaeger TracerType = "jaeger"
-	
+
 	// OpenTelemetry Protocol (OTLP) backend
 	OTLP TracerType = "otlp"
-	
+
 	// Prometheus tracing backend (future implementation)
 	Prometheus TracerType = "prometheus"
-	
+
 	// AWS X-Ray tracing backend (future implementation)
 	AWSXRay TracerType = "xray"
-	
+
 	// Google Cloud Trace backend (future implementation)
 	GoogleCloudTrace TracerType = "gcp"
-	
+
 	// Azure Application Insights backend (future implementation)
 	AzureAppInsights TracerType = "azure"
 )
@@ -62,7 +59,7 @@ func (tt TracerType) IsValid() bool {
 		GoogleCloudTrace,
 		AzureAppInsights,
 	}
-	
+
 	for _, supportedType := range supportedTypes {
 		if tt == supportedType {
 			return true
@@ -104,7 +101,7 @@ func (tt TracerType) DefaultPort() int {
 	case Zipkin:
 		return 9411
 	case Jaeger:
-		return 14268 // HTTP collector
+		return 4317 // OTLP gRPC receiver
 	case OTLP:
 		return 4317 // gRPC
 	case Prometheus:
@@ -158,15 +155,13 @@ func GetImplementedTypes() []TracerType {
 	return []TracerType{
 		Zipkin,
 		Jaeger,
-		// OTLP can be added here when implemented
+		OTLP,
 	}
 }
 
 // GetFutureTypes returns tracer types planned for future implementation
 func GetFutureTypes() []TracerType {
 	return []TracerType{
-		Jaeger,
-		OTLP,
 		Prometheus,
 		AWSXRay,
 		GoogleCloudTrace,
@@ -177,7 +172,7 @@ func GetFutureTypes() []TracerType {
 // ParseTracerType parses a string into TracerType
 func ParseTracerType(s string) (TracerType, error) {
 	s = strings.ToLower(strings.TrimSpace(s))
-	
+
 	switch s {
 	case "zipkin":
 		return Zipkin, nil
@@ -221,8 +216,6 @@ func (tt TracerType) RequiresAuthentication() bool {
 	}
 }
 
-
-
 // GetURL returns the full URL for the tracing backend
 func (c Config) GetURL() string {
 	if c.Endpoint != "" {
@@ -235,7 +228,7 @@ func (c Config) GetURL() string {
 }
 
 // Validate validates the tracing configuration
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
 	// Parse tracer type
 	tracerType, err := ParseTracerType(c.Type)
 	if err != nil {
@@ -295,7 +288,7 @@ func NewTracerProvider(config Config) (*TracerProvider, error) {
 
 	// Check if the tracer type is implemented
 	if !tracerType.IsImplemented() {
-		return nil, fmt.Errorf("tracer type '%s' is not yet implemented. Supported types: %v", 
+		return nil, fmt.Errorf("tracer type '%s' is not yet implemented. Supported types: %v",
 			tracerType.DisplayName(), GetImplementedTypes())
 	}
 
@@ -317,119 +310,13 @@ func NewTracer(config Config) (*Tracer, error) {
 	return NewTracerProvider(config)
 }
 
-// newZipkinTracerProvider creates a Zipkin tracer provider
-func newZipkinTracerProvider(config Config) (*TracerProvider, error) {
-	// Create Zipkin exporter
-	exporter, err := zipkin.New(
-		config.GetURL(),
-		zipkin.WithLogger(log.New(os.Stdout, "zipkin: ", log.LstdFlags)),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Zipkin exporter: %w", err)
-	}
-
-	// Create resource
-	res, err := resource.New(context.Background(),
-		resource.WithAttributes(
-			attribute.String("service.name", config.ServiceName),
-			attribute.String("service.version", config.ServiceVersion),
-			attribute.String("deployment.environment", config.Environment),
-		),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
-
-	// Create tracer provider
-	provider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter,
-			sdktrace.WithBatchTimeout(config.BatchTimeout),
-			sdktrace.WithMaxExportBatchSize(config.MaxExportBatchSize),
-		),
-		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.SampleRate)),
-	)
-
-	// Set global tracer provider
-	otel.SetTracerProvider(provider)
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	logger.Info("Zipkin tracing initialized",
-		zap.String("service", config.ServiceName),
-		zap.String("url", config.GetURL()),
-		zap.Float64("sample_rate", config.SampleRate),
-	)
-
-	return &TracerProvider{
-		provider: provider,
-		config:   config,
-	}, nil
-}
-
-// newJaegerTracerProvider creates a Jaeger tracer provider
-func newJaegerTracerProvider(config Config) (*TracerProvider, error) {
-	// Create Jaeger exporter
-	endpoint := jaeger.WithCollectorEndpoint(
-		jaeger.WithEndpoint(fmt.Sprintf("http://%s:%d%s", config.Host, config.Port, config.Endpoint)),
-	)
-	if config.Username != "" && config.Password != "" {
-		endpoint = jaeger.WithCollectorEndpoint(
-			jaeger.WithEndpoint(fmt.Sprintf("http://%s:%d%s", config.Host, config.Port, config.Endpoint)),
-			jaeger.WithUsername(config.Username),
-			jaeger.WithPassword(config.Password),
-		)
-	}
-
-	exporter, err := jaeger.New(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Jaeger exporter: %w", err)
-	}
-
-	// Create resource
-	res, err := resource.New(context.Background(),
-		resource.WithAttributes(
-			attribute.String("service.name", config.ServiceName),
-			attribute.String("service.version", config.ServiceVersion),
-			attribute.String("deployment.environment", config.Environment),
-		),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
-
-	// Create tracer provider
-	provider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter,
-			sdktrace.WithBatchTimeout(config.BatchTimeout),
-			sdktrace.WithMaxExportBatchSize(config.MaxExportBatchSize),
-		),
-		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.SampleRate)),
-	)
-
-	// Set global tracer provider
-	otel.SetTracerProvider(provider)
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	logger.Info("Jaeger tracing initialized",
-		zap.String("service", config.ServiceName),
-		zap.String("endpoint", fmt.Sprintf("http://%s:%d%s", config.Host, config.Port, config.Endpoint)),
-		zap.Float64("sample_rate", config.SampleRate),
-	)
-
-	return &TracerProvider{
-		provider: provider,
-		config:   config,
-	}, nil
-}
-
 // newOTLPTracerProvider creates an OTLP tracer provider
 func newOTLPTracerProvider(config Config) (*TracerProvider, error) {
 	ctx := context.Background()
 
 	// Determine if we should use HTTP or gRPC based on endpoint configuration
 	endpoint := fmt.Sprintf("%s:%d", config.Host, config.Port)
-	
+
 	var exporter *otlptrace.Exporter
 	var err error
 
@@ -517,7 +404,7 @@ func ValidateConfig(config Config) error {
 // Tracer returns a tracer instance
 func (tp *TracerProvider) Tracer(name string) trace.Tracer {
 	if tp.provider == nil {
-		return trace.NewNoopTracerProvider().Tracer(name)
+		return noop.NewTracerProvider().Tracer(name)
 	}
 	return tp.provider.Tracer(name)
 }
@@ -527,7 +414,7 @@ func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 	if tp.provider == nil {
 		return nil
 	}
-	
+
 	logger.Info("Shutting down tracer provider")
 	return tp.provider.Shutdown(ctx)
 }
@@ -542,7 +429,7 @@ func (tp *TracerProvider) StartSpan(ctx context.Context, name string, opts ...tr
 	if !tp.IsEnabled() {
 		return ctx, trace.SpanFromContext(ctx)
 	}
-	
+
 	tracer := tp.Tracer(name)
 	return tracer.Start(ctx, name, opts...)
 }
@@ -552,7 +439,7 @@ func (tp *TracerProvider) StartSpanWithParent(ctx context.Context, name string, 
 	if !tp.IsEnabled() {
 		return ctx, trace.SpanFromContext(ctx)
 	}
-	
+
 	tracer := tp.Tracer(name)
 	opts = append(opts, trace.WithLinks(trace.Link{
 		SpanContext: parentSpan.SpanContext(),
@@ -605,7 +492,7 @@ func SetSpanAttributes(span trace.Span, attributes map[string]interface{}) {
 	if span == nil || !span.IsRecording() {
 		return
 	}
-	
+
 	for key, value := range attributes {
 		switch v := value.(type) {
 		case string:
@@ -629,7 +516,7 @@ func SetSpanError(span trace.Span, err error) {
 	if span == nil || !span.IsRecording() || err == nil {
 		return
 	}
-	
+
 	span.SetAttributes(attribute.String("error", err.Error()))
 	span.SetStatus(codes.Error, err.Error())
 }
@@ -639,6 +526,6 @@ func SetSpanOK(span trace.Span) {
 	if span == nil || !span.IsRecording() {
 		return
 	}
-	
+
 	span.SetStatus(codes.Ok, "OK")
 }

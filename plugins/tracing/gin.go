@@ -10,26 +10,26 @@ import (
 func GinMiddleware(serviceName string) gin.HandlerFunc {
 	tracer := GlobalTracer()
 	httpMiddleware := NewHTTPMiddleware(tracer)
-	
+
 	return func(c *gin.Context) {
 		// Convert gin.Context to http.Handler
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c.Next()
 		})
-		
+
 		// Wrap with HTTP tracing middleware
 		tracedHandler := httpMiddleware.Wrap(serviceName, handler)
-		
+
 		// Create a new request with the gin context
 		req := c.Request
 		c.Request = req.WithContext(c.Request.Context())
-		
+
 		// Create a response writer wrapper
 		w := &ginResponseWriter{ResponseWriter: c.Writer, Context: c}
-		
+
 		// Call the traced handler
 		tracedHandler.ServeHTTP(w, c.Request)
-		
+
 		// Set tracing headers in gin context
 		if traceID := GetTraceID(c.Request.Context()); traceID != "" {
 			c.Header("X-Trace-ID", traceID)

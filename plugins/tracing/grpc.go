@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type originalStreamContextKey struct{}
+
 // GRPCInterceptor provides gRPC tracing interceptor
 type GRPCInterceptor struct {
 	tracer *TracerProvider
@@ -85,7 +87,7 @@ func (i *GRPCInterceptor) StreamServerInterceptor() grpc.StreamServerInterceptor
 		md, ok := metadata.FromIncomingContext(ctx)
 		if ok {
 			ctx = otel.GetTextMapPropagator().Extract(ctx, &metadataCarrier{md})
-			ctx = context.WithValue(ctx, "original_stream", ss)
+			ctx = context.WithValue(ctx, originalStreamContextKey{}, ss)
 		}
 
 		// Start span
@@ -275,13 +277,13 @@ func extractServiceName(fullMethod string) string {
 	if len(fullMethod) < 3 || fullMethod[0] != '/' {
 		return fullMethod
 	}
-	
+
 	// Find the second slash
 	for i := 1; i < len(fullMethod); i++ {
 		if fullMethod[i] == '/' {
 			return fullMethod[1:i] // Return package.service
 		}
 	}
-	
+
 	return fullMethod[1:] // Return everything after first slash if no second slash
 }

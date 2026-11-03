@@ -4,12 +4,12 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
-	"github.com/google/uuid"
 )
 
 // HTTPMiddleware provides HTTP tracing middleware
@@ -32,13 +32,13 @@ func (m *HTTPMiddleware) Wrap(handlerName string, handler http.Handler) http.Han
 
 		// Extract context from incoming headers
 		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-		
+
 		// Start span
 		spanName := handlerName
 		if spanName == "" {
 			spanName = r.URL.Path
 		}
-		
+
 		ctx, span := m.tracer.StartSpan(ctx, spanName, trace.WithAttributes(
 			attribute.String("http.method", r.Method),
 			attribute.String("http.url", r.URL.String()),
@@ -47,7 +47,7 @@ func (m *HTTPMiddleware) Wrap(handlerName string, handler http.Handler) http.Han
 			attribute.String("http.user_agent", r.UserAgent()),
 			attribute.String("http.remote_addr", r.RemoteAddr),
 		))
-		
+
 		defer span.End()
 
 		// Add request ID if not present
@@ -99,7 +99,7 @@ func InjectHeaders(ctx context.Context, headers http.Header) {
 	if ctx == nil {
 		return
 	}
-	
+
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(headers))
 }
 
@@ -108,7 +108,7 @@ func ExtractHeaders(ctx context.Context, headers http.Header) context.Context {
 	if headers == nil {
 		return ctx
 	}
-	
+
 	return otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(headers))
 }
 

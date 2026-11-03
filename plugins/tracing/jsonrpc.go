@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"github.com/gin-gonic/gin"
 )
 
 // JSONRPCInterceptor provides JSON-RPC tracing middleware
@@ -80,13 +80,14 @@ func (i *JSONRPCInterceptor) Middleware() gin.HandlerFunc {
 func (i *JSONRPCInterceptor) handleJSONRPCSpecific(c *gin.Context, span trace.Span) {
 	// Try to extract JSON-RPC method from request body or query
 	method := "unknown"
-	
+
 	// For GET requests, check query parameters
-	if c.Request.Method == "GET" {
+	switch c.Request.Method {
+	case "GET":
 		if methodParam := c.Query("method"); methodParam != "" {
 			method = methodParam
 		}
-	} else if c.Request.Method == "POST" {
+	case "POST":
 		// For POST requests, we could parse the body to extract method
 		// but this would consume the request body, so we'll use a different approach
 		// In a real implementation, you might want to use a request wrapper
@@ -110,7 +111,7 @@ func (i *JSONRPCInterceptor) WrapHandler(methodName string, handler gin.HandlerF
 		}
 
 		ctx := c.Request.Context()
-		
+
 		// Start span for specific method
 		spanName := fmt.Sprintf("jsonrpc.%s", methodName)
 		ctx, span := i.tracer.StartSpan(ctx, spanName, trace.WithAttributes(
