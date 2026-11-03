@@ -2,8 +2,12 @@
 package alert
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -44,9 +48,9 @@ type Channel interface {
 
 // Config holds alert manager configuration
 type Config struct {
-	Enabled       bool          `yaml:"enabled" json:"enabled"`
-	BufferSize    int           `yaml:"buffer_size" json:"buffer_size"`
-	FlushInterval time.Duration `yaml:"flush_interval" json:"flush_interval"`
+	Enabled       bool            `yaml:"enabled" json:"enabled"`
+	BufferSize    int             `yaml:"buffer_size" json:"buffer_size"`
+	FlushInterval time.Duration   `yaml:"flush_interval" json:"flush_interval"`
 	Channels      []ChannelConfig `yaml:"channels" json:"channels"`
 }
 
@@ -67,6 +71,8 @@ type Manager struct {
 	stopCh    chan struct{}
 	handlers  map[string][]AlertHandler
 	mu        sync.RWMutex
+	closeOnce sync.Once
+	closed    bool
 }
 
 // AlertHandler is a function that handles alerts
@@ -185,6 +191,12 @@ func (m *Manager) Queue(alert Alert) {
 		alert.Timestamp = time.Now()
 	}
 
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.closed {
+		return
+	}
+
 	select {
 	case m.buffer <- alert:
 	default:
@@ -199,9 +211,13 @@ func (m *Manager) Queue(alert Alert) {
 
 // Close closes the alert manager
 func (m *Manager) Close() error {
-	close(m.stopCh)
+	m.closeOnce.Do(func() {
+		m.mu.Lock()
+		m.closed = true
+		close(m.stopCh)
+		m.mu.Unlock()
+	})
 	m.wg.Wait()
-	close(m.buffer)
 	return nil
 }
 
@@ -216,18 +232,21 @@ func (m *Manager) processLoop() {
 	for {
 		select {
 		case <-m.stopCh:
-			// Process remaining alerts
-			for alert := range m.buffer {
-				batch = append(batch, alert)
-				if len(batch) >= 100 {
-					m.flush(batch)
-					batch = batch[:0]
+			for {
+				select {
+				case alert := <-m.buffer:
+					batch = append(batch, alert)
+					if len(batch) >= 100 {
+						m.flush(batch)
+						batch = batch[:0]
+					}
+				default:
+					if len(batch) > 0 {
+						m.flush(batch)
+					}
+					return
 				}
 			}
-			if len(batch) > 0 {
-				m.flush(batch)
-			}
-			return
 
 		case alert := <-m.buffer:
 			batch = append(batch, alert)
@@ -264,6 +283,10 @@ type LogChannel struct {
 	logger interface{}
 }
 
+type printfLogger interface {
+	Printf(format string, args ...any)
+}
+
 // NewLogChannel creates a new log channel
 func NewLogChannel(name string, logger interface{}) *LogChannel {
 	return &LogChannel{name: name, logger: logger}
@@ -276,21 +299,33 @@ func (c *LogChannel) Name() string {
 
 // Send sends an alert to the log
 func (c *LogChannel) Send(ctx context.Context, alert Alert) error {
-	// Implementation depends on your logger
-	fmt.Printf("[ALERT][%s] %s: %s\n", alert.Level, alert.Title, alert.Message)
+	if logger, ok := c.logger.(printfLogger); ok {
+		logger.Printf("[ALERT][%s] %s: %s", alert.Level, alert.Title, alert.Message)
+	} else {
+		log.Printf("[ALERT][%s] %s: %s", alert.Level, alert.Title, alert.Message)
+	}
 	return nil
 }
 
 // WebhookChannel is a channel that sends alerts via webhook
 type WebhookChannel struct {
-	name   string
-	url    string
+	name    string
+	url     string
 	headers map[string]string
+	client  *http.Client
 }
 
 // NewWebhookChannel creates a new webhook channel
 func NewWebhookChannel(name, url string, headers map[string]string) *WebhookChannel {
-	return &WebhookChannel{name: name, url: url, headers: headers}
+	return NewWebhookChannelWithClient(name, url, headers, nil)
+}
+
+// NewWebhookChannelWithClient creates a webhook channel using a custom HTTP client.
+func NewWebhookChannelWithClient(name, url string, headers map[string]string, client *http.Client) *WebhookChannel {
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	return &WebhookChannel{name: name, url: url, headers: headers, client: client}
 }
 
 // Name returns the channel name
@@ -300,8 +335,27 @@ func (c *WebhookChannel) Name() string {
 
 // Send sends an alert via webhook
 func (c *WebhookChannel) Send(ctx context.Context, alert Alert) error {
-	// Implementation would use http.Client to POST to webhook URL
-	fmt.Printf("[WEBHOOK][%s] Would send to %s: %s\n", c.name, c.url, alert.Title)
+	body, err := json.Marshal(alert)
+	if err != nil {
+		return fmt.Errorf("marshal alert for webhook %q: %w", c.name, err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create webhook request for %q: %w", c.name, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for key, value := range c.headers {
+		req.Header.Set(key, value)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send webhook %q: %w", c.name, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("webhook %q returned status %s", c.name, resp.Status)
+	}
 	return nil
 }
 
