@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -15,21 +16,21 @@ import (
 )
 
 const (
-	fcmEndpoint        = "https://fcm.googleapis.com/v1/projects/%s/messages:send"
-	fcmBatchEndpoint   = "https://fcm.googleapis.com/batch"
-	fcmTopicEndpoint   = "https://iid.googleapis.com/iid/v1:batchAdd"
-	fcmUnsubEndpoint   = "https://iid.googleapis.com/iid/v1:batchRemove"
-	fcmLegacyEndpoint  = "https://fcm.googleapis.com/fcm/send"
-	maxFCMTokens       = 500
-	defaultFCMTimeout  = 30 * time.Second
+	fcmEndpoint       = "https://fcm.googleapis.com/v1/projects/%s/messages:send"
+	fcmBatchEndpoint  = "https://fcm.googleapis.com/batch"
+	fcmTopicEndpoint  = "https://iid.googleapis.com/iid/v1:batchAdd"
+	fcmUnsubEndpoint  = "https://iid.googleapis.com/iid/v1:batchRemove"
+	fcmLegacyEndpoint = "https://fcm.googleapis.com/fcm/send"
+	maxFCMTokens      = 500
+	defaultFCMTimeout = 30 * time.Second
 )
 
 // FCMClient is the Firebase Cloud Messaging client
 type FCMClient struct {
-	config     Config
-	httpClient *http.Client
+	config      Config
+	httpClient  *http.Client
 	tokenSource oauth2.TokenSource
-	projectID  string
+	projectID   string
 }
 
 // NewFCMClient creates a new FCM client
@@ -69,9 +70,11 @@ func (c *FCMClient) setupTokenSource() error {
 	if c.config.FCM.ServiceAccountKey != "" {
 		credentials = []byte(c.config.FCM.ServiceAccountKey)
 	} else if c.config.FCM.ServiceAccountKeyPath != "" {
-		// In a real implementation, read from file
-		// For now, we'll expect the key content to be provided
-		return fmt.Errorf("service account key path not implemented, please use ServiceAccountKey")
+		var err error
+		credentials, err = os.ReadFile(c.config.FCM.ServiceAccountKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to read service account key file: %w", err)
+		}
 	}
 
 	if len(credentials) == 0 {
@@ -165,10 +168,10 @@ func (c *FCMClient) sendV1(ctx context.Context, notification *Notification, toke
 
 	return &Response{
 		Success:   true,
-		MessageID:  result.Name,
-		Token:      token,
-		Provider:   ProviderTypeFCM,
-		SentAt:     time.Now(),
+		MessageID: result.Name,
+		Token:     token,
+		Provider:  ProviderTypeFCM,
+		SentAt:    time.Now(),
 	}, nil
 }
 
@@ -233,11 +236,11 @@ func (c *FCMClient) sendLegacy(ctx context.Context, notification *Notification, 
 
 	if result.Failure > 0 && len(result.Results) > 0 {
 		return &Response{
-			Success: false,
-			Token:   token,
-			Error:   c.mapLegacyError(result.Results[0].Error),
+			Success:  false,
+			Token:    token,
+			Error:    c.mapLegacyError(result.Results[0].Error),
 			Provider: ProviderTypeFCM,
-			SentAt:  time.Now(),
+			SentAt:   time.Now(),
 		}, nil
 	}
 
@@ -495,7 +498,7 @@ func (c *FCMClient) manageTopic(ctx context.Context, tokens []string, topic stri
 	}
 
 	payload := map[string]interface{}{
-		"to":                 "/topics/" + topic,
+		"to":                  "/topics/" + topic,
 		"registration_tokens": tokens,
 	}
 
@@ -696,13 +699,15 @@ func (c *FCMClient) parseErrorResponse(body []byte, statusCode int, token string
 			Message string `json:"message"`
 			Status  string `json:"status"`
 			Details []struct {
-				Type     string `json:"@type"`
+				Type      string `json:"@type"`
 				ErrorCode string `json:"errorCode,omitempty"`
 			} `json:"details"`
 		} `json:"error"`
 	}
 
-	json.Unmarshal(body, &errorResp)
+	if err := json.Unmarshal(body, &errorResp); err != nil {
+		return nil, fmt.Errorf("decode FCM error response: %w", err)
+	}
 
 	err := &Error{
 		Code:    errorResp.Error.Status,

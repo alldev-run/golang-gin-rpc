@@ -80,10 +80,10 @@ func TestNotification_WithDeepLink(t *testing.T) {
 
 func TestNotification_IsValid(t *testing.T) {
 	tests := []struct {
-		name        string
+		name         string
 		notification *Notification
-		wantErr     bool
-		errMsg      string
+		wantErr      bool
+		errMsg       string
 	}{
 		{
 			name: "valid with tokens",

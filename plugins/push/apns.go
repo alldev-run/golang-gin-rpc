@@ -4,18 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/pkcs12"
 )
 
 const (
@@ -42,12 +40,12 @@ type APNsClient struct {
 
 // APNsTokenAuth holds token-based authentication info
 type APNsTokenAuth struct {
-	AuthKey    *ecdsa.PrivateKey
-	KeyID      string
-	TeamID     string
-	BundleID   string
-	Token      string
-	Expiry     time.Time
+	AuthKey  *ecdsa.PrivateKey
+	KeyID    string
+	TeamID   string
+	BundleID string
+	Token    string
+	Expiry   time.Time
 }
 
 // NewAPNsClient creates a new APNs client
@@ -101,8 +99,11 @@ func (c *APNsClient) setupTokenAuth() error {
 	if c.config.APNs.AuthKey != "" {
 		keyData = []byte(c.config.APNs.AuthKey)
 	} else if c.config.APNs.AuthKeyPath != "" {
-		// In production, read from file
-		return fmt.Errorf("auth key path not implemented, please use AuthKey content")
+		var err error
+		keyData, err = os.ReadFile(c.config.APNs.AuthKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to read auth key file: %w", err)
+		}
 	}
 
 	if len(keyData) == 0 {
@@ -389,7 +390,9 @@ func (c *APNsClient) parseErrorResponse(body []byte, statusCode int, token strin
 		Timestamp int64  `json:"timestamp"`
 	}
 
-	json.Unmarshal(body, &errorResp)
+	if err := json.Unmarshal(body, &errorResp); err != nil {
+		return nil, fmt.Errorf("decode APNs error response: %w", err)
+	}
 
 	err := &Error{
 		Code:    errorResp.Reason,
@@ -459,28 +462,4 @@ func (c *APNsClient) parseErrorResponse(body []byte, statusCode int, token strin
 		Provider: ProviderTypeAPNs,
 		SentAt:   time.Now(),
 	}, nil
-}
-
-// Helper function to parse PKCS12 certificate (for certificate auth)
-func parsePKCS12(certData []byte, password string) (*tls.Certificate, error) {
-	blocks, err := pkcs12.ToPEM(certData, password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode PKCS12: %w", err)
-	}
-
-	var certPEM, keyPEM []byte
-	for _, block := range blocks {
-		if block.Type == "CERTIFICATE" {
-			certPEM = append(certPEM, pem.EncodeToMemory(block)...)
-		} else if block.Type == "PRIVATE KEY" || strings.Contains(block.Type, "PRIVATE KEY") {
-			keyPEM = append(keyPEM, pem.EncodeToMemory(block)...)
-		}
-	}
-
-	cert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load X509 key pair: %w", err)
-	}
-
-	return &cert, nil
 }

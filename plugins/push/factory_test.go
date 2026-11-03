@@ -138,27 +138,27 @@ func TestNewClient_UnsupportedProvider(t *testing.T) {
 
 func TestCreateClient(t *testing.T) {
 	tests := []struct {
-		name      string
-		provider  string
-		wantErr   bool
+		name        string
+		provider    string
+		wantErr     bool
 		errContains string
 	}{
 		{
-			name:      "valid FCM",
-			provider:  "fcm",
-			wantErr:   true, // Will error due to missing credentials, but provider parsing works
+			name:        "valid FCM",
+			provider:    "fcm",
+			wantErr:     true, // Will error due to missing credentials, but provider parsing works
 			errContains: "invalid push notification config",
 		},
 		{
-			name:      "valid APNs",
-			provider:  "apns",
-			wantErr:   true,
+			name:        "valid APNs",
+			provider:    "apns",
+			wantErr:     true,
 			errContains: "invalid push notification config",
 		},
 		{
-			name:      "invalid provider",
-			provider:  "invalid",
-			wantErr:   true,
+			name:        "invalid provider",
+			provider:    "invalid",
+			wantErr:     true,
 			errContains: "unsupported push provider type",
 		},
 	}
