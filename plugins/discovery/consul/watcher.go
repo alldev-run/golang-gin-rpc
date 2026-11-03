@@ -2,11 +2,12 @@ package consul
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 
+	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
+	"go.uber.org/zap"
 )
 
 // ServiceWatcher 服务监听器
@@ -65,7 +66,7 @@ func NewServiceWatcher(ctx context.Context, addr string, serviceName string) (*S
 	// 3. 在独立协程中运行（类似 Swoole 的异步协程）
 	go func() {
 		if err := plan.Run(addr); err != nil {
-			fmt.Printf("Consul watch error: %v\n", err)
+			logger.Errorf("Consul watch error", zap.Error(err))
 		}
 	}()
 

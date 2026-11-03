@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.etcd.io/etcd/client/v3"
+	"log"
 	"sync/atomic"
 )
 
@@ -77,7 +78,9 @@ func (sw *ServiceWatcher) watchLoop() {
 
 			// 监听到变化，重新触发更新
 			// 简单起见，这里直接全量更新；复杂场景下建议针对 Event 做增量 Patch
-			sw.initWithFullPull()
+			if err := sw.initWithFullPull(); err != nil {
+				log.Printf("etcd watcher full pull failed: %v", err)
+			}
 		}
 	}
 }

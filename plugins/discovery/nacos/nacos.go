@@ -173,9 +173,7 @@ func (r *Registry) GetAllServices(ctx context.Context) ([]string, error) {
 	}
 
 	names := make([]string, 0, len(services.Doms))
-	for _, dom := range services.Doms {
-		names = append(names, dom)
-	}
+	names = append(names, services.Doms...)
 	return names, nil
 }
 

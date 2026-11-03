@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -51,7 +52,9 @@ func (r *Registry) Register(ctx context.Context, inst *ServiceInstance) error {
 
 	// 1. 如果已存在，先注销旧的（防止重复注册导致租约泄露）
 	if _, ok := r.leases[key]; ok {
-		r.deregisterUnlocked(ctx, key)
+		if err := r.deregisterUnlocked(ctx, key); err != nil {
+			return fmt.Errorf("etcd deregister existing service: %w", err)
+		}
 	}
 
 	// 2. 创建租约 (TTL 10s)
@@ -139,8 +142,14 @@ func (r *Registry) GetService(ctx context.Context, serviceName string) ([]*Servi
 func (r *Registry) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	var closeErrors []error
 	for key := range r.leases {
-		r.deregisterUnlocked(context.Background(), key)
+		if err := r.deregisterUnlocked(context.Background(), key); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("etcd deregister %q: %w", key, err))
+		}
 	}
-	return r.client.Close()
+	if err := r.client.Close(); err != nil {
+		closeErrors = append(closeErrors, err)
+	}
+	return errors.Join(closeErrors...)
 }

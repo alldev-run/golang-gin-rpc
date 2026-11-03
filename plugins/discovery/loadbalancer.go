@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"sync"
 )
 
@@ -22,20 +23,20 @@ const (
 
 // LoadBalancer provides load balancing for service instances
 type LoadBalancer struct {
-	strategy    LoadBalancerStrategy
-	instances   []*ServiceInstance
+	strategy     LoadBalancerStrategy
+	instances    []*ServiceInstance
 	currentIndex int
-	mu          sync.RWMutex
-	connections map[string]int // Track connections for least_conn strategy
+	mu           sync.RWMutex
+	connections  map[string]int // Track connections for least_conn strategy
 }
 
 // NewLoadBalancer creates a new load balancer
 func NewLoadBalancer(strategy LoadBalancerStrategy) *LoadBalancer {
 	return &LoadBalancer{
-		strategy:    strategy,
-		instances:   make([]*ServiceInstance, 0),
+		strategy:     strategy,
+		instances:    make([]*ServiceInstance, 0),
 		currentIndex: 0,
-		connections: make(map[string]int),
+		connections:  make(map[string]int),
 	}
 }
 
@@ -45,14 +46,14 @@ func (lb *LoadBalancer) UpdateInstances(instances []*ServiceInstance) {
 	defer lb.mu.Unlock()
 
 	lb.instances = instances
-	
+
 	// Reset connection tracking for new instances
 	for _, inst := range instances {
 		if _, exists := lb.connections[inst.ID]; !exists {
 			lb.connections[inst.ID] = 0
 		}
 	}
-	
+
 	// Remove connection tracking for removed instances
 	for id := range lb.connections {
 		found := false
@@ -107,14 +108,29 @@ func (lb *LoadBalancer) random() *ServiceInstance {
 
 // weightedRandom implements weighted random load balancing
 func (lb *LoadBalancer) weightedRandom() *ServiceInstance {
-	// For now, use equal weights. In a real implementation, you would parse weights from metadata
-	totalWeight := len(lb.instances)
-	if totalWeight == 0 {
-		return lb.instances[0]
+	totalWeight := 0
+	for _, instance := range lb.instances {
+		totalWeight += instanceWeight(instance)
 	}
-
 	target := rand.Intn(totalWeight)
-	return lb.instances[target]
+	for _, instance := range lb.instances {
+		target -= instanceWeight(instance)
+		if target < 0 {
+			return instance
+		}
+	}
+	return lb.instances[len(lb.instances)-1]
+}
+
+func instanceWeight(instance *ServiceInstance) int {
+	if instance == nil || instance.Payload == nil {
+		return 1
+	}
+	weight, err := strconv.Atoi(instance.Payload["weight"])
+	if err != nil || weight <= 0 {
+		return 1
+	}
+	return weight
 }
 
 // leastConn implements least connections load balancing
@@ -193,7 +209,7 @@ func (lb *LoadBalancer) SetStrategy(strategy LoadBalancerStrategy) {
 func (lb *LoadBalancer) GetInstances() []*ServiceInstance {
 	lb.mu.RLock()
 	defer lb.mu.RUnlock()
-	
+
 	instances := make([]*ServiceInstance, len(lb.instances))
 	copy(instances, lb.instances)
 	return instances
@@ -321,8 +337,8 @@ func (ct *ConnectionTracker) Close() {
 
 // ServiceSelector provides intelligent service selection
 type ServiceSelector struct {
-	registry   *ServiceRegistry
-	manager    *ServiceDiscoveryManager
+	registry        *ServiceRegistry
+	manager         *ServiceDiscoveryManager
 	defaultStrategy LoadBalancerStrategy
 }
 
@@ -342,7 +358,7 @@ func (ss *ServiceSelector) SelectInstance(ctx context.Context, serviceName, clie
 	if !exists {
 		// Create a new load balancer with default strategy
 		lb = ss.registry.RegisterService(serviceName, ss.defaultStrategy)
-		
+
 		// Get initial instances
 		instances, err := ss.manager.GetService(ctx, serviceName)
 		if err != nil {
@@ -378,10 +394,10 @@ func (ss *ServiceSelector) UpdateService(ctx context.Context, serviceName string
 func (ss *ServiceSelector) SetServiceStrategy(serviceName string, strategy LoadBalancerStrategy) {
 	lb, exists := ss.registry.GetLoadBalancer(serviceName)
 	if !exists {
-		lb = ss.registry.RegisterService(serviceName, strategy)
-	} else {
-		lb.SetStrategy(strategy)
+		ss.registry.RegisterService(serviceName, strategy)
+		return
 	}
+	lb.SetStrategy(strategy)
 }
 
 // GetRegistry returns the service registry

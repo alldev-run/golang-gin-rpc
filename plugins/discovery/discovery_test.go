@@ -37,7 +37,7 @@ func (m *mockDiscovery) Deregister(ctx context.Context, instance *ServiceInstanc
 	if instances == nil {
 		return nil
 	}
-	
+
 	for i, inst := range instances {
 		if inst.ID == instance.ID {
 			m.services[instance.Name] = append(instances[:i], instances[i+1:]...)
@@ -65,7 +65,7 @@ func TestNewDiscovery(t *testing.T) {
 		Address: "127.0.0.1:8500",
 		Timeout: 5 * time.Second,
 	}
-	
+
 	discovery, err := NewDiscovery(consulConfig)
 	if err != nil {
 		// Consul is not running, this is expected in test environment
@@ -82,7 +82,7 @@ func TestNewDiscovery(t *testing.T) {
 		Address: "127.0.0.1:2379",
 		Timeout: 5 * time.Second,
 	}
-	
+
 	discovery, err = NewDiscovery(etcdConfig)
 	if err != nil {
 		// etcd is not running, this is expected in test environment
@@ -118,7 +118,7 @@ func TestNewDiscovery(t *testing.T) {
 		Address: "127.0.0.1:1234",
 		Timeout: 5 * time.Second,
 	}
-	
+
 	_, err = NewDiscovery(invalidConfig)
 	if err == nil {
 		t.Error("Expected error for invalid discovery type")
@@ -133,7 +133,7 @@ func TestNewDiscovery(t *testing.T) {
 		Address: "127.0.0.1:1234",
 		Timeout: 5 * time.Second,
 	}
-	
+
 	_, err = NewDiscovery(emptyConfig)
 	if err == nil {
 		t.Error("Expected error for empty discovery type")
@@ -322,13 +322,13 @@ func TestDiscoveryMultipleServices(t *testing.T) {
 func TestConsulAdapter(t *testing.T) {
 	// This test would require a running Consul instance
 	// For now, we just test the adapter structure
-	
+
 	// Create a consul adapter with mock discovery
 	adapter := &consulAdapter{registry: nil} // We can't easily mock the consul.Registry
-	
+
 	// Test that the adapter implements the Discovery interface
 	var _ Discovery = adapter
-	
+
 	// In a real test environment with Consul running, we would test:
 	// - Register service
 	// - Get service
@@ -339,13 +339,13 @@ func TestConsulAdapter(t *testing.T) {
 func TestEtcdAdapter(t *testing.T) {
 	// This test would require a running etcd instance
 	// For now, we just test the adapter structure
-	
+
 	// Create an etcd adapter with mock discovery
 	adapter := &etcdAdapter{registry: nil} // We can't easily mock the etcd.Registry
-	
+
 	// Test that the adapter implements the Discovery interface
 	var _ Discovery = adapter
-	
+
 	// In a real test environment with etcd running, we would test:
 	// - Register service
 	// - Get service

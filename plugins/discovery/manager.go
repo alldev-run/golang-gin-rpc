@@ -4,6 +4,8 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -18,6 +20,7 @@ type ManagerConfig struct {
 	RegistryAddress     string        `yaml:"registry_address" json:"registry_address"`
 	Timeout             time.Duration `yaml:"timeout" json:"timeout"`
 	HealthCheckInterval time.Duration `yaml:"health_check_interval" json:"health_check_interval"`
+	HealthCheckTimeout  time.Duration `yaml:"health_check_timeout" json:"health_check_timeout"`
 	AutoRegister        bool          `yaml:"auto_register" json:"auto_register"`
 	ServiceName         string        `yaml:"service_name" json:"service_name"`
 	ServiceAddress      string        `yaml:"service_address" json:"service_address"`
@@ -33,6 +36,7 @@ func DefaultManagerConfig() ManagerConfig {
 		RegistryAddress:     "localhost:8500",
 		Timeout:             30 * time.Second,
 		HealthCheckInterval: 30 * time.Second,
+		HealthCheckTimeout:  2 * time.Second,
 		AutoRegister:        true,
 		ServiceName:         "github.com/alldev-run/golang-gin-rpc",
 		ServiceAddress:      "localhost",
@@ -46,6 +50,7 @@ type ServiceDiscoveryManager struct {
 	config    ManagerConfig
 	discovery Discovery
 	instances map[string]*ServiceInstance
+	unhealthy map[string]bool
 	mu        sync.RWMutex
 	started   bool
 	stopCh    chan struct{}
@@ -57,6 +62,7 @@ func NewServiceDiscoveryManager(config ManagerConfig) (*ServiceDiscoveryManager,
 		return &ServiceDiscoveryManager{
 			config:    config,
 			instances: make(map[string]*ServiceInstance),
+			unhealthy: make(map[string]bool),
 			stopCh:    make(chan struct{}),
 		}, nil
 	}
@@ -77,6 +83,7 @@ func NewServiceDiscoveryManager(config ManagerConfig) (*ServiceDiscoveryManager,
 		config:    config,
 		discovery: discovery,
 		instances: make(map[string]*ServiceInstance),
+		unhealthy: make(map[string]bool),
 		stopCh:    make(chan struct{}),
 	}, nil
 }
@@ -155,6 +162,7 @@ func (m *ServiceDiscoveryManager) Register(ctx context.Context, instance *Servic
 	}
 
 	m.instances[instance.ID] = instance
+	delete(m.unhealthy, instance.ID)
 	logger.Info("Service registered",
 		zap.String("id", instance.ID),
 		zap.String("name", instance.Name),
@@ -177,6 +185,7 @@ func (m *ServiceDiscoveryManager) Deregister(ctx context.Context, instance *Serv
 	}
 
 	delete(m.instances, instance.ID)
+	delete(m.unhealthy, instance.ID)
 	logger.Info("Service deregistered",
 		zap.String("id", instance.ID),
 		zap.String("name", instance.Name))
@@ -325,10 +334,61 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 	m.mu.RUnlock()
 
 	for _, instance := range instances {
-		// Simple health check - in a real implementation, you would check the service health
-		logger.Debug("Health check",
+		timeout := m.config.HealthCheckTimeout
+		if timeout <= 0 {
+			timeout = 2 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		address := net.JoinHostPort(instance.Address, strconv.Itoa(instance.Port))
+		conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
+		cancel()
+		if err == nil {
+			_ = conn.Close()
+			m.mu.Lock()
+			if m.instances[instance.ID] != instance || !m.unhealthy[instance.ID] {
+				m.mu.Unlock()
+				continue
+			}
+			registerCtx, registerCancel := context.WithTimeout(context.Background(), m.config.Timeout)
+			registerErr := m.discovery.Register(registerCtx, instance)
+			registerCancel()
+			if registerErr == nil {
+				delete(m.unhealthy, instance.ID)
+				logger.Info("Re-registered recovered service instance",
+					zap.String("id", instance.ID),
+					zap.String("service", instance.Name),
+					zap.String("address", address))
+			}
+			m.mu.Unlock()
+			continue
+		}
+
+		m.mu.Lock()
+		if m.instances[instance.ID] != instance || m.unhealthy[instance.ID] {
+			m.mu.Unlock()
+			continue
+		}
+		if m.unhealthy == nil {
+			m.unhealthy = make(map[string]bool)
+		}
+		m.unhealthy[instance.ID] = true
+		deregisterCtx, deregisterCancel := context.WithTimeout(context.Background(), m.config.Timeout)
+		deregisterErr := m.discovery.Deregister(deregisterCtx, instance)
+		deregisterCancel()
+		m.mu.Unlock()
+		if deregisterErr != nil {
+			logger.Warn("Marked service instance unhealthy; registry deregistration failed",
+				zap.String("id", instance.ID),
+				zap.String("service", instance.Name),
+				zap.String("address", address),
+				zap.Error(deregisterErr))
+			continue
+		}
+		logger.Warn("Deregistered unhealthy service instance",
+			zap.String("id", instance.ID),
 			zap.String("service", instance.Name),
-			zap.String("address", fmt.Sprintf("%s:%d", instance.Address, instance.Port)))
+			zap.String("address", address),
+			zap.Error(err))
 	}
 }
 
