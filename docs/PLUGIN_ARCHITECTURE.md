@@ -9,7 +9,12 @@
 | 层面 | 机制 | 效果 |
 |---|---|---|
 | **链接期** | 应用只 `import` 需要的插件包 | 未 import 的插件及其重型 SDK 根本不进二进制 |
-| **运行期** | 配置 `plugins.<name>.enabled: false` | 已注册但被禁用的插件跳过 Configure/Start/Stop |
+| **运行期** | 对内置适配器配置 `plugins.<name>.enabled: false` | 已注册但被禁用的内置组件跳过 Configure/Start/Stop |
+
+**内核插件边界：**只有 `internal/bootstrap/plugins_builtin.go` 中列出的 10 个内置组件
+被包装为 `kernel.Plugin`，并参与内核注册、排序及启停配置。其他 `plugins/<name>` 模块是
+可独立导入的 Go 库；除非应用或组合根显式注册、装配，否则不会因为存在
+`plugins.<name>.enabled` 配置项而自动加载或启停。
 
 ## 目录布局
 
@@ -37,20 +42,49 @@ plugins/<name>/       功能插件，每个子目录一个独立 Go 模块
 ## 插件成熟度分级
 
 每个插件按 API 稳定性、测试覆盖、生产验证程度划分为三个等级，便于使用者评估接入风险。
+本次审计只保留原已列为 GA 的插件；GA 门槛为至少一个可核实的生产案例、模块 statement
+coverage ≥50%、README 完整且无占位实现。生产案例未核实前不将 Beta 插件升级为 GA。
 
 | 等级 | 含义 | 承诺 |
 |---|---|---|
-| **GA** | 生产就绪 | 接口稳定（遵循 semver）、测试覆盖完整、已在生产环境验证 |
+| **GA** | 满足审计门槛的稳定组件 | 至少一个可核实的生产案例、statement coverage ≥50%、README 完整、无占位实现 |
 | **Beta** | 功能完整但尚未广泛验证 | 接口基本稳定，允许小幅调整；测试覆盖中等 |
-| **Experimental** | 占位 / 原型 / 接口不稳定 | 允许破坏性变更，可能缺少实现或测试 |
+| **Experimental** | 实验阶段或接口尚未稳定 | 允许破坏性变更，部分能力可能尚未验证 |
 
 ### 当前分级
 
-- **GA**：`db`、`cache`、`gateway`、`rpc`、`discovery`、`auth`、`health`、`metrics`、`tracing`、`middleware`、`websocket`、`messaging`
-- **Beta**：`actor`、`audit`、`bloomfilter`、`circuitbreaker`、`loadbalancer`、`push`、`ratelimit`、`rbac`、`upload`、`configcenter`、`scheduler`、`alert`、`geoip`、`gameserver`
-- **Experimental**：`search`（当前为空壳占位，接口未定义）
+GA 仅保留审计前已列为 GA、且达到覆盖率门槛、README 完整并且无占位实现的插件。
+没有可核实生产案例的插件不升级为 GA；`search` 保持 Experimental。
 
-> 分级随版本演进调整；升级至 GA 的硬性门槛：至少 1 个生产案例 + 完整 README + 关键路径测试覆盖。
+| 插件 | 等级 | statement coverage |
+|---|---|---:|
+| actor | Beta | 78.7% |
+| alert | Beta | 86.6% |
+| audit | Beta | 78.8% |
+| auth | GA | 71.0% |
+| bloomfilter | Beta | 97.4% |
+| cache | GA | 53.1% |
+| circuitbreaker | Beta | 47.2% |
+| configcenter | Beta | 36.5% |
+| db | Beta | 33.5% |
+| discovery | Beta | 40.5% |
+| gameserver | Beta | 91.0% |
+| gateway | GA | 57.2% |
+| geoip | Beta | 29.6% |
+| health | GA | 65.7% |
+| loadbalancer | Beta | 73.9% |
+| messaging | Beta | 34.3% |
+| metrics | GA | 89.4% |
+| middleware | Beta | 37.0% |
+| push | Beta | 33.1% |
+| ratelimit | Beta | 36.6% |
+| rbac | Beta | 89.5% |
+| rpc | GA | 56.2% |
+| scheduler | Beta | 90.8% |
+| search | Experimental | 25.6% |
+| tracing | GA | 50.9% |
+| upload | Beta | 31.7% |
+| websocket | GA | 67.0% |
 
 ## Plugin 契约（pkg/kernel）
 
@@ -96,7 +130,7 @@ func (p *myPlugin) Configure(ctx *kernel.Context) error {
 ```
 kernel.Register（init 或组合根） → Loader.Build() → App.Start(ctx) → App.Stop(ctx)
                                      │
-                                     ├─ 1. 运行期过滤:plugins.<name>.enabled
+                                     ├─ 1. 内置适配器运行期过滤:plugins.<name>.enabled
                                      ├─ 2. Configure（可主动 ErrDisabled）
                                      ├─ 3. 依赖校验（硬依赖必须可用）
                                      └─ 4. 拓扑排序（环检测,注册序决胜）
@@ -142,7 +176,7 @@ framework:
   services: ["rpc", "api-gateway"]
 ```
 
-启动日志（运行期裁剪可观测）：
+启动日志（内置适配器运行期裁剪可观测）：
 
 ```
 kernel: plugin disabled by config   plugin=db
@@ -152,7 +186,7 @@ kernel: starting plugin             plugin=metrics
 
 ## 如何裁剪一个应用
 
-1. **运行期**：在 `config.yaml` 把不需要的内置插件 `enabled: false`
+1. **运行期**：在 `config.yaml` 把不需要的内置组件 `enabled: false`；此机制只覆盖上述 10 个内置适配器
 2. **链接期**：不 import 不需要的插件模块（二进制体积与攻击面同步减小）
 3. 验证：`go tool nm <binary> | grep <重型SDK>` 应无符号
 

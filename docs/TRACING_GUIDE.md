@@ -4,13 +4,14 @@
 
 ## 概述
 
-项目集成了 OpenTelemetry 和 Zipkin，提供完整的分布式链路追踪解决方案。支持：
+项目集成了 OpenTelemetry、Zipkin 和通过 OTLP gRPC 接入的 Jaeger，提供分布式链路追踪能力。支持：
 
 - HTTP 请求追踪
 - gRPC 调用追踪  
 - 自定义业务追踪
 - 跨服务链路传播
 - 与 Zipkin 集成
+- 将 Jaeger 配置为 OTLP gRPC 接收端
 
 ## 快速开始
 
@@ -79,6 +80,8 @@ go run main.go
 | `sample_rate` | 采样率 (0.0-1.0) | `1.0` |
 | `batch_timeout` | 批处理超时 | `5s` |
 | `max_export_batch_size` | 最大批处理大小 | `512` |
+
+Jaeger 使用 OTLP gRPC 接收端，默认端口为 `4317`；旧式 Thrift collector 端点不再使用。
 
 ### 环境配置
 
@@ -334,16 +337,10 @@ func setupGRPCServer() *grpc.Server {
 
 ## 扩展
 
-### 自定义导出器
+### Jaeger / OTLP
 
-可以扩展支持其他追踪后端：
-
-```go
-// 实现 Jaeger 导出器
-func NewJaegerExporter(url string) (sdktrace.SpanExporter, error) {
-    // Jaeger 导出器实现
-}
-```
+Jaeger 通过 OTLP gRPC 接收追踪数据。将 `type` 设为 `jaeger`，并将 `host` 与 `port`
+指向启用了 OTLP 的 Jaeger collector（默认端口 `4317`）；无需实现自定义导出器。
 
 ### 追追踪策略
 

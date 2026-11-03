@@ -106,7 +106,8 @@ session_resume:
 
 - `rate_limit: {rate: 50, burst: 100}`:每连接入站令牌桶,超限报错并由 read-loop 关闭连接
 - `max_connections: 10000`:超限握手直接返回 503
-- `origin_patterns: ["*.example.com"]`:开启跨域校验(默认沿用旧的任意 origin 行为,公网部署务必配置)
+- `origin_patterns: ["*.example.com"]`:允许指定跨域来源;为空时使用库的同源默认策略
+- `allow_any_origin: true`:显式关闭来源校验;仅在确有需要时启用
 - `read_limit: 65536`:单条消息上限
 - `compression: true`:permessage-deflate(无上下文接管,内存友好)
 
@@ -210,7 +211,8 @@ session_resume:
 - `MaxConnections`(连接数上限,0 不限)
 - `SendQueueSize`(每连接发送队列容量,默认 256)
 - `ReadLimit`(单条消息大小上限,0=32KiB,-1 不限)
-- `OriginPatterns`(origin 校验模式,空=沿用任意 origin)
+- `OriginPatterns`(允许来源模式,空=同源默认策略)
+- `AllowAnyOrigin`(显式允许任意来源,默认 false)
 - `Compression`(permessage-deflate)
 - `RateLimit`(每连接入站限流:`rate` 每秒消息数 + `burst` 突发容量)
 - `SessionResume`(会话恢复:`buffer_capacity` 重放缓冲 / `ttl` 会话存活 / `max_sessions`)

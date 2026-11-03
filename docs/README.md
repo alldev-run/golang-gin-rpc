@@ -904,6 +904,6 @@ Apache License 2.0 - See LICENSE file for details.
 ---
 
 For more details, see:
-- [Production Deployment Guide](docs/production-deployment.md)
-- [API Usage Examples](examples/)
-- [Integration Tests](deploy/docker-compose.integration.yml)
+- [Production Deployment Guide](../docs/production-deployment.md)
+- [API Usage Examples](../examples/)
+- [Integration Tests](../deploy/docker-compose.integration.yml)

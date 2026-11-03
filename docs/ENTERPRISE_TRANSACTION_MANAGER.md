@@ -124,6 +124,19 @@ distributedConfig := orm.TransactionConfig{
 }
 ```
 
+## Coordinator HTTP protocol
+
+`CoordinatorURL` is the base URL for the coordinator REST API. The transaction manager sends:
+
+| Operation | Request |
+| --- | --- |
+| Begin | `POST /transactions` with JSON `{"tx_id":"<id>"}` |
+| Commit | `POST /transactions/{id}/commit` |
+| Rollback | `POST /transactions/{id}/rollback` |
+| Status | `GET /transactions/{id}` |
+
+The coordinator must return a 2xx status for successful mutations. The status endpoint returns JSON such as `{"status":"active"}`; supported values are `active`, `committed`, `rolled_back`, and `failed`. Unknown status values and non-2xx responses are errors. Transaction IDs are URL-escaped in path segments. Requests honor their context, and the default HTTP client timeout is 10 seconds.
+
 ## Usage Examples
 
 ### 1. Basic Transaction with Retry
@@ -259,7 +272,7 @@ orm_transaction_duration_seconds
 
 ### Distributed Tracing
 
-Integration with Jaeger for distributed tracing:
+The transaction tracer uses `otel.Tracer(serviceName)` and the application's global OpenTelemetry `TracerProvider` and propagator. Configure the exporter and provider in the application (for example, through `plugins/tracing`). `NewJaegerTracer` remains as a deprecated compatibility constructor for `NewOTelTracer`; it no longer selects a Jaeger exporter itself.
 
 ```go
 // Trace spans are automatically created

@@ -572,6 +572,7 @@ Apache License 2.0 - See `LICENSE` file for details.
 ### 📖 其他文档
 - `docs/README.md` - Database 插件文档（plugins/db）
 - `plugins/discovery/README.md` - 服务发现包文档
+- [变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md)
  
  ## 总结
  

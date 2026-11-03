@@ -28,6 +28,9 @@ tracing:
   sample_rate: 1.0
 ```
 
+使用 Jaeger 时需启用 OTLP gRPC 接收端，并将端口设为 `4317`；`otlp` 类型也可用于
+直接配置 OTLP collector。
+
 ### 2. 服务端配置
 
 JSON-RPC 服务器会自动集成追踪功能，无需额外配置：
