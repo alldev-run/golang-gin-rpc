@@ -3,6 +3,7 @@ package ratelimiter
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -136,7 +137,7 @@ func TestFixedWindowRateLimiter(t *testing.T) {
 	}
 
 	// Wait for window reset
-	time.Sleep(time.Second * 2 + time.Millisecond*100)
+	time.Sleep(time.Second*2 + time.Millisecond*100)
 
 	// Should be allowed again
 	if !limiter.Allow() {
@@ -174,7 +175,7 @@ func TestSlidingWindowRateLimiter(t *testing.T) {
 	}
 
 	// Wait for some requests to slide out of window
-	time.Sleep(time.Second * 2 + time.Millisecond*100)
+	time.Sleep(time.Second*2 + time.Millisecond*100)
 
 	// Should be allowed again
 	if !limiter.Allow() {
@@ -269,7 +270,7 @@ func TestRateLimiter_Context(t *testing.T) {
 func TestRateLimiter_ConcurrentAccess(t *testing.T) {
 	config := Config{
 		Strategy: StrategyTokenBucket,
-		Rate:     100,
+		Rate:     0,
 		Burst:    50,
 	}
 
@@ -282,7 +283,7 @@ func TestRateLimiter_ConcurrentAccess(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	var allowedCount int64
+	var allowedCount atomic.Int64
 
 	// Test concurrent access
 	for i := 0; i < 100; i++ {
@@ -290,19 +291,15 @@ func TestRateLimiter_ConcurrentAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			if limiter.Allow() {
-				allowedCount++
+				allowedCount.Add(1)
 			}
 		}()
 	}
 
 	wg.Wait()
 
-	// Should allow at least burst amount
-	if allowedCount < 50 {
-		t.Errorf("Expected at least 50 allowed requests, got %d", allowedCount)
-	}
-	if allowedCount > 100 {
-		t.Errorf("Expected at most 100 allowed requests, got %d", allowedCount)
+	if got := allowedCount.Load(); got != int64(config.Burst) {
+		t.Errorf("allowed %d requests, want exactly the initial burst of %d with zero refill rate", got, config.Burst)
 	}
 }
 

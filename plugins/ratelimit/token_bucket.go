@@ -13,12 +13,12 @@ import (
 // refill happens in seconds granularity.
 type TokenBucketLimiter struct {
 	requestsPerMinute int
-	burst            int
-	refillPerSecond  int
-	ttl              time.Duration
-	maxKeys          int
-	cleanupInterval  time.Duration
-	lastCleanup      time.Time
+	burst             int
+	refillPerSecond   int
+	ttl               time.Duration
+	maxKeys           int
+	cleanupInterval   time.Duration
+	lastCleanup       time.Time
 
 	mu      sync.Mutex
 	buckets map[string]*tokenBucket
@@ -50,13 +50,13 @@ func NewTokenBucketLimiter(requestsPerMinute, burst int) *TokenBucketLimiter {
 	}
 	return &TokenBucketLimiter{
 		requestsPerMinute: requestsPerMinute,
-		burst:            burst,
-		refillPerSecond:  refill,
-		ttl:              ttl,
-		maxKeys:          100000,
-		cleanupInterval:  time.Minute,
-		lastCleanup:      time.Now(),
-		buckets:          make(map[string]*tokenBucket),
+		burst:             burst,
+		refillPerSecond:   refill,
+		ttl:               ttl,
+		maxKeys:           100000,
+		cleanupInterval:   time.Minute,
+		lastCleanup:       time.Now(),
+		buckets:           make(map[string]*tokenBucket),
 	}
 }
 

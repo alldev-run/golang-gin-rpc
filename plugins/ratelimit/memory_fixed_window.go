@@ -10,12 +10,12 @@ import (
 //
 // It is safe for concurrent use.
 type MemoryFixedWindow struct {
-	requests int
-	window   time.Duration
-	ttl      time.Duration
-	maxKeys  int
+	requests        int
+	window          time.Duration
+	ttl             time.Duration
+	maxKeys         int
 	cleanupInterval time.Duration
-	lastCleanup time.Time
+	lastCleanup     time.Time
 
 	mu      sync.Mutex
 	clients map[string]*bucket
@@ -39,13 +39,13 @@ func NewMemoryFixedWindow(requests int, window time.Duration) *MemoryFixedWindow
 		ttl = time.Minute
 	}
 	return &MemoryFixedWindow{
-		requests: requests,
-		window:   window,
-		ttl:      ttl,
-		maxKeys:  100000,
+		requests:        requests,
+		window:          window,
+		ttl:             ttl,
+		maxKeys:         100000,
 		cleanupInterval: window,
-		lastCleanup: time.Now(),
-		clients:  make(map[string]*bucket),
+		lastCleanup:     time.Now(),
+		clients:         make(map[string]*bucket),
 	}
 }
 
