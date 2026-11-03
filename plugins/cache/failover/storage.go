@@ -2,11 +2,11 @@
 package failover
 
 import (
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,8 +28,8 @@ type Storage interface {
 
 // CacheEntry represents a cached item with metadata.
 type CacheEntry struct {
-	Data      interface{} `json:"data"`
-	Timestamp time.Time   `json:"timestamp"`
+	Data      interface{}   `json:"data"`
+	Timestamp time.Time     `json:"timestamp"`
 	TTL       time.Duration `json:"ttl"`
 }
 
@@ -54,17 +54,23 @@ func NewMemoryStorage() *MemoryStorage {
 // Get retrieves a value from memory storage.
 func (m *MemoryStorage) Get(ctx context.Context, key string) (interface{}, bool) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	entry, exists := m.cache[key]
-	if !exists || entry.IsExpired() {
-		if exists {
-			delete(m.cache, key)
-		}
+	if !exists {
+		m.mu.RUnlock()
 		return nil, false
 	}
+	if !entry.IsExpired() {
+		m.mu.RUnlock()
+		return entry.Data, true
+	}
+	m.mu.RUnlock()
 
-	return entry.Data, true
+	m.mu.Lock()
+	if current, ok := m.cache[key]; ok && current == entry && current.IsExpired() {
+		delete(m.cache, key)
+	}
+	m.mu.Unlock()
+	return nil, false
 }
 
 // Set stores a value in memory storage.
@@ -248,7 +254,7 @@ func (f *FileStorage) Clear(ctx context.Context) error {
 // Keys returns all keys in file storage.
 func (f *FileStorage) Keys(ctx context.Context) []string {
 	f.mu.RLock()
-	defer f.mu.Unlock()
+	defer f.mu.RUnlock()
 
 	files, err := os.ReadDir(f.directory)
 	if err != nil {
@@ -501,19 +507,19 @@ func (m *MemcacheStorage) Get(ctx context.Context, key string) (interface{}, boo
 // Set stores a value in Memcache storage.
 func (m *MemcacheStorage) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
 	prefixedKey := m.keyPrefix + key
-	
+
 	// Convert value to bytes
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal value: %w", err)
 	}
-	
+
 	item := &memcache.Item{
 		Key:        prefixedKey,
 		Value:      data,
 		Expiration: int32(ttl.Seconds()),
 	}
-	
+
 	return m.client.Set(ctx, item)
 }
 

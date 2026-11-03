@@ -25,17 +25,17 @@ func (a *QueryCacheAdapter) Get(key string) (interface{}, bool) {
 
 // Set stores a value in the cache (implements ORM QueryCache interface).
 func (a *QueryCacheAdapter) Set(key string, value interface{}, ttl time.Duration) {
-	a.failoverCache.Set(context.Background(), key, value, ttl)
+	_ = a.failoverCache.Set(context.Background(), key, value, ttl)
 }
 
 // Delete removes a value from the cache (implements ORM QueryCache interface).
 func (a *QueryCacheAdapter) Delete(key string) {
-	a.failoverCache.Delete(context.Background(), key)
+	_ = a.failoverCache.Delete(context.Background(), key)
 }
 
 // Clear removes all values from the cache (implements ORM QueryCache interface).
 func (a *QueryCacheAdapter) Clear() {
-	a.failoverCache.Clear(context.Background())
+	_ = a.failoverCache.Clear(context.Background())
 }
 
 // Keys returns all cache keys (implements ORM QueryCache interface).

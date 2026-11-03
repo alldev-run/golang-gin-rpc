@@ -10,15 +10,15 @@ import (
 
 // FailoverCache provides failover support between multiple storage backends.
 type FailoverCache struct {
-	primary           Storage
-	secondary         Storage
-	tertiary          Storage
-	maxRetries        int
-	retryDelay        time.Duration
+	primary             Storage
+	secondary           Storage
+	tertiary            Storage
+	maxRetries          int
+	retryDelay          time.Duration
 	healthCheckInterval time.Duration
-	mu                sync.RWMutex
-	healthTicker      *time.Ticker
-	healthStatus      map[string]bool
+	mu                  sync.RWMutex
+	healthTicker        *time.Ticker
+	healthStatus        map[string]bool
 }
 
 // NewFailoverCache creates a new failover cache with multiple storage backends.
@@ -111,7 +111,7 @@ func (fc *FailoverCache) Get(ctx context.Context, key string) (interface{}, bool
 		if value, found := fc.secondary.Get(ctx, key); found {
 			// Restore to primary for future faster access
 			if fc.isHealthy("primary") && fc.primary != nil {
-				fc.primary.Set(ctx, key, value, 5*time.Minute)
+				_ = fc.primary.Set(ctx, key, value, 5*time.Minute)
 			}
 			return value, true
 		}
@@ -122,10 +122,10 @@ func (fc *FailoverCache) Get(ctx context.Context, key string) (interface{}, bool
 		if value, found := fc.tertiary.Get(ctx, key); found {
 			// Restore to primary and secondary
 			if fc.isHealthy("primary") && fc.primary != nil {
-				fc.primary.Set(ctx, key, value, 5*time.Minute)
+				_ = fc.primary.Set(ctx, key, value, 5*time.Minute)
 			}
 			if fc.isHealthy("secondary") && fc.secondary != nil {
-				fc.secondary.Set(ctx, key, value, 5*time.Minute)
+				_ = fc.secondary.Set(ctx, key, value, 5*time.Minute)
 			}
 			return value, true
 		}
@@ -296,15 +296,13 @@ func (fc *FailoverCache) startHealthCheck() {
 		fc.mu.RLock()
 		ticker := fc.healthTicker
 		fc.mu.RUnlock()
-		
+
 		if ticker == nil {
 			break
 		}
-		
-		select {
-		case <-ticker.C:
-			fc.updateHealthStatus()
-		}
+
+		<-ticker.C
+		fc.updateHealthStatus()
 	}
 }
 
@@ -346,25 +344,25 @@ func CreateStorage(storageType StorageType, config interface{}) (Storage, error)
 	switch storageType {
 	case StorageTypeMemory:
 		return NewMemoryStorage(), nil
-		
+
 	case StorageTypeFile:
 		if fileConfig, ok := config.(FileStorageConfig); ok {
 			return NewFileStorage(fileConfig)
 		}
 		return nil, fmt.Errorf("invalid file storage configuration")
-		
+
 	case StorageTypeRedis:
 		if redisConfig, ok := config.(RedisStorageConfig); ok {
 			return NewRedisStorage(redisConfig)
 		}
 		return nil, fmt.Errorf("invalid redis storage configuration")
-		
+
 	case StorageTypeMemcache:
 		if memcacheConfig, ok := config.(MemcacheStorageConfig); ok {
 			return NewMemcacheStorage(memcacheConfig)
 		}
 		return nil, fmt.Errorf("invalid memcache storage configuration")
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported storage type: %s", storageType)
 	}
@@ -386,7 +384,7 @@ func NewFailoverCacheFromConfig(config Config) (*FailoverCache, error) {
 		switch StorageType(storageType) {
 		case StorageTypeMemory:
 			storage = NewMemoryStorage()
-			
+
 		case StorageTypeFile:
 			fileConfig := FileStorageConfig{
 				Directory:       config.StoragePath,
@@ -396,16 +394,12 @@ func NewFailoverCacheFromConfig(config Config) (*FailoverCache, error) {
 				CleanupInterval: 10 * time.Minute,
 			}
 			storage, err = NewFileStorage(fileConfig)
-			
+
 		case StorageTypeRedis:
-			// Redis configuration would need to be passed in config
-			// This is a placeholder
-			err = fmt.Errorf("redis storage configuration not provided")
-			
+			storage, err = NewRedisStorage(*config.Redis)
+
 		case StorageTypeMemcache:
-			// Memcache configuration would need to be passed in config
-			// This is a placeholder
-			err = fmt.Errorf("memcache storage configuration not provided")
+			storage, err = NewMemcacheStorage(*config.Memcache)
 		}
 
 		if err == nil && storage != nil {

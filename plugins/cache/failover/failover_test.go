@@ -94,7 +94,7 @@ func TestNewFailoverCache(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{
 		MaxRetries:          3,
 		RetryDelay:          time.Millisecond * 100,
@@ -130,7 +130,7 @@ func TestFailoverCache_Get_PrimarySuccess(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -156,7 +156,7 @@ func TestFailoverCache_Get_SecondaryFallback(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -167,7 +167,7 @@ func TestFailoverCache_Get_SecondaryFallback(t *testing.T) {
 
 	// Make primary fail
 	primary.SetShouldFail(true)
-	
+
 	// Set value in secondary
 	secondary.Set(context.Background(), "test-key", "test-value", 0)
 
@@ -185,7 +185,7 @@ func TestFailoverCache_Get_TertiaryFallback(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -197,7 +197,7 @@ func TestFailoverCache_Get_TertiaryFallback(t *testing.T) {
 	// Make primary and secondary fail
 	primary.SetShouldFail(true)
 	secondary.SetShouldFail(true)
-	
+
 	// Set value in tertiary
 	tertiary.Set(context.Background(), "test-key", "test-value", 0)
 
@@ -215,7 +215,7 @@ func TestFailoverCache_Get_AllFail(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -243,7 +243,7 @@ func TestFailoverCache_Set_PrimarySuccess(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -272,7 +272,7 @@ func TestFailoverCache_Set_SecondaryFallback(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -304,7 +304,7 @@ func TestFailoverCache_Delete_PrimarySuccess(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -333,7 +333,7 @@ func TestFailoverCache_Clear_AllStorages(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 	defer func() {
@@ -369,7 +369,7 @@ func TestFailoverCache_Close(t *testing.T) {
 	primary := NewMockStorage()
 	secondary := NewMockStorage()
 	tertiary := NewMockStorage()
-	
+
 	config := Config{MaxRetries: 3}
 	fc := NewFailoverCache(primary, secondary, tertiary, config)
 

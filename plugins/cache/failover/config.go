@@ -2,6 +2,7 @@
 package failover
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -11,23 +12,25 @@ type Config struct {
 	StorageType StorageType `yaml:"storage_type" json:"storage_type"`
 	StoragePath string      `yaml:"storage_path" json:"storage_path"`
 	FileSuffix  string      `yaml:"file_suffix" json:"file_suffix"`
-	
+
 	// Cache behavior
-	MaxRetries      int           `yaml:"max_retries" json:"max_retries"`
-	RetryDelay      time.Duration `yaml:"retry_delay" json:"retry_delay"`
+	MaxRetries          int           `yaml:"max_retries" json:"max_retries"`
+	RetryDelay          time.Duration `yaml:"retry_delay" json:"retry_delay"`
 	HealthCheckInterval time.Duration `yaml:"health_check_interval" json:"health_check_interval"`
-	
+
 	// Fallback order
-	FallbackOrder []string `yaml:"fallback_order" json:"fallback_order"`
+	FallbackOrder []string               `yaml:"fallback_order" json:"fallback_order"`
+	Redis         *RedisStorageConfig    `yaml:"redis" json:"redis,omitempty"`
+	Memcache      *MemcacheStorageConfig `yaml:"memcache" json:"memcache,omitempty"`
 }
 
 // StorageType represents the type of storage backend.
 type StorageType string
 
 const (
-	StorageTypeMemory StorageType = "memory"
-	StorageTypeFile   StorageType = "file"
-	StorageTypeRedis  StorageType = "redis"
+	StorageTypeMemory   StorageType = "memory"
+	StorageTypeFile     StorageType = "file"
+	StorageTypeRedis    StorageType = "redis"
 	StorageTypeMemcache StorageType = "memcache"
 )
 
@@ -55,19 +58,19 @@ type FileStorageConfig struct {
 
 // RedisStorageConfig holds Redis-specific storage configuration.
 type RedisStorageConfig struct {
-	Host         string        `yaml:"host" json:"host"`
-	Port         int           `yaml:"port" json:"port"`
-	Password     string        `yaml:"password" json:"password"`
-	Database     int           `yaml:"database" json:"database"`
-	KeyPrefix    string        `yaml:"key_prefix" json:"key_prefix"`
-	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
+	Host      string        `yaml:"host" json:"host"`
+	Port      int           `yaml:"port" json:"port"`
+	Password  string        `yaml:"password" json:"password"`
+	Database  int           `yaml:"database" json:"database"`
+	KeyPrefix string        `yaml:"key_prefix" json:"key_prefix"`
+	Timeout   time.Duration `yaml:"timeout" json:"timeout"`
 }
 
 // MemcacheStorageConfig holds Memcache-specific storage configuration.
 type MemcacheStorageConfig struct {
-	Hosts        []string      `yaml:"hosts" json:"hosts"`
-	KeyPrefix    string        `yaml:"key_prefix" json:"key_prefix"`
-	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
+	Hosts     []string      `yaml:"hosts" json:"hosts"`
+	KeyPrefix string        `yaml:"key_prefix" json:"key_prefix"`
+	Timeout   time.Duration `yaml:"timeout" json:"timeout"`
 }
 
 // Validate validates the configuration.
@@ -95,6 +98,21 @@ func (c *Config) Validate() error {
 	}
 	if len(c.FallbackOrder) == 0 {
 		c.FallbackOrder = []string{"file", "memory"}
+	}
+	for _, backend := range c.FallbackOrder {
+		switch StorageType(backend) {
+		case StorageTypeMemory, StorageTypeFile:
+		case StorageTypeRedis:
+			if c.Redis == nil {
+				return fmt.Errorf("redis configuration is required when redis is in fallback_order")
+			}
+		case StorageTypeMemcache:
+			if c.Memcache == nil {
+				return fmt.Errorf("memcache configuration is required when memcache is in fallback_order")
+			}
+		default:
+			return fmt.Errorf("unsupported fallback storage type %q", backend)
+		}
 	}
 	return nil
 }

@@ -311,7 +311,7 @@ func MasterSlaveConfig() Config {
 }
 
 // Validate validates the configuration
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
 	if c.Mode == "" {
 		c.Mode = ModeSingle
 	}

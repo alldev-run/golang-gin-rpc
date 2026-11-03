@@ -155,12 +155,12 @@ func TestGetFirstAvailableNode(t *testing.T) {
 		},
 		{
 			name:     "first non-nil at start",
-			nodes:    []*redis.Client{&redis.Client{}, nil, nil},
+			nodes:    []*redis.Client{{}, nil, nil},
 			expected: &redis.Client{},
 		},
 		{
 			name:     "first non-nil in middle",
-			nodes:    []*redis.Client{nil, &redis.Client{}, nil},
+			nodes:    []*redis.Client{nil, {}, nil},
 			expected: &redis.Client{},
 		},
 	}

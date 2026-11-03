@@ -9,7 +9,6 @@ import (
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
-
 // Item represents an item to be stored in memcache.
 type Item struct {
 	Key        string
