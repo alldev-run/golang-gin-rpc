@@ -2,6 +2,8 @@
 
 本文档介绍了如何在 JSON-RPC 服务中启用和使用分布式追踪功能。
 
+OpenTelemetry、Zipkin、Jaeger/OTLP exporter 与采样的项目级配置见[分布式链路追踪指南](../observability/tracing.md)；本文仅说明 JSON-RPC 的接入方式和 span 行为。
+
 ## 概述
 
 JSON-RPC 追踪功能提供了以下能力：
@@ -11,27 +13,9 @@ JSON-RPC 追踪功能提供了以下能力：
 - **链路传播**：支持跨服务的追踪上下文传播
 - **性能监控**：记录请求处理时间和状态
 
-## 配置
+## JSON-RPC 接入
 
-### 1. 启用追踪
-
-在配置文件中启用追踪：
-
-```yaml
-tracing:
-  type: "zipkin"  # 或 jaeger, otlp
-  enabled: true
-  service_name: "jsonrpc-service"
-  host: "localhost"
-  port: 9411
-  endpoint: "/api/v2/spans"
-  sample_rate: 1.0
-```
-
-使用 Jaeger 时需启用 OTLP gRPC 接收端，并将端口设为 `4317`；`otlp` 类型也可用于
-直接配置 OTLP collector。
-
-### 2. 服务端配置
+### 服务端
 
 JSON-RPC 服务器会自动集成追踪功能，无需额外配置：
 
@@ -40,7 +24,7 @@ JSON-RPC 服务器会自动集成追踪功能，无需额外配置：
 server := rpc.NewJSONRPCServer(config)
 ```
 
-### 3. 客户端配置
+### 客户端
 
 使用追踪客户端替代普通客户端：
 
@@ -159,7 +143,7 @@ JSON-RPC 追踪会记录以下属性：
 ## 性能影响
 
 - **最小开销**：当追踪禁用时，几乎没有性能开销
-- **采样支持**：通过 `sample_rate` 控制采样率，减少性能影响
+- **采样支持**：JSON-RPC 遵循项目级追踪采样配置，详见[通用追踪指南](../observability/tracing.md)
 - **异步处理**：追踪数据异步发送，不阻塞请求处理
 
 ## 最佳实践
@@ -187,15 +171,7 @@ err := client.Call(nil, "method", params, &result)
 
 ### 3. 设置合理的采样率
 
-```yaml
-# 开发环境：高采样率
-tracing:
-  sample_rate: 1.0  # 100%
-
-# 生产环境：低采样率
-tracing:
-  sample_rate: 0.1  # 10%
-```
+采样率由项目级追踪配置控制，开发与生产环境的建议见[通用追踪指南](../observability/tracing.md#环境配置)。
 
 ### 4. 使用有意义的方法名
 
@@ -212,17 +188,11 @@ client.Call(ctx, "execute", data, &result)
 
 ### 1. 追踪数据未出现
 
-检查：
-- 追踪是否启用：`tracing.enabled: true`
-- 采样率是否合适：`tracing.sample_rate`
-- 追踪服务器是否可访问
+确认服务端已初始化项目追踪 provider，且客户端使用 `jsonrpc.NewTracedClient`；provider、采样和 exporter 的检查方式见[通用追踪指南](../observability/tracing.md#故障排除)。
 
 ### 2. 性能问题
 
-检查：
-- 采样率是否过高
-- 追踪服务器响应时间
-- 网络连接质量
+检查 JSON-RPC 调用量及其 span 属性，并按[通用追踪指南](../observability/tracing.md)调整采样和 exporter。
 
 ### 3. 链路断裂
 

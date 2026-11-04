@@ -18,6 +18,7 @@ and this project adheres to semantic versioning.
 
 ### Changed
 
+- Documentation is now organized into category directories under `docs/`; see [the documentation index](docs/README.md).
 - **Breaking:** WebSocket servers now use the WebSocket library's same-origin policy when `origin_patterns` is empty. Set `allow_any_origin: true` only when unrestricted cross-origin access is intentional.
 - **Breaking:** `bootstrap.StopFramework` now returns an error; callers should handle shutdown errors.
 - **Breaking:** `jwtx.(*Manager).RevokeUser` and `jwtx.RevokeUser` now return an error.

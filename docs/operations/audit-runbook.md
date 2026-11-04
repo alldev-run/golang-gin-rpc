@@ -78,7 +78,7 @@ Actions:
 Expected insert target:
 
 - table: `audit_events` (or configured table)
-- required columns align with `docs/AUDIT_SECURITY_GUIDE.md`
+- required columns align with [the audit security guide](../security/audit.md)
 
 Validation SQL examples:
 

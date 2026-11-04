@@ -99,7 +99,7 @@ test-coverage: ## Run tests with coverage
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
-test-coverage-plugins: ## Statement coverage report for all plugin modules (source of the docs/PLUGIN_ARCHITECTURE.md table)
+test-coverage-plugins: ## Statement coverage report for all plugin modules (source of the docs/architecture/plugin-architecture.md table)
 	@bash ./scripts/coverage_gate.sh report --all
 
 coverage-gate: ## Enforce the >=50% coverage gate for one plugin: make coverage-gate PLUGIN=db

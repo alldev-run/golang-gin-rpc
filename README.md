@@ -20,7 +20,7 @@
   - 游戏服：`gameserver`（九宫格 AOI 空间管理，供实时游戏房间/大世界邻居查询）
   - 工具类：`alert`、`bloomfilter`、`scheduler`
 
-> 插件机制详见 [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md)。
+> 插件机制详见 [插件架构文档](docs/architecture/plugin-architecture.md)。
  
  ## 项目结构
  
@@ -539,40 +539,15 @@ Apache License 2.0 - See `LICENSE` file for details.
 - John James
 - Email: `nbjohn999@gmail.com`
  
- ## 相关文档
+## 相关文档
 
-### 📚 核心功能文档
-- `docs/API_USAGE_GUIDE.md` - API 使用指南
-- `docs/RPC_GUIDE.md` - RPC 使用指南  
-- `docs/MESSAGING_GUIDE.md` - 消息队列指南
-- `docs/DISCOVERY_GUIDE.md` - 服务发现指南
-- `docs/TRACING_GUIDE.md` - 链路追踪指南
+文档总索引（含完整指南及各插件 README）：[docs/README.md](docs/README.md)。
+[变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md)
 
-### 🗄️ 数据库相关
-- `docs/orm-usage-guide.md` - ORM 使用指南
-- `docs/ENTERPRISE_TRANSACTION_MANAGER.md` - 企业级事务管理器
-
-### 🚀 缓存相关
-- `docs/FAILOVER_CACHE_GUIDE.md` - 故障转移缓存指南
-- `docs/FILE_CACHE_GUIDE.md` - 文件缓存指南
-
-### 🌐 网关相关
-- `docs/gateway.md` - 网关基础指南
-- `docs/gateway-discovery.md` - 网关服务发现
-- `docs/gateway-auth-complete-guide.md` - 网关认证完整指南
-
-### 🔐 安全相关
-- `docs/RPC_AUTHENTICATION.md` - RPC 认证
-- `docs/JSON_RPC_TRACING.md` - JSON RPC 追踪
-
-### 🛠️ 框架相关
-- `docs/gin-router-system.md` - Gin 路由系统
-- `docs/production-deployment.md` - 生产环境部署指南
-
-### 📖 其他文档
-- `docs/README.md` - Database 插件文档（plugins/db）
-- `plugins/discovery/README.md` - 服务发现包文档
-- [变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md)
+- [架构](docs/README.md#架构) · [数据库](docs/README.md#数据库) · [缓存](docs/README.md#缓存)
+- [RPC](docs/README.md#rpc) · [网关](docs/README.md#网关) · [服务发现](docs/README.md#服务发现)
+- [可观测性](docs/README.md#可观测性) · [消息](docs/README.md#消息) · [上传](docs/README.md#上传)
+- [安全](docs/README.md#安全) · [运维](docs/README.md#运维)
  
  ## 总结
  

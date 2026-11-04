@@ -92,5 +92,5 @@ go test ./api/http-gateway -v
 
 ## 相关文档
 
-- `docs/gateway.md`
+- `docs/gateway/README.md`
 - `plugins/gateway/README.md`

@@ -3,7 +3,7 @@
 ## Ops Assets
 
 - Grafana dashboard: `configs/grafana/audit_dashboard.json`
-- Troubleshooting runbook: `docs/AUDIT_TROUBLESHOOTING_RUNBOOK.md`
+- Troubleshooting runbook: [audit runbook](../operations/audit-runbook.md)
 - Alert rules: `configs/audit_alerts.yml`
 
 ## Integration Environment

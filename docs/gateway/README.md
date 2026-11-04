@@ -1,6 +1,6 @@
 # HTTP Gateway 使用指南
 
-本文档面向 `api/http-gateway` 示例与 `plugins/gateway` 组件的实际使用方式，内容已按当前代码实现校准。
+本文档面向 `api/http-gateway` 示例与 `plugins/gateway` 组件，说明启动、配置、服务发现和常见排查方式；内容按当前代码实现校准。
 
 ## 快速启动
 
@@ -58,21 +58,90 @@ load_balancer:
   strategy: "round_robin"
 ```
 
+## 服务发现（静态 & Consul）
+
+- Gateway 服务发现开关：`discovery.enabled`
+- 开启后通过 `plugins/discovery` 按 `discovery.type` 和 `discovery.endpoints` 拉取实例
+- 关闭或拉取失败时，会回退使用每条路由里的静态 `targets`
+- 路由端点会在后台定时刷新
+
+`gateway.DiscoveryConfig` 当前有效字段：
+
+```yaml
+discovery:
+  type: "static"          # static / consul / etcd / zookeeper（由 plugins/discovery 决定）
+  endpoints: []
+  namespace: "default"
+  timeout: "5s"
+  enabled: false
+  options: {}
+```
+
+说明：`discovery_cache_ttl`、`failover_threshold`、`refresh_interval` 等字段不在当前 `gateway.Config` 结构内。
+
+### 静态路由（默认推荐起步）
+
+```yaml
+discovery:
+  type: "static"
+  enabled: false
+  endpoints: []
+
+routes:
+  - path: "/api/user/*"
+    method: "*"
+    protocol: "http"
+    service: "user-service"
+    targets:
+      - "http://localhost:8081"
+      - "http://localhost:8082"
+```
+
+### 启用 Consul 动态发现
+
+```yaml
+discovery:
+  type: "consul"
+  enabled: true
+  endpoints: ["localhost:8500"]
+  namespace: "default"
+  timeout: "5s"
+  options: {}
+
+routes:
+  - path: "/api/user/*"
+    method: "*"
+    protocol: "http"
+    service: "user-service"
+    targets: ["http://localhost:8081"] # discovery 失败时回退
+```
+
+## 运行时行为
+
+1. 启动时初始化 `ServiceDiscovery`
+2. 初始化路由时，若开启发现则优先尝试 `GetServiceEndpoints(service)`
+3. 失败或返回空时，回退到 `route.targets`
+4. 后台定时刷新服务端点并更新负载均衡目标
+
 ## 常见问题
 
 ### `no healthy upstream`
 
-常见原因是路由目标不可达。
+常见原因是路由目标不可达或注册中心没有可用实例：
 
-排查建议：
-
-1. 检查 `routes[*].targets` 对应服务是否真的在监听
+1. 检查 `routes[*].targets` 对应服务是否在监听
 2. 若启用了服务发现，检查注册中心内是否有健康实例
 3. 用 `curl http://localhost:8080/ready` 查看当前健康路由数量
 
+### `service discovery failed`
+
+- 检查 `discovery.endpoints` 可达性
+- 检查 `discovery.type` 与注册中心是否匹配
+- 查看网关日志中的 `Service discovery refresh failed` / `Using static targets`
+
 ### 路由冲突（例如 `/health` 重复注册）
 
-`plugins/gateway` 已注册 `/health`、`/ready`、`/info`、`/metrics`，业务层避免重复注册同路径。
+`plugins/gateway` 已注册 `/health`、`/ready`、`/info`、`/metrics`，业务层应避免重复注册同路径。
 
 ### 配置看起来生效但行为异常
 
@@ -88,5 +157,5 @@ go test ./api/http-gateway -v
 ## 相关文档
 
 - `plugins/gateway/README.md`
-- `docs/gateway-discovery.md`
-- `docs/gateway-auth-complete-guide.md`
+- [Gateway 认证](authentication.md)
+- [服务发现插件](../discovery/README.md)

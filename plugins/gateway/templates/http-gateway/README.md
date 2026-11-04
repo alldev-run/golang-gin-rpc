@@ -92,5 +92,5 @@ go test ./__API_PATH__ -v
 
 ## 相关文档
 
-- `docs/gateway.md`
+- `docs/gateway/README.md`
 - `plugins/gateway/README.md`

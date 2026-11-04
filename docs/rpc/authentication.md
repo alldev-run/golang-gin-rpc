@@ -2,7 +2,7 @@
 
 本文档描述的是 `plugins/rpc` 当前实现的 API Key 认证能力（以 `plugins/rpc/auth.go` 与 `plugins/rpc/server.go` 为准）。
 
-说明：网关侧认证请参考 `docs/gateway-auth-complete-guide.md`。
+说明：网关侧认证请参考[网关认证指南](../gateway/authentication.md)。
 
 ## 能力范围
 

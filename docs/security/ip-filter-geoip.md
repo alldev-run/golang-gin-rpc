@@ -405,9 +405,9 @@ func getCachedCountry(ip string) string {
 
 ## 相关文档
 
-- [Gateway 配置指南](./gateway.md)
-- [生产环境部署](./production-deployment.md)
-- [API 使用指南](./API_USAGE_GUIDE.md)
+- [Gateway 配置指南](../gateway/README.md)
+- [生产环境部署](../operations/production-deployment.md)
+- [API 使用指南](../database/api-usage.md)
 
 ## API 参考
 

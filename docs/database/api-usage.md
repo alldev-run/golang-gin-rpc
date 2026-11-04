@@ -5,13 +5,14 @@ This guide provides detailed examples for using the database client packages.
 ## Table of Contents
 
 1. [Factory Pattern](#factory-pattern)
-2. [Connection Pooling](#connection-pooling)
-3. [Read-Write Splitting](#read-write-splitting)
-4. [Circuit Breaker](#circuit-breaker)
-5. [Slow Query Logging](#slow-query-logging)
-6. [SQL Injection Prevention](#sql-injection-prevention)
-7. [Database Migration](#database-migration)
-8. [Metrics Collection](#metrics-collection)
+2. [MySQL Write Helpers](#mysql-write-helpers)
+3. [Connection Pooling](#connection-pooling)
+4. [Read-Write Splitting](#read-write-splitting)
+5. [Circuit Breaker](#circuit-breaker)
+6. [Slow Query Logging](#slow-query-logging)
+7. [SQL Injection Prevention](#sql-injection-prevention)
+8. [Database Migration](#database-migration)
+9. [Metrics Collection](#metrics-collection)
 
 ## Factory Pattern
 
@@ -119,7 +120,7 @@ esClient, _ := factory.Create(db.Config{
 })
 ```
 
-## Connection Pooling
+## MySQL Write Helpers
 
 ### Insert / Update Helpers (MySQL)
 
@@ -474,79 +475,7 @@ logger.LogManual("complex_operation", duration, err,
 
 ## Database Migration
 
-### Creating Migrations
-
-```go
-import "github.com/alldev-run/golang-gin-rpc/plugins/db/migration"
-
-// Create migrator
-m := migration.New(mysqlClient.DB()) // 参数为 *sql.DB
-
-// Migration 1: Create users table
-m.Add(1, "create_users",
-    `CREATE TABLE users (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );`,
-    `DROP TABLE users;`)
-
-// Migration 2: Create posts table with foreign key
-m.Add(2, "create_posts",
-    `CREATE TABLE posts (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        user_id INT NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        content TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );`,
-    `DROP TABLE posts;`)
-
-// Migration 3: Add index
-m.Add(3, "add_email_index",
-    `CREATE INDEX idx_email ON users(email);`,
-    `DROP INDEX idx_email ON users;`)
-```
-
-### Running Migrations
-
-```go
-ctx := context.Background()
-
-// Initialize migration table
-if err := m.Init(ctx); err != nil {
-    log.Fatal(err)
-}
-
-// Get current version
-version, _ := m.GetCurrentVersion(ctx)
-fmt.Printf("Current version: %d\n", version)
-
-// Run all pending migrations
-if err := m.Up(ctx); err != nil {
-    log.Fatal("Migration failed:", err)
-}
-
-// Check status
-statuses, _ := m.Status(ctx)
-for _, s := range statuses {
-    status := "pending"
-    if s.Applied {
-        status = "applied"
-    }
-    fmt.Printf("Migration %d (%s): %s\n", s.Version, s.Name, status)
-}
-```
-
-### Rolling Back
-
-```go
-// Rollback last migration
-if err := m.Down(ctx); err != nil {
-    log.Fatal("Rollback failed:", err)
-}
-```
+迁移文件生成、执行、状态检查和回滚示例见[数据库插件指南的迁移章节](README.md#database-migration)。
 
 ## Metrics Collection
 

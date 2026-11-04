@@ -6,7 +6,7 @@ This document focuses on the `plugins/db` plugin module in `github.com/alldev-ru
 
 `plugins/db` provides reusable database access components for Go services, including client factory (driver registry), connection pooling extensions, read-write split helpers, ORM builder, migration utilities, and related observability helpers.
 
-> 框架整体的插件机制见 [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md)。
+> 框架整体的插件机制见 [插件架构文档](../architecture/plugin-architecture.md)。
 
 ## Supported Databases (`plugins/db`)
 
@@ -477,97 +477,13 @@ result, err := orm.NewDeleteBuilder(client, "users").Where("status = ?", "inacti
 
 ## Connection Pooling
 
-```go
-// Load configuration
-cfg := poolcb.Config{
-    PoolConfig: pool.Config{
-        MaxSize:           50,
-        HealthCheckPeriod: 30 * time.Second,
-    },
-    BreakerConfig: circuitbreaker.Config{
-        MaxFailures:  5,
-        ResetTimeout: 30 * time.Second,
-    },
-}
-
-// Create pool with circuit breaker
-pool := poolcb.New(cfg, db.NewFactory())
-defer pool.Close()
-
-// Register database
-pool.Register("main-db", db.Config{
-    Type: db.TypeMySQL,
-    MySQL: mysql.Config{
-        Host:     "localhost",
-        Port:     3306,
-        Database: "myapp",
-    },
-})
-
-// Acquire and use
-client, err := pool.Acquire(ctx, "main-db")
-if err != nil {
-    log.Fatal(err)
-}
-defer client.Close()
-```
-
-### SQL Operations with Read-Write Split
-
-```go
-import "github.com/alldev-run/golang-gin-rpc/plugins/db/poolrw"
-
-// Configure master and replicas
-cfg := poolrw.RWPoolConfig{
-    MasterConfig: db.Config{
-        Type: db.TypeMySQL,
-        MySQL: mysql.Config{
-            Host: "master.db.internal",
-            Port: 3306,
-        },
-    },
-    ReplicaConfigs: []db.Config{
-        {
-            Type: db.TypeMySQL,
-            MySQL: mysql.Config{
-                Host: "replica1.db.internal",
-                Port: 3306,
-            },
-        },
-    },
-}
-
-pool, _ := poolrw.New(cfg, db.NewFactory())
-defer pool.Close()
-
-// SELECT goes to replica
-rows, _ := pool.Query(ctx, "SELECT * FROM users")
-
-// INSERT/UPDATE/DELETE goes to master
-result, _ := pool.Exec(ctx, "INSERT INTO logs VALUES (?)", data)
-
-// Transaction always on master
-tx, _ := pool.Begin(ctx, nil)
-```
+连接池、读写分离和连接生命周期的详细示例见[数据库 API 用法](api-usage.md#connection-pooling)。
 
 ## Features
 
 ### 1. Connection Pooling
 
-- Max connection limit
-- Idle connection timeout
-- Health checking
-- Automatic reconnection
-
-```go
-poolConfig := pool.Config{
-    MaxSize:           100,
-    MaxIdleTime:       30 * time.Minute,
-    HealthCheckPeriod: 30 * time.Second,
-    MaxFailures:       3,
-    AcquireTimeout:    5 * time.Second,
-}
-```
+连接池配置与使用示例见[数据库 API 用法](api-usage.md#connection-pooling)。
 
 ### 2. Read-Write Splitting
 
@@ -590,25 +506,7 @@ pool.ForceMaster(false)
 
 ### 3. Circuit Breaker
 
-- Automatic failure detection
-- Fast fail when service is unhealthy
-- Automatic recovery
-
-```go
-// Configure circuit breaker
-breakerConfig := circuitbreaker.Config{
-    MaxFailures:         5,
-    ResetTimeout:        30 * time.Second,
-    HalfOpenMaxRequests: 3,
-    SuccessThreshold:    2,
-}
-
-// Returns ErrCircuitOpen when breaker is open
-client, err := pool.Acquire(ctx, "main-db")
-if errors.Is(err, circuitbreaker.ErrCircuitOpen) {
-    // Service unavailable, use fallback
-}
-```
+熔断器配置、状态和调用示例见[数据库 API 用法](api-usage.md#circuit-breaker)。
 
 ### 4. Slow Query Logging
 
@@ -673,6 +571,12 @@ rows, err := db.Query(query, params...)
 safePattern := sqlprevention.CleanLikePattern("test%") 
 // Result: test\% (escapes special characters)
 ```
+
+## PostgreSQL 批量写入
+
+`postgres.Client.CopyFrom` 使用由 `lib/pq` 支持的 `database/sql` 连接，无法取得 pgx 连接调用 `pgx.CopyFrom`，因此在单个事务中执行分批多行 `INSERT`。每批不超过 PostgreSQL 的 65,535 个参数限制；任一批次失败都会回滚事务。表名和列名按 SQL 标识符引用，值始终作为参数传入。
+
+需要 PostgreSQL COPY 协议处理超大导入时，应使用专用 pgx 连接；`Client.CopyFrom` 不提供该连接。
 
 ## Configuration
 
@@ -789,18 +693,7 @@ for _, s := range statuses {
 
 ## Production Checklist
 
-- [ ] Use environment variables for passwords
-- [ ] Enable SSL/TLS for database connections
-- [ ] Configure connection pool sizes based on database capacity
-- [ ] Set up circuit breaker with appropriate thresholds
-- [ ] Enable slow query logging (threshold: 100-200ms)
-- [ ] Configure Prometheus metrics export
-- [ ] Set up database migration system
-- [ ] Use read-write split for read-heavy workloads
-- [ ] **Enable SQL injection validation for all user inputs**
-- [ ] Use parameterized queries instead of string concatenation
-- [ ] Monitor connection pool usage
-- [ ] Test failover scenarios
+数据库生产部署检查项见[生产部署指南](../operations/production-deployment.md)，此处集中说明驱动、ORM 和数据库 API。
 
 ## API Reference
 
@@ -904,6 +797,6 @@ Apache License 2.0 - See LICENSE file for details.
 ---
 
 For more details, see:
-- [Production Deployment Guide](../docs/production-deployment.md)
-- [API Usage Examples](../examples/)
-- [Integration Tests](../deploy/docker-compose.integration.yml)
+- [Production Deployment Guide](../operations/production-deployment.md)
+- [API Usage Examples](../../examples/)
+- [Integration Tests](../../deploy/docker-compose.integration.yml)

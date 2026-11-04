@@ -777,5 +777,5 @@ A: 项目提供的 `plugins/middleware/auth.go` 中间件功能更丰富，支�
 
 ## 相关文档
 
-- [RPC 认证指南](./RPC_AUTHENTICATION.md)
-- [网关认证完整指南](./gateway-auth-complete-guide.md)
+- [RPC 认证指南](../rpc/authentication.md)
+- [网关认证完整指南](../gateway/authentication.md)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # coverage_gate.sh — per-plugin statement coverage gate & report.
 #
-# The GA/Beta maturity gates are defined in docs/PLUGIN_ARCHITECTURE.md:
+# The GA/Beta maturity gates are defined in docs/architecture/plugin-architecture.md:
 # every GA (and GA-ready Beta) plugin must keep module statement coverage >= 50%.
 # This script is the enforcement point:
 #
@@ -11,14 +11,14 @@
 #   report [--all] [plugin...]  print a coverage table. "--all" covers every
 #                               plugin module (source for the doc table).
 #
-# Keep GATED_PLUGINS in sync with docs/PLUGIN_ARCHITECTURE.md.
+# Keep GATED_PLUGINS in sync with docs/architecture/plugin-architecture.md.
 
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLUGINS_DIR="$ROOT/plugins"
 
-# GA + GA-ready Beta plugins gated at GATE_THRESHOLD (sync with docs/PLUGIN_ARCHITECTURE.md).
+# GA + GA-ready Beta plugins gated at GATE_THRESHOLD (sync with docs/architecture/plugin-architecture.md).
 GATED_PLUGINS=(
   # GA
   auth cache gateway health metrics rpc tracing websocket

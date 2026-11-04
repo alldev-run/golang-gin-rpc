@@ -454,7 +454,7 @@ cd plugins/db && go test ./orm/ -cover
 # 模块级 statement coverage（GA 门槛 >= 50%，CI 强制）
 bash scripts/coverage_gate.sh gate db
 
-# 全部插件模块覆盖率报表（docs/PLUGIN_ARCHITECTURE.md 表格数据来源）
+# 全部插件模块覆盖率报表（docs/architecture/plugin-architecture.md 表格数据来源）
 bash scripts/coverage_gate.sh report --all
 ```
 
