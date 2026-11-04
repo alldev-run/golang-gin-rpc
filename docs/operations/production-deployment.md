@@ -11,6 +11,10 @@
 5. [监控与告警](#监控与告警)
 6. [故障排查](#故障排查)
 7. [性能优化](#性能优化)
+8. [安全建议](#安全建议)
+9. [数据库上线检查清单](#数据库上线检查清单)
+10. [压测与验证](#压测与验证)
+11. [附录](#附录)
 
 ## 架构概述
 
@@ -366,6 +370,21 @@ redisClient.Set(ctx, key, data, 5*time.Minute)
 3. **最小权限**: 数据库用户只授予必要权限
 4. **网络隔离**: 数据库服务器应在私有子网
 5. **审计日志**: 启用数据库审计功能
+
+## 数据库上线检查清单
+
+- [ ] Use environment variables for passwords
+- [ ] Enable SSL/TLS for database connections
+- [ ] Configure connection pool sizes based on database capacity
+- [ ] Set up circuit breaker with appropriate thresholds
+- [ ] Enable slow query logging (threshold: 100-200ms)
+- [ ] Configure Prometheus metrics export
+- [ ] Set up database migration system
+- [ ] Use read-write split for read-heavy workloads
+- [ ] **Enable SQL injection validation for all user inputs**
+- [ ] Use parameterized queries instead of string concatenation
+- [ ] Monitor connection pool usage
+- [ ] Test failover scenarios
 
 ## 压测与验证
 

@@ -286,6 +286,46 @@ err := client.Transaction(ctx, func(tx *sql.Tx) error {
 })
 ```
 
+### Pool-based Read-Write Split (poolrw)
+
+`poolrw` 在连接池之上提供读写分离：SELECT 走从库，写操作和事务走主库。
+
+```go
+import "github.com/alldev-run/golang-gin-rpc/plugins/db/poolrw"
+
+// Configure master and replicas
+cfg := poolrw.RWPoolConfig{
+    MasterConfig: db.Config{
+        Type: db.TypeMySQL,
+        MySQL: mysql.Config{
+            Host: "master.db.internal",
+            Port: 3306,
+        },
+    },
+    ReplicaConfigs: []db.Config{
+        {
+            Type: db.TypeMySQL,
+            MySQL: mysql.Config{
+                Host: "replica1.db.internal",
+                Port: 3306,
+            },
+        },
+    },
+}
+
+pool, _ := poolrw.New(cfg, db.NewFactory())
+defer pool.Close()
+
+// SELECT goes to replica
+rows, _ := pool.Query(ctx, "SELECT * FROM users")
+
+// INSERT/UPDATE/DELETE goes to master
+result, _ := pool.Exec(ctx, "INSERT INTO logs VALUES (?)", data)
+
+// Transaction always on master
+tx, _ := pool.Begin(ctx, nil)
+```
+
 ### Forcing Master for Consistency
 
 ```go

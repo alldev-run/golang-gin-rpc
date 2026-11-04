@@ -693,7 +693,7 @@ for _, s := range statuses {
 
 ## Production Checklist
 
-数据库生产部署检查项见[生产部署指南](../operations/production-deployment.md)，此处集中说明驱动、ORM 和数据库 API。
+数据库生产部署检查项见[生产部署指南 · 数据库上线检查清单](../operations/production-deployment.md#数据库上线检查清单)，此处集中说明驱动、ORM 和数据库 API。
 
 ## API Reference
 
