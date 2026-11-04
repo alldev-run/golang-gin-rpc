@@ -7,6 +7,7 @@ require (
 	github.com/go-zookeeper/zk v1.0.4
 	github.com/hashicorp/consul/api v1.33.4
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
+	go.etcd.io/etcd/api/v3 v3.6.8
 	go.etcd.io/etcd/client/v3 v3.6.8
 	go.uber.org/zap v1.27.1
 )
@@ -70,7 +71,6 @@ require (
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.8 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.8 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
