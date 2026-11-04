@@ -1,28 +1,54 @@
 package upload
 
 import (
+	"bytes"
 	"fmt"
+	"mime/multipart"
 	"os"
 	"testing"
 )
 
 func ExampleUploader_Upload() {
+	dir, err := os.MkdirTemp("", "upload-example-*")
+	if err != nil {
+		return
+	}
+	defer os.RemoveAll(dir)
+
 	config := DefaultConfig()
-	config.UploadDir = "./test_uploads"
-	config.AutoCreateDir = true
+	config.UploadDir = dir
+	config.AllowedExtensions = []string{".txt"}
+	// Short files sniff as application/octet-stream because the uploader
+	// detects MIME from a zero-padded 512-byte buffer.
+	config.AllowedMimeTypes = []string{"text/plain", "application/octet-stream"}
+	config.NamingStrategy = "original"
 
 	uploader := NewUploader(config)
 
-	// Create a test file
-	content := []byte("test file content")
-	result := uploader.UploadFromBytes("test.txt", content)
-
-	if result.Success {
-		fmt.Printf("File uploaded successfully: %s\n", result.SavedFilename)
-		// Clean up
-		os.Remove(result.FilePath)
-		os.Remove(config.UploadDir)
+	// Build a multipart form exactly like an inbound HTTP request would carry.
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "notes.txt")
+	if err != nil {
+		return
 	}
+	if _, err := part.Write([]byte("hello from multipart")); err != nil {
+		return
+	}
+	if err := writer.Close(); err != nil {
+		return
+	}
+	form, err := multipart.NewReader(&body, writer.Boundary()).ReadForm(1 << 20)
+	if err != nil {
+		return
+	}
+	defer func() { _ = form.RemoveAll() }()
+
+	result := uploader.Upload(form.File["file"][0])
+	if result.Success {
+		fmt.Printf("Saved %d bytes as %s\n", result.FileSize, result.SavedFilename)
+	}
+	// Output: Saved 20 bytes as notes.txt
 }
 
 func ExampleConfig() {
@@ -30,15 +56,18 @@ func ExampleConfig() {
 	fmt.Printf("Default upload directory: %s\n", config.UploadDir)
 	fmt.Printf("Max file size: %d bytes\n", config.MaxFileSize)
 	fmt.Printf("Naming strategy: %s\n", config.NamingStrategy)
+	// Output:
+	// Default upload directory: ./uploads
+	// Max file size: 10485760 bytes
+	// Naming strategy: uuid
 }
 
 func TestUploadFromBytes(t *testing.T) {
 	config := DefaultConfig()
-	config.UploadDir = "./test_uploads"
+	config.UploadDir = t.TempDir()
 	config.AutoCreateDir = true
 	config.AllowedExtensions = []string{".txt", ".jpg", ".png", ".pdf"}
 	config.AllowedMimeTypes = []string{"text/plain", "image/jpeg", "image/png", "application/pdf"}
-	defer os.RemoveAll(config.UploadDir)
 
 	uploader := NewUploader(config)
 	content := []byte("test file content")
@@ -67,9 +96,8 @@ func TestUploadValidation(t *testing.T) {
 	config := DefaultConfig()
 	config.MaxFileSize = 100 // 100 bytes
 	config.AllowedExtensions = []string{".txt"}
-	config.UploadDir = "./test_uploads"
+	config.UploadDir = t.TempDir()
 	config.AutoCreateDir = true
-	defer os.RemoveAll(config.UploadDir)
 
 	uploader := NewUploader(config)
 
@@ -95,11 +123,10 @@ func TestUploadValidation(t *testing.T) {
 
 func TestNamingStrategies(t *testing.T) {
 	config := DefaultConfig()
-	config.UploadDir = "./test_uploads"
+	config.UploadDir = t.TempDir()
 	config.AutoCreateDir = true
 	config.AllowedExtensions = []string{".txt", ".jpg", ".png", ".pdf"}
 	config.AllowedMimeTypes = []string{"text/plain", "image/jpeg", "image/png", "application/pdf"}
-	defer os.RemoveAll(config.UploadDir)
 
 	testCases := []struct {
 		strategy string
@@ -122,35 +149,8 @@ func TestNamingStrategies(t *testing.T) {
 			if result.SavedFilename == "" {
 				t.Fatal("Saved filename is empty")
 			}
-
-			os.Remove(result.FilePath)
 		})
 	}
-}
-
-func TestHandlerUpload(t *testing.T) {
-	// HTTP handlers are now in API Gateway layer, not in core upload package
-	t.Skip("HTTP handlers are in API Gateway layer")
-}
-
-func TestAuthUsesConfiguredCredentials(t *testing.T) {
-	// Authentication is handled in API Gateway layer, not in core upload package
-	t.Skip("Authentication is in API Gateway layer")
-}
-
-func TestIssueTokenRequiresAuthAndDownloadWithToken(t *testing.T) {
-	// Token handling is in API Gateway layer, not in core upload package
-	t.Skip("Token handling is in API Gateway layer")
-}
-
-func TestPublicGenerateAndVerifyDownloadToken(t *testing.T) {
-	// Token handling is in API Gateway layer, not in core upload package
-	t.Skip("Token handling is in API Gateway layer")
-}
-
-func TestUploadStreamHandler(t *testing.T) {
-	// HTTP handlers are in API Gateway layer, not in core upload package
-	t.Skip("HTTP handlers are in API Gateway layer")
 }
 
 func TestValidator(t *testing.T) {
@@ -183,12 +183,11 @@ func TestValidator(t *testing.T) {
 
 func TestPathTraversalBlocked(t *testing.T) {
 	config := DefaultConfig()
-	config.UploadDir = "./test_uploads"
+	config.UploadDir = t.TempDir()
 	config.AutoCreateDir = true
 	config.NamingStrategy = "original"
 	config.AllowedExtensions = []string{".txt"}
 	config.AllowedMimeTypes = []string{"text/plain"}
-	defer os.RemoveAll(config.UploadDir)
 
 	uploader := NewUploader(config)
 
