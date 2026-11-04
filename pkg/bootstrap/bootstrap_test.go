@@ -173,86 +173,43 @@ func TestLoadDatabaseConfigNilBootstrap(t *testing.T) {
 	assert.Contains(t, err.Error(), "bootstrap instance is nil")
 }
 
-func TestGetDatabaseFactory(t *testing.T) {
-	boot, err := NewBootstrapWithDefaults()
-	require.NoError(t, err)
-	defer boot.Close()
-
-	factory := GetDatabaseFactory(boot)
-	// Factory is nil when database is not initialized
-	assert.Nil(t, factory)
-}
-
-func TestGetMySQLClient(t *testing.T) {
-	boot, err := NewBootstrapWithDefaults()
-	require.NoError(t, err)
-	defer boot.Close()
-
-	// Test when database is not initialized
-	client, err := GetMySQLClient(boot)
+func TestDependency_NilBootstrap(t *testing.T) {
+	_, err := Dependency[*int](nil, "anything")
 	assert.Error(t, err)
-	assert.Nil(t, client)
-	assert.Contains(t, err.Error(), "database factory not initialized")
-
-	// Test with nil bootstrap
-	client, err = GetMySQLClient(nil)
-	assert.Error(t, err)
-	assert.Nil(t, client)
 	assert.Contains(t, err.Error(), "bootstrap instance is nil")
 }
 
-func TestGetMySQLSQLClient(t *testing.T) {
+func TestDependency_MissingKey(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
 
-	// Test when database is not initialized
-	client, err := GetMySQLSQLClient(boot)
+	_, err = Dependency[*int](boot, "no.such.dependency")
 	assert.Error(t, err)
-	assert.Nil(t, client)
-	assert.Contains(t, err.Error(), "database factory not initialized")
-
-	// Test with nil bootstrap
-	client, err = GetMySQLSQLClient(nil)
-	assert.Error(t, err)
-	assert.Nil(t, client)
-	assert.Contains(t, err.Error(), "bootstrap instance is nil")
+	assert.Contains(t, err.Error(), "dependency not found")
 }
 
-func TestGetRedisClient(t *testing.T) {
+func TestDependency_TypeMismatch(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
 
-	// Test when database is not initialized
-	client, err := GetRedisClient(boot)
+	// errors.initialized is stored as bool; asserting another type must fail.
+	boot.SetDependency("errors.initialized", true)
+	_, err = Dependency[string](boot, "errors.initialized")
 	assert.Error(t, err)
-	assert.Nil(t, client)
-	assert.Contains(t, err.Error(), "database factory not initialized")
-
-	// Test with nil bootstrap
-	client, err = GetRedisClient(nil)
-	assert.Error(t, err)
-	assert.Nil(t, client)
-	assert.Contains(t, err.Error(), "bootstrap instance is nil")
+	assert.Contains(t, err.Error(), "not")
 }
 
-func TestGetPostgresClient(t *testing.T) {
+func TestDependency_TypedHit(t *testing.T) {
 	boot, err := NewBootstrapWithDefaults()
 	require.NoError(t, err)
 	defer boot.Close()
 
-	// Test when database is not initialized
-	client, err := GetPostgresClient(boot)
-	assert.Error(t, err)
-	assert.Nil(t, client)
-	assert.Contains(t, err.Error(), "database factory not initialized")
-
-	// Test with nil bootstrap
-	client, err = GetPostgresClient(nil)
-	assert.Error(t, err)
-	assert.Nil(t, client)
-	assert.Contains(t, err.Error(), "bootstrap instance is nil")
+	boot.SetDependency("cache", "cache-value")
+	got, err := Dependency[string](boot, "cache")
+	assert.NoError(t, err)
+	assert.Equal(t, "cache-value", got)
 }
 
 func TestLoadDatabaseConfigFileNotFound(t *testing.T) {

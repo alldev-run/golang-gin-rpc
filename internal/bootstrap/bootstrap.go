@@ -971,6 +971,12 @@ func (b *Bootstrap) GetDependency(key string) (interface{}, bool) {
 	return v, ok
 }
 
+// SetDependency 注入或覆盖依赖容器中的对象，供应用侧注册自定义依赖，
+// 或测试时构造容器内容。
+func (b *Bootstrap) SetDependency(key string, value interface{}) {
+	b.setDependency(key, value)
+}
+
 // MustGetDependency returns a dependency by key or panics when not found.
 func (b *Bootstrap) MustGetDependency(key string) interface{} {
 	v, ok := b.GetDependency(key)
@@ -1130,14 +1136,6 @@ func (b *Bootstrap) GetMySQLSQLClient() (db.SQLClient, error) {
 		return nil, fmt.Errorf("database factory not initialized")
 	}
 	return b.db.GetMySQLSQLClient()
-}
-
-// GetRedisClient returns the Redis client from the database factory
-func (b *Bootstrap) GetRedisClient() (*redis.Client, error) {
-	if b.db == nil {
-		return nil, fmt.Errorf("database factory not initialized")
-	}
-	return b.db.GetRedis()
 }
 
 // GetPostgresClient returns the PostgreSQL client from the database factory

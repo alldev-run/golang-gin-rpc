@@ -1,3 +1,12 @@
+// Package bootstrap 是框架的便捷组装入口（纯 facade，不 import 任何插件模块）。
+//
+// 两条组装路径：
+//  1. 全量便捷入口（本包）：NewBootstrap + StartFramework 经组合根装配 10 个
+//     内置插件与托管服务，二进制包含全部内置依赖；
+//  2. 最小组装：直接使用 pkg/kernel（依赖闭包不含任何插件），应用按需 import
+//     插件模块并 kernel.Register——未引入的插件及其重型 SDK 不进二进制。
+//
+// 插件对象的类型化访问用 Dependency[T]（应用自行 import 插件包做断言）。
 package bootstrap
 
 import (
@@ -13,12 +22,6 @@ import (
 	internalbootstrap "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	"github.com/alldev-run/golang-gin-rpc/plugins/actor"
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
-	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
-	"github.com/alldev-run/golang-gin-rpc/plugins/upload"
 )
 
 type Bootstrap = internalbootstrap.Bootstrap
@@ -203,58 +206,28 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 	return nil
 }
 
-// GetDatabaseFactory returns the database factory instance
-func GetDatabaseFactory(boot *Bootstrap) *db.Factory {
+// Dependency 按依赖键取回插件对象并断言为具体类型。本包不 import 任何插件
+// 模块（链接期裁剪：应用自行 import 需要的插件包后在此做类型断言），例如：
+//
+//	factory, err := bootstrap.Dependency[*db.Factory](boot, "db.factory")
+//	system, err := bootstrap.Dependency[*actor.System](boot, "actor.system")
+//
+// 依赖键与 internal/bootstrap 的依赖容器一致："db.factory"、"cache"、
+// "rpc.manager"、"discovery.manager"、"tracer"、"auth.manager"、
+// "metrics.collector"、"upload.uploader"、"actor.system"、
+// "gateway"、"websocket.server" 等。
+func Dependency[T any](boot *Bootstrap, key string) (T, error) {
+	var zero T
 	if boot == nil {
-		return nil
+		return zero, fmt.Errorf("bootstrap instance is nil")
 	}
-	return boot.GetDatabaseFactory()
-}
-
-// GetMySQLClient returns the MySQL client from the database factory
-func GetMySQLClient(boot *Bootstrap) (*mysql.Client, error) {
-	if boot == nil {
-		return nil, fmt.Errorf("bootstrap instance is nil")
+	v, ok := boot.GetDependency(key)
+	if !ok {
+		return zero, fmt.Errorf("dependency not found: %s", key)
 	}
-	return boot.GetMySQLClient()
-}
-
-// GetMySQLSQLClient returns the MySQL client as SQLClient interface
-func GetMySQLSQLClient(boot *Bootstrap) (db.SQLClient, error) {
-	if boot == nil {
-		return nil, fmt.Errorf("bootstrap instance is nil")
+	typed, ok := v.(T)
+	if !ok {
+		return zero, fmt.Errorf("dependency %s is %T, not %T", key, v, zero)
 	}
-	return boot.GetMySQLSQLClient()
-}
-
-// GetRedisClient returns the Redis client from the database factory
-func GetRedisClient(boot *Bootstrap) (*redis.Client, error) {
-	if boot == nil {
-		return nil, fmt.Errorf("bootstrap instance is nil")
-	}
-	return boot.GetRedisClient()
-}
-
-// GetPostgresClient returns the PostgreSQL client from the database factory
-func GetPostgresClient(boot *Bootstrap) (*postgres.Client, error) {
-	if boot == nil {
-		return nil, fmt.Errorf("bootstrap instance is nil")
-	}
-	return boot.GetPostgresClient()
-}
-
-// GetUploader returns the upload uploader from bootstrap
-func GetUploader(boot *Bootstrap) (*upload.Uploader, error) {
-	if boot == nil {
-		return nil, fmt.Errorf("bootstrap instance is nil")
-	}
-	return boot.GetUploader(), nil
-}
-
-// GetActorSystem returns the actor system from bootstrap (nil until enabled).
-func GetActorSystem(boot *Bootstrap) *actor.System {
-	if boot == nil {
-		return nil
-	}
-	return boot.GetActorSystem()
+	return typed, nil
 }
