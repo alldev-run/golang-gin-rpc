@@ -20,7 +20,7 @@ GOVET = $(GOCMD) vet
 BUILD_FLAGS = -v
 LDFLAGS = -ldflags "-X main.version=$(shell git describe --tags --always 2>/dev/null || echo 'dev')"
 
-.PHONY: help build run test clean deps fmt vet lint docker-build docker-run proto proto-tools
+.PHONY: help build run test clean deps fmt vet lint docker-build docker-run proto proto-tools test-coverage-plugins coverage-gate
 
 # Default target
 help: ## Show this help message
@@ -98,6 +98,16 @@ test-coverage: ## Run tests with coverage
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+test-coverage-plugins: ## Statement coverage report for all plugin modules (source of the docs/PLUGIN_ARCHITECTURE.md table)
+	@bash ./scripts/coverage_gate.sh report --all
+
+coverage-gate: ## Enforce the >=50% coverage gate for one plugin: make coverage-gate PLUGIN=db
+	@if [ -z "$(PLUGIN)" ]; then \
+		echo "usage: make coverage-gate PLUGIN=<plugin>"; \
+		exit 2; \
+	fi
+	@bash ./scripts/coverage_gate.sh gate $(PLUGIN)
 
 # Quality targets
 check: fmt vet test ## Run all quality checks (format, vet, test)

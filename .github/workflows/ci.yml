@@ -86,6 +86,8 @@ jobs:
         run: go vet ./...
       - name: Test
         run: go test -count=1 -race -cover ./...
+      - name: Coverage gate
+        run: bash ../../scripts/coverage_gate.sh gate ${{ matrix.plugin }}
       - name: Tidy check
         run: |
           go mod tidy
