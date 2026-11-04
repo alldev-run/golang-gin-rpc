@@ -87,6 +87,15 @@ func (c *Client) Database() *mongo.Database {
 	return c.database
 }
 
+// newClientWithClient creates a Client with an injected mongo.Client (for testing).
+func newClientWithClient(client *mongo.Client, config Config) *Client {
+	return &Client{
+		client:   client,
+		database: client.Database(config.Database),
+		config:   config,
+	}
+}
+
 // Collection returns a collection from the default database.
 func (c *Client) Collection(name string) *mongo.Collection {
 	return c.database.Collection(name)

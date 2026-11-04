@@ -41,6 +41,11 @@ type Client struct {
 	config Config
 }
 
+// newClientWithConn creates a Client with an injected driver.Conn (for testing).
+func newClientWithConn(conn driver.Conn, cfg Config) *Client {
+	return &Client{conn: conn, config: cfg}
+}
+
 // New creates a new ClickHouse client from config.
 func New(config Config) (*Client, error) {
 	conn, err := clickhouse.Open(&clickhouse.Options{
