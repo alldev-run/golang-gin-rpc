@@ -14,7 +14,7 @@ require (
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5 // indirect
 	github.com/nats-io/nats.go v1.53.1 // indirect
 	github.com/oschwald/geoip2-golang v1.11.0 // indirect
-	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	github.com/redis/go-redis/v9 v9.18.0 // indirect
 	github.com/stretchr/testify v1.11.1
@@ -157,11 +157,15 @@ replace cloud.google.com/go => cloud.google.com/go v0.121.0
 
 // 框架插件模块(本地路径,见 go.work;拆分到独立仓库时改为线上版本)
 
+replace github.com/alldev-run/golang-gin-rpc/plugins/audit => ./plugins/audit
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/messaging => ./plugins/messaging
+
+replace github.com/alldev-run/golang-gin-rpc/plugins/ratelimit => ./plugins/ratelimit
+
 replace github.com/alldev-run/golang-gin-rpc/plugins/actor => ./plugins/actor
 
-require github.com/alldev-run/golang-gin-rpc/plugins/audit v0.0.0
-
-replace github.com/alldev-run/golang-gin-rpc/plugins/audit => ./plugins/audit
+require github.com/alldev-run/golang-gin-rpc/plugins/audit v0.0.0 // indirect
 
 require github.com/alldev-run/golang-gin-rpc/plugins/auth v0.0.0
 
@@ -203,9 +207,7 @@ require github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer v0.0.0 // indi
 
 replace github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer => ./plugins/loadbalancer
 
-require github.com/alldev-run/golang-gin-rpc/plugins/messaging v0.0.0
-
-replace github.com/alldev-run/golang-gin-rpc/plugins/messaging => ./plugins/messaging
+require github.com/alldev-run/golang-gin-rpc/plugins/messaging v0.0.0 // indirect
 
 require github.com/alldev-run/golang-gin-rpc/plugins/metrics v0.0.0
 
@@ -215,9 +217,7 @@ require github.com/alldev-run/golang-gin-rpc/plugins/middleware v0.0.0
 
 replace github.com/alldev-run/golang-gin-rpc/plugins/middleware => ./plugins/middleware
 
-require github.com/alldev-run/golang-gin-rpc/plugins/ratelimit v0.0.0
-
-replace github.com/alldev-run/golang-gin-rpc/plugins/ratelimit => ./plugins/ratelimit
+require github.com/alldev-run/golang-gin-rpc/plugins/ratelimit v0.0.0 // indirect
 
 require github.com/alldev-run/golang-gin-rpc/plugins/rbac v0.0.0 // indirect
 

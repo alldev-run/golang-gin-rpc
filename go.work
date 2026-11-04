@@ -2,6 +2,7 @@ go 1.25.7
 
 use (
 	.
+	./examples
 	./plugins/actor
 	./plugins/alert
 	./plugins/audit
@@ -12,8 +13,8 @@ use (
 	./plugins/configcenter
 	./plugins/db
 	./plugins/discovery
-	./plugins/gateway
 	./plugins/gameserver
+	./plugins/gateway
 	./plugins/geoip
 	./plugins/health
 	./plugins/loadbalancer
