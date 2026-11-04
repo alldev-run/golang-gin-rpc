@@ -107,13 +107,6 @@ func applyDefaults(cfg *Config) {
 		if cfg.MySQL.Charset == "" {
 			cfg.MySQL.Charset = "utf8mb4"
 		}
-	case TypeRedis:
-		if cfg.Redis.Host == "" {
-			cfg.Redis.Host = "localhost"
-		}
-		if cfg.Redis.Port == 0 {
-			cfg.Redis.Port = 6379
-		}
 	case TypePostgres:
 		if cfg.PG.Host == "" {
 			cfg.PG.Host = "localhost"
@@ -124,14 +117,10 @@ func applyDefaults(cfg *Config) {
 		if cfg.PG.SSLMode == "" {
 			cfg.PG.SSLMode = "disable"
 		}
-	case TypeMemcache:
-		if len(cfg.Memcache.Hosts) == 0 {
-			cfg.Memcache.Hosts = []string{"localhost:11211"}
-		}
 	}
 
-	// 重型驱动（clickhouse/elasticsearch/mongodb）的默认值由各驱动子包
-	// 的注册逻辑负责（见 plugins/db/<driver>/register.go）。
+	// redis/memcache 与重型驱动（clickhouse/elasticsearch/mongodb）的默认值
+	// 由各自驱动子包的注册逻辑负责（见对应模块的 register.go）。
 }
 
 // SaveConfigToYAML saves configuration to YAML file.

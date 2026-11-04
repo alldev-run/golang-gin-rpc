@@ -169,27 +169,33 @@ linked := db.LinkedDrivers()   // 当前二进制已链接的驱动列表
 ok := db.DriverLinked(db.TypeMongoDB)
 ```
 
-#### 驱动注册表（重型驱动自注册）
+#### 驱动注册表（驱动自注册）
 
-`mysql/redis/postgres/memcache` 由本包 `init()` 内置注册；重型驱动
-（`clickhouse`、`mongodb`）通过独立子包 **import 即注册**——不 import 不链接：
+`mysql`/`postgres` 由本包 `init()` 内置注册；redis/memcache 由
+`plugins/cache` 对应子包自注册；重型驱动（`clickhouse`、`mongodb`）
+通过独立子包 **import 即注册**——不 import 不链接：
 
 ```go
 import (
-    _ "github.com/alldev-run/golang-gin-rpc/plugins/db/clickhouse" // 注册 ClickHouse 驱动
-    _ "github.com/alldev-run/golang-gin-rpc/plugins/db/mongodb"    // 注册 MongoDB 驱动
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/db/clickhouse"  // 注册 ClickHouse 驱动
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/db/mongodb"     // 注册 MongoDB 驱动
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"    // 注册 Redis 驱动
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache" // 注册 Memcache 驱动
 )
 
 client, err := factory.Create(db.Config{Type: db.TypeMongoDB, MongoDB: mongoCfg})
+client, err = factory.Create(db.Config{Type: db.TypeRedis, Redis: redisCfg})
 // 具体类型经驱动子包断言取回：见各子包 register.go
 ```
 
-未链接的驱动会得到明确错误，提示 import 对应的 `plugins/db/<driver>` 包。
+未链接的驱动会得到明确错误，提示 import 对应的驱动包。
+`plugins/db` 不依赖 `plugins/cache`（orm 查询缓存的 redis/memcache/failover
+后端在 `plugins/cache/ormcache`）。
 
 #### 各驱动配置参考
 
 配置结构体以 `db.Config` 聚合，字段与 yaml/json tag 一致：
-`MySQL`/`Redis`/`PG`/`Memcache` 为具体结构体，`CH`/`ES`/`MongoDB` 以 `any`
+`MySQL`/`PG` 为具体结构体；`Redis`/`Memcache`/`CH`/`ES`/`MongoDB` 以 `any`
 携带、由对应驱动子包解析（`decodeConfig` 支持 struct 直传与 map 兜底）。
 字段明细见各子包 `Config` 结构体的 yaml tag（如 `postgres.Config`：
 `host` `port` `database` `username` `password` `ssl_mode` `max_open_conns`

@@ -139,20 +139,6 @@ func TestDelete_FactoryNotInitialized(t *testing.T) {
 	}
 }
 
-// ==================== Test Redis Helper ====================
-
-func TestRedis_FactoryNotInitialized(t *testing.T) {
-	defer func() {
-		SetGlobalFactory(nil)
-	}()
-
-	SetGlobalFactory(nil)
-
-	_, err := Redis()
-	if err != ErrFactoryNotInitialized {
-		t.Errorf("Redis() error = %v, want %v", err, ErrFactoryNotInitialized)
-	}
-}
 
 // ==================== Test PostgreSQL Helper ====================
 
@@ -263,12 +249,6 @@ func TestHelpers_WithMockFactory(t *testing.T) {
 	_, err = Delete("users")
 	if err == nil {
 		t.Error("Delete() expected error when no MySQL initialized, got nil")
-	}
-
-	// Test Redis returns error for no Redis initialized
-	_, err = Redis()
-	if err == nil {
-		t.Error("Redis() expected error when no Redis initialized, got nil")
 	}
 
 	// Test Postgres returns error for no Postgres initialized

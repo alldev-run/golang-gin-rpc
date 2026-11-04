@@ -397,20 +397,6 @@ func TestNewCacheFromConfig_UnsupportedType(t *testing.T) {
 	}
 }
 
-func TestNewCacheFromConfig_RedisNoConfig(t *testing.T) {
-	_, err := NewCacheFromConfig(CacheConfig{Type: CacheTypeRedis})
-	if err == nil {
-		t.Error("expected error when redis config is nil")
-	}
-}
-
-func TestNewCacheFromConfig_MemcacheNoConfig(t *testing.T) {
-	_, err := NewCacheFromConfig(CacheConfig{Type: CacheTypeMemcache})
-	if err == nil {
-		t.Error("expected error when memcache config is nil")
-	}
-}
-
 func TestNewCacheFromConfig_FileNoConfig(t *testing.T) {
 	_, err := NewCacheFromConfig(CacheConfig{Type: CacheTypeFile})
 	if err == nil {
@@ -434,26 +420,15 @@ func TestNewCacheFromConfig_File(t *testing.T) {
 	}
 }
 
-func TestNewCacheFromConfig_FailoverNoPrimary(t *testing.T) {
-	_, err := NewCacheFromConfig(CacheConfig{
-		Type:          CacheTypeFailover,
-		FallbackOrder: []CacheType{},
-	})
+func TestNewCacheFromConfig_UnsupportedBackend(t *testing.T) {
+	// redis/memcache/failover 后端已迁至 plugins/cache/ormcache，此处应明确报错。
+	_, err := NewCacheFromConfig(CacheConfig{Type: CacheTypeRedis})
 	if err == nil {
-		t.Error("expected error when no primary cache for failover")
+		t.Error("expected error for redis backend in orm package")
 	}
-}
-
-func TestNewCacheFromConfig_FailoverWithMemory(t *testing.T) {
-	cache, err := NewCacheFromConfig(CacheConfig{
-		Type:          CacheTypeFailover,
-		FallbackOrder: []CacheType{CacheTypeMemory, CacheTypeMemory},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cache == nil {
-		t.Fatal("cache should not be nil")
+	_, err = NewCacheFromConfig(CacheConfig{Type: CacheTypeMemcache})
+	if err == nil {
+		t.Error("expected error for memcache backend in orm package")
 	}
 }
 

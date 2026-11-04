@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
@@ -271,15 +270,6 @@ func Postgres() (SQLClient, error) {
 
 // MongoDB/ClickHouse 等重型驱动的便捷取用已随驱动注册表化移除：
 // 通过 GetGlobalFactory().GetClient(db.TypeMongoDB) 获取，并在驱动子包中做类型断言。
-// Redis returns the global Redis client.
-func Redis() (*redis.Client, error) {
-	factory := GetGlobalFactory()
-	if factory == nil {
-		return nil, ErrFactoryNotInitialized
-	}
-	return factory.GetRedis()
-}
-
 // ==================== Database Type Helpers ====================
 
 // InsertOn creates an INSERT builder for the specified database type.

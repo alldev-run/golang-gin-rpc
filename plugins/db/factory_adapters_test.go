@@ -11,8 +11,6 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
@@ -98,7 +96,7 @@ func TestLinkedDrivers_ContainsBuiltinAndFake(t *testing.T) {
 	for _, typ := range linked {
 		found[typ] = true
 	}
-	for _, typ := range []Type{TypeMySQL, TypeRedis, TypePostgres, TypeMemcache, fakeDriverType} {
+	for _, typ := range []Type{TypeMySQL, TypePostgres, fakeDriverType} {
 		if !found[typ] {
 			t.Errorf("LinkedDrivers() missing %s", typ)
 		}
@@ -230,7 +228,7 @@ func TestFactoryCreate_PingFailureIsNotFactoryError(t *testing.T) {
 	// failure surfaces through Ping, not Create.
 	factory := registerFakeDriver(t)
 
-	client, err := factory.Create(Config{Type: fakeDriverType, Memcache: memcache.Config{Hosts: []string{"different"}}})
+	client, err := factory.Create(Config{Type: fakeDriverType, CH: "distinct-marker"})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -268,15 +266,6 @@ func TestGetMySQLWithConfig_Unreachable(t *testing.T) {
 	}
 }
 
-func TestGetRedisWithConfig_Unreachable(t *testing.T) {
-	factory := NewFactory()
-
-	_, err := factory.GetRedisWithConfig(redis.Config{Host: "127.0.0.1", Port: 1})
-	if err == nil {
-		t.Fatal("GetRedisWithConfig() against an unreachable server should fail")
-	}
-}
-
 func TestGetPostgresWithConfig_Unreachable(t *testing.T) {
 	factory := NewFactory()
 
@@ -285,28 +274,6 @@ func TestGetPostgresWithConfig_Unreachable(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("GetPostgresWithConfig() against an unreachable server should fail")
-	}
-}
-
-func TestGetMemcacheWithConfig_OfflineSuccess(t *testing.T) {
-	// memcache.New is lazy (no ping), so the WithConfig path succeeds offline
-	// and hands back a usable adapter.
-	factory := NewFactory()
-
-	client, err := factory.GetMemcacheWithConfig(memcache.Config{Hosts: []string{"127.0.0.1:1"}})
-	if err != nil {
-		t.Fatalf("GetMemcacheWithConfig() error = %v", err)
-	}
-	adapter, ok := client.(*memcacheAdapter)
-	if !ok {
-		t.Fatalf("type = %T, want *memcacheAdapter", client)
-	}
-
-	if err := adapter.Ping(t.Context()); err == nil {
-		t.Error("memcacheAdapter.Ping() against an unreachable server should fail")
-	}
-	if err := adapter.Close(); err != nil {
-		t.Errorf("memcacheAdapter.Close() error = %v, want nil", err)
 	}
 }
 

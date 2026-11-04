@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
 )
@@ -97,11 +96,15 @@ mysql:
 		if cfg.Type != TypeRedis {
 			t.Errorf("Config Type = %v, want redis", cfg.Type)
 		}
-		if cfg.Redis.Host != "127.0.0.1" {
-			t.Errorf("Redis Host = %v, want 127.0.0.1", cfg.Redis.Host)
+		redisCfg, ok := cfg.Redis.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Redis config should decode as map, got %T", cfg.Redis)
 		}
-		if cfg.Redis.Port != 6380 {
-			t.Errorf("Redis Port = %v, want 6380", cfg.Redis.Port)
+		if redisCfg["host"] != "127.0.0.1" {
+			t.Errorf("Redis Host = %v, want 127.0.0.1", redisCfg["host"])
+		}
+		if port, ok := redisCfg["port"].(float64); !ok || port != 6380 {
+			t.Errorf("Redis Port = %v, want 6380", redisCfg["port"])
 		}
 	})
 
@@ -165,14 +168,6 @@ mysql:
 				expected: "MySQL SQL client not found",
 			},
 			{
-				name: "Redis",
-				testFunc: func() error {
-					_, err := factory.GetRedis()
-					return err
-				},
-				expected: "Redis client not found",
-			},
-			{
 				name: "Postgres",
 				testFunc: func() error {
 					_, err := factory.GetPostgres()
@@ -215,16 +210,6 @@ mysql:
 			t.Errorf("MySQL default Port = %v, want 3306", cfg.MySQL.Port)
 		}
 
-		// 测试 Redis 默认值
-		cfg = Config{Type: TypeRedis}
-		applyDefaults(&cfg)
-		if cfg.Redis.Host != "localhost" {
-			t.Errorf("Redis default Host = %v, want localhost", cfg.Redis.Host)
-		}
-		if cfg.Redis.Port != 6379 {
-			t.Errorf("Redis default Port = %v, want 6379", cfg.Redis.Port)
-		}
-
 		// 测试 PostgreSQL 默认值
 		cfg = Config{Type: TypePostgres}
 		applyDefaults(&cfg)
@@ -265,11 +250,8 @@ mysql:
 		// 测试 JSON 保存和加载
 		jsonFile := filepath.Join(tmpDir, "save_test.json")
 		cfg2 := Config{
-			Type: TypeRedis,
-			Redis: redis.Config{
-				Host: "redishost",
-				Port: 6380,
-			},
+			Type:  TypeRedis,
+			Redis: map[string]interface{}{"host": "redishost", "port": 6380},
 		}
 
 		if err := SaveConfigToJSON(jsonFile, cfg2); err != nil {
@@ -349,13 +331,8 @@ secondary:
 				},
 			},
 			{
-				Type: TypeRedis,
-				Redis: redis.Config{
-					Host:     "localhost",
-					Port:     6379,
-					Database: 0,
-					PoolSize: 10,
-				},
+				Type:   TypeRedis,
+				Redis:  map[string]interface{}{"host": "localhost", "port": 6379},
 			},
 			{
 				Type: TypePostgres,
@@ -411,15 +388,6 @@ func TestFactoryClientStorageDetailed(t *testing.T) {
 				return err
 			},
 			expectedErr: "MySQL SQL client not found",
-		},
-		{
-			name:   "Redis",
-			dbType: TypeRedis,
-			getFunc: func() error {
-				_, err := factory.GetRedis()
-				return err
-			},
-			expectedErr: "Redis client not found",
 		},
 		{
 			name:   "Postgres",

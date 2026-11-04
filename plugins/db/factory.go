@@ -11,8 +11,6 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache"
-	"github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/postgres"
 )
@@ -32,11 +30,15 @@ const (
 
 // Config holds configuration for all database types.
 type Config struct {
-	Type     Type            `yaml:"type" json:"type"`
-	MySQL    mysql.Config    `yaml:"mysql" json:"mysql"`
-	Redis    redis.Config    `yaml:"redis" json:"redis"`
-	PG       postgres.Config `yaml:"postgres" json:"postgres"`
-	Memcache memcache.Config `yaml:"memcache" json:"memcache"`
+	Type Type            `yaml:"type" json:"type"`
+	MySQL mysql.Config    `yaml:"mysql" json:"mysql"`
+	PG    postgres.Config `yaml:"postgres" json:"postgres"`
+
+	// Redis/Memcache 与重型驱动一样以 any 携带配置，由驱动子包解析
+	// （见 plugins/cache/redis、plugins/cache/memcache 的 register.go）：
+	// Redis 携带 cache/redis.Config，Memcache 携带 cache/memcache.Config。
+	Redis    any `yaml:"redis,omitempty" json:"redis,omitempty"`
+	Memcache any `yaml:"memcache,omitempty" json:"memcache,omitempty"`
 
 	// 重型驱动的配置由对应驱动子包解析（见各子包 register.go）：
 	// CH 携带 clickhouse.Config，ES 携带 elasticsearch.Config，MongoDB 携带 mongodb.Config。
@@ -198,19 +200,6 @@ func (a *mysqlAdapter) Transaction(ctx context.Context, fn func(*sql.Tx) error) 
 	return a.client.Transaction(ctx, fn)
 }
 
-// redisAdapter adapts redis.Client to db.Client.
-type redisAdapter struct {
-	client *redis.Client
-}
-
-func (a *redisAdapter) Ping(ctx context.Context) error {
-	return a.client.Ping(ctx)
-}
-
-func (a *redisAdapter) Close() error {
-	return a.client.Close()
-}
-
 // postgresAdapter adapts postgres.Client to db.Client.
 type postgresAdapter struct {
 	client *postgres.Client
@@ -248,19 +237,6 @@ func (a *postgresAdapter) Transaction(ctx context.Context, fn func(*sql.Tx) erro
 	return a.client.Transaction(ctx, fn)
 }
 
-// memcacheAdapter adapts memcache.Client to db.Client.
-type memcacheAdapter struct {
-	client *memcache.Client
-}
-
-func (a *memcacheAdapter) Ping(ctx context.Context) error {
-	return a.client.Ping(ctx)
-}
-
-func (a *memcacheAdapter) Close() error {
-	return a.client.Close()
-}
-
 // GetMySQL returns the MySQL client from the factory.
 func (f *Factory) GetMySQL() (*mysql.Client, error) {
 	f.mu.RLock()
@@ -291,20 +267,6 @@ func (f *Factory) GetMySQLSQLClient() (SQLClient, error) {
 		}
 	}
 	return nil, fmt.Errorf("MySQL SQL client not found")
-}
-
-// GetRedis returns the Redis client from the factory.
-func (f *Factory) GetRedis() (*redis.Client, error) {
-	f.mu.RLock()
-	client, exists := f.clients[TypeRedis]
-	f.mu.RUnlock()
-
-	if exists {
-		if adapter, ok := client.(*redisAdapter); ok {
-			return adapter.client, nil
-		}
-	}
-	return nil, fmt.Errorf("Redis client not found")
 }
 
 // GetPostgres returns the PostgreSQL client from the factory.
@@ -345,29 +307,6 @@ func (f *Factory) GetMySQLWithConfig(cfg mysql.Config) (Client, error) {
 	return f.createMySQL(cfg)
 }
 
-// GetRedisWithConfig creates or returns a Redis client with specific config
-func (f *Factory) GetRedisWithConfig(cfg redis.Config) (Client, error) {
-	key := createKey("redis", cfg)
-
-	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
-		client, err := redis.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &redisAdapter{client: client}
-
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[Type(key)] = adapter
-		return adapter, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
-
 // GetPostgresWithConfig creates or returns a PostgreSQL client with specific config
 func (f *Factory) GetPostgresWithConfig(cfg postgres.Config) (Client, error) {
 	key := createKey("postgres", cfg)
@@ -378,29 +317,6 @@ func (f *Factory) GetPostgresWithConfig(cfg postgres.Config) (Client, error) {
 			return nil, err
 		}
 		adapter := &postgresAdapter{client: client}
-
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.clients[Type(key)] = adapter
-		return adapter, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return v.(Client), nil
-}
-
-// GetMemcacheWithConfig creates or returns a Memcached client with specific config
-func (f *Factory) GetMemcacheWithConfig(cfg memcache.Config) (Client, error) {
-	key := createKey("memcache", cfg)
-
-	v, err, _ := f.sf.Do(key, func() (interface{}, error) {
-		client, err := memcache.New(cfg)
-		if err != nil {
-			return nil, err
-		}
-		adapter := &memcacheAdapter{client: client}
 
 		f.mu.Lock()
 		defer f.mu.Unlock()
