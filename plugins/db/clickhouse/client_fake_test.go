@@ -13,19 +13,18 @@ import (
 
 type fakeConn struct {
 	driver.Conn
-	pingErr      error
-	closeErr     error
-	queryErr     error
-	execErr      error
-	prepareErr   error
-	queryRows    driver.Rows
-	queryRow     driver.Row
-	batch        driver.Batch
-	batchErr     error
+	pingErr    error
+	closeErr   error
+	queryErr   error
+	execErr    error
+	prepareErr error
+	queryRows  driver.Rows
+	queryRow   driver.Row
+	batch      driver.Batch
 }
 
 func (f *fakeConn) Ping(ctx context.Context) error { return f.pingErr }
-func (f *fakeConn) Close() error                    { return f.closeErr }
+func (f *fakeConn) Close() error                   { return f.closeErr }
 
 func (f *fakeConn) Query(ctx context.Context, query string, args ...any) (driver.Rows, error) {
 	return f.queryRows, f.queryErr

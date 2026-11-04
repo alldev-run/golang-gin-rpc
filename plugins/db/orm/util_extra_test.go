@@ -632,7 +632,7 @@ func TestBuildUpdateQuery_Errors(t *testing.T) {
 		}
 	})
 	t.Run("only_id_in_data", func(t *testing.T) {
-	_, _, err := BuildUpdateQuery("users", "id", 1, map[string]interface{}{"id": 1}, dialect)
+		_, _, err := BuildUpdateQuery("users", "id", 1, map[string]interface{}{"id": 1}, dialect)
 		if err == nil {
 			t.Error("expected error when only id column in data")
 		}

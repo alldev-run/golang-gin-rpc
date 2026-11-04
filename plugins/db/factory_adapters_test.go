@@ -499,4 +499,3 @@ func TestLegacyHelpers_QueryQueryRowExec(t *testing.T) {
 		t.Errorf("Ping() error = %v", err)
 	}
 }
-

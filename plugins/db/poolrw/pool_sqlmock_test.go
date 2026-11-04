@@ -20,9 +20,9 @@ type fakeSQLClient struct {
 	db *sql.DB
 }
 
-func (c *fakeSQLClient) DB() *sql.DB                                { return c.db }
-func (c *fakeSQLClient) Ping(ctx context.Context) error             { return c.db.PingContext(ctx) }
-func (c *fakeSQLClient) Close() error                               { return c.db.Close() }
+func (c *fakeSQLClient) DB() *sql.DB                    { return c.db }
+func (c *fakeSQLClient) Ping(ctx context.Context) error { return c.db.PingContext(ctx) }
+func (c *fakeSQLClient) Close() error                   { return c.db.Close() }
 func (c *fakeSQLClient) Query(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
 	return c.db.QueryContext(ctx, q, args...)
 }

@@ -14,7 +14,7 @@ type mockDiscovery struct {
 	services map[string][]*ServiceInstance
 	// fail switches force the corresponding operation to return an error so
 	// tests can exercise manager error paths.
-	failRegister  bool
+	failRegister   bool
 	failDeregister bool
 	failGet        bool
 }

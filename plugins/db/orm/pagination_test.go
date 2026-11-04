@@ -66,19 +66,19 @@ func TestPaginationOptions_CalculateOffset(t *testing.T) {
 
 func TestNewPagination(t *testing.T) {
 	tests := []struct {
-		name       string
-		page       int
-		pageSize   int
-		total      int64
-		wantPages  int
-		wantNext   bool
-		wantPrev   bool
+		name      string
+		page      int
+		pageSize  int
+		total     int64
+		wantPages int
+		wantNext  bool
+		wantPrev  bool
 	}{
 		{"first_page", 1, 10, 100, 10, true, false},
 		{"middle_page", 5, 10, 100, 10, true, true},
 		{"last_page", 10, 10, 100, 10, false, true},
-		{"zero_page", 0, 10, 50, 5, true, false},   // page 0 → 1
-		{"zero_size", 1, 0, 50, 5, true, false},     // size 0 → 10
+		{"zero_page", 0, 10, 50, 5, true, false}, // page 0 → 1
+		{"zero_size", 1, 0, 50, 5, true, false},  // size 0 → 10
 		{"empty_result", 1, 10, 0, 0, false, false},
 		{"single_page", 1, 10, 5, 1, false, false},
 	}

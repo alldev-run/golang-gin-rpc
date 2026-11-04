@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 )
 
 // --- sqlmock-backed EnhancedPool tests ---
@@ -30,7 +30,7 @@ func newTestEnhancedPool(t *testing.T, mutate func(*PoolConfig)) (*EnhancedPool,
 		ConnMaxLifetime:    time.Hour,
 		ConnMaxIdleTime:    time.Hour,
 		QueryTimeout:       2 * time.Second,
-		HealthCheckPeriod:  time.Hour,  // background ticker must not fire during tests
+		HealthCheckPeriod:  time.Hour, // background ticker must not fire during tests
 		HealthCheckTimeout: time.Second,
 		MetricsInterval:    time.Hour, // ditto for the metrics ticker
 		MaxRetries:         1,

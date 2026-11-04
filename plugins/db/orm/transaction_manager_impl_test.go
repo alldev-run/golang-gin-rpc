@@ -148,9 +148,9 @@ func TestDefaultErrorClassifier_IsRetryable_IsTransient(t *testing.T) {
 	classifier := NewDefaultErrorClassifier()
 
 	tests := []struct {
-		name         string
-		err          error
-		wantRetry    bool
+		name          string
+		err           error
+		wantRetry     bool
 		wantTransient bool
 	}{
 		{"deadlock", errors.New("deadlock detected"), true, true},

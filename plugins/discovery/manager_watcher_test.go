@@ -401,9 +401,9 @@ func TestServiceSelectorStrategyAndInfoBranches(t *testing.T) {
 
 func TestConfigValidateDefaultsForSubRegistryTypes(t *testing.T) {
 	tests := []struct {
-		name     string
-		typ      RegistryType
-		address  string
+		name      string
+		typ       RegistryType
+		address   string
 		namespace string
 	}{
 		{name: "etcd", typ: RegistryTypeEtcd, address: "localhost:2379", namespace: "default"},
