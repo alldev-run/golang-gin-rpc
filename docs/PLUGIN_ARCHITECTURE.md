@@ -45,6 +45,11 @@ plugins/<name>/       功能插件，每个子目录一个独立 Go 模块
 本次审计只保留原已列为 GA 的插件；GA 门槛为至少一个可核实的生产案例、模块 statement
 coverage ≥50%、README 完整且无占位实现。生产案例未核实前不将 Beta 插件升级为 GA。
 
+覆盖率门槛由 `scripts/coverage_gate.sh` 强制执行（CI 的 plugins matrix 中每个
+GA/GA-ready 插件必须 ≥50%，否则构建失败；本地可用 `make coverage-gate PLUGIN=<name>`
+或 `bash scripts/coverage_gate.sh report --all` 复核）。脚本中的 `GATED_PLUGINS`
+名单需与下方分级表保持同步。
+
 | 等级 | 含义 | 承诺 |
 |---|---|---|
 | **GA** | 满足审计门槛的稳定组件 | 至少一个可核实的生产案例、statement coverage ≥50%、README 完整、无占位实现 |
@@ -58,16 +63,16 @@ GA 仅保留审计前已列为 GA、且达到覆盖率门槛、README 完整并�
 
 | 插件 | 等级 | statement coverage |
 |---|---|---:|
-| actor | Beta | 78.7% |
-| alert | Beta | 86.6% |
+| actor | Beta | 83.0% |
+| alert | Beta | 88.2% |
 | audit | Beta | 78.8% |
 | auth | GA | 71.0% |
 | bloomfilter | Beta | 97.4% |
 | cache | GA | 53.1% |
 | circuitbreaker | Beta | 47.2% |
-| configcenter | Beta | 36.5% |
-| db | Beta | 33.5% |
-| discovery | Beta | 40.5% |
+| configcenter | Beta | 37.4% |
+| db | Beta | 63.8% |
+| discovery | Beta | 86.5% |
 | gameserver | Beta | 91.0% |
 | gateway | GA | 57.2% |
 | geoip | Beta | 29.6% |
@@ -79,12 +84,31 @@ GA 仅保留审计前已列为 GA、且达到覆盖率门槛、README 完整并�
 | push | Beta | 33.1% |
 | ratelimit | Beta | 36.6% |
 | rbac | Beta | 89.5% |
-| rpc | GA | 56.2% |
+| rpc | GA | 56.0% |
 | scheduler | Beta | 90.8% |
 | search | Experimental | 25.6% |
 | tracing | GA | 50.9% |
-| upload | Beta | 31.7% |
-| websocket | GA | 67.0% |
+| upload | Beta | 93.1% |
+| websocket | GA | 66.9% |
+
+### GA 就绪插件（待生产案例核实）
+
+以下 Beta 插件已满足 GA 的技术门槛（statement coverage ≥50%、README 完整、无占位实现），
+**仅需核实至少一个可核实的生产案例**即可正式升级为 GA：
+
+| 插件 | 覆盖率 | 备注 |
+|---|---:|---|
+| actor | 83.0% | 核心内置组件，本轮补齐 nats.PublishAsync/NewBridgeFromConfig、Props.WithSupervision、discovery.Start |
+| alert | 88.2% | 通知插件 |
+| audit | 78.8% | 审计日志 |
+| bloomfilter | 97.4% | 布隆过滤器 |
+| db | 63.8% | 核心内置组件，本轮从 33.5% 提升；补齐 orm 事务管理器、postgres/mongodb 客户端与根包适配器测试，修复 poolcb SQLClient 代理缺陷 |
+| discovery | 86.5% | 核心内置组件，本轮从 40.5% 提升；zookeeper 后端引入 zkConn 注入缝并全覆盖（zk 包 92.4%） |
+| gameserver | 91.0% | 游戏服务器 |
+| loadbalancer | 73.9% | 负载均衡 |
+| rbac | 89.5% | 角色权限控制 |
+| scheduler | 90.8% | 任务调度 |
+| upload | 93.1% | 核心内置组件，本轮从 31.7% 提升 |
 
 ## Plugin 契约（pkg/kernel）
 
