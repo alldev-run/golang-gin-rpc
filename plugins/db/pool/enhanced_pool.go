@@ -168,8 +168,7 @@ func (p *EnhancedPool) GetDB() *sql.DB {
 
 // Query executes a query with timeout and retry logic
 func (p *EnhancedPool) Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	ctx, cancel := context.WithTimeout(ctx, p.config.QueryTimeout)
-	defer cancel()
+	queryCtx := queryContextWithTimeout(ctx, p.config.QueryTimeout)
 
 	var rows *sql.Rows
 	var err error
@@ -177,8 +176,8 @@ func (p *EnhancedPool) Query(ctx context.Context, query string, args ...interfac
 	for attempt := 0; attempt <= p.config.MaxRetries; attempt++ {
 		if attempt > 0 {
 			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
+			case <-queryCtx.Done():
+				return nil, queryCtx.Err()
 			case <-time.After(p.config.RetryDelay):
 				logger.Warn("Retrying database query",
 					zap.Int("attempt", attempt),
@@ -186,7 +185,7 @@ func (p *EnhancedPool) Query(ctx context.Context, query string, args ...interfac
 			}
 		}
 
-		rows, err = p.db.QueryContext(ctx, query, args...)
+		rows, err = p.db.QueryContext(queryCtx, query, args...)
 		if err == nil {
 			p.recordQuery("query", "success")
 			return rows, nil
@@ -207,10 +206,18 @@ func (p *EnhancedPool) Query(ctx context.Context, query string, args ...interfac
 
 // QueryRow executes a query that returns a single row
 func (p *EnhancedPool) QueryRow(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	ctx, cancel := context.WithTimeout(ctx, p.config.QueryTimeout)
-	defer cancel()
+	queryCtx := queryContextWithTimeout(ctx, p.config.QueryTimeout)
 
-	return p.db.QueryRowContext(ctx, query, args...)
+	return p.db.QueryRowContext(queryCtx, query, args...)
+}
+
+func queryContextWithTimeout(ctx context.Context, timeout time.Duration) context.Context {
+	queryCtx, cancel := context.WithCancel(ctx)
+	timer := time.AfterFunc(timeout, cancel)
+	context.AfterFunc(queryCtx, func() {
+		timer.Stop()
+	})
+	return queryCtx
 }
 
 // Exec executes a query that doesn't return rows
