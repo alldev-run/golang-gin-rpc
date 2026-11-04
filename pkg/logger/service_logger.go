@@ -44,7 +44,7 @@ func GetServiceLoggerInstance(serviceName string, config ServiceLoggerConfig) *z
 func createServiceLogger(serviceName string, config ServiceLoggerConfig) *zap.Logger {
 	// Build final configuration
 	var finalConfig Config
-	if config.InheritGlobalConfig && defaultL != nil {
+	if config.InheritGlobalConfig && defaultL.Load() != nil {
 		// Use global config as base
 		finalConfig = DefaultConfig() // We'll improve this later
 	} else {

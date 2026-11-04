@@ -4,6 +4,7 @@ package logger
 import (
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -13,7 +14,7 @@ import (
 
 var (
 	once     sync.Once
-	defaultL *zap.Logger
+	defaultL atomic.Pointer[zap.Logger]
 )
 
 // Init 初始化全局 logger（建议在 main 最开始调用一次）
@@ -119,17 +120,17 @@ func Init(cfg Config) {
 			options = append(options, zap.AddStacktrace(zapcore.ErrorLevel))
 		}
 
-		defaultL = zap.New(core, options...)
+		defaultL.Store(zap.New(core, options...))
 	})
 }
 
 // L 获取全局 logger（如果未初始化，会用默认配置兜底）
 func L() *zap.Logger {
-	if defaultL == nil {
-		// 兜底：未调用 Init 时自动初始化为默认配置
-		Init(DefaultConfig())
+	if logger := defaultL.Load(); logger != nil {
+		return logger
 	}
-	return defaultL
+	Init(DefaultConfig())
+	return defaultL.Load()
 }
 
 // GetServiceLogger gets or creates a service-specific logger using global config
@@ -137,7 +138,7 @@ func GetServiceLogger(serviceName string) *zap.Logger {
 	config := DefaultServiceLoggerConfig(serviceName)
 
 	// If global logger is initialized, try to inherit its config
-	if defaultL != nil {
+	if defaultL.Load() != nil {
 		// We need to access the global config, but it's not stored currently
 		// For now, use default config with inheritance enabled
 		config.InheritGlobalConfig = true
