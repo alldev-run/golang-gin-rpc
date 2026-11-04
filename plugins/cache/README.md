@@ -105,3 +105,47 @@ return err
 
 Redis 分布式锁采用 SET NX PX 与唯一 token，并通过 Lua 校验释放/续期；看门狗按 TTL
 周期续租。Redis 集成测试需服务端：`go test -tags integration ./...`。
+
+## 作为 db 工厂驱动自注册
+
+`redis/`、`memcache/` 子包通过 `init()` 向 db 工厂驱动注册表自注册
+（镜像 `plugins/db/clickhouse`、`plugins/db/mongodb` 的模式）：
+
+```go
+import (
+    "github.com/alldev-run/golang-gin-rpc/plugins/db"
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis"    // 注册 db.TypeRedis
+    _ "github.com/alldev-run/golang-gin-rpc/plugins/cache/memcache" // 注册 db.TypeMemcache
+)
+
+client, err := factory.Create(db.Config{
+    Type:  db.TypeRedis,
+    Redis: redis.Config{Host: "127.0.0.1", Port: 6379}, // 也接受 map（yaml 兜底）
+})
+```
+
+- 配置在 `db.Config.Redis` / `db.Config.Memcache`（any）中携带，由子包
+  `register.go` 的 `decodeConfig` 还原（struct 直传或 map 经 yaml 重序列化）。
+- 只有 import 对应子包的二进制才会链接 go-redis/gomemcache。
+- 依赖方向：`plugins/cache` -> `plugins/db`（驱动需要 `db.Client` 接口）；
+  `plugins/db` 不依赖 `plugins/cache`。
+
+## orm 查询缓存后端（ormcache）
+
+`plugins/db/orm` 的 QueryCache 体系只内置 memory/file 后端；redis/memcache/
+failover 后端在本模块 `ormcache` 包（`ormcache.QueryCache` 为 `orm.QueryCache`
+的类型别名）：
+
+```go
+cache, err := ormcache.NewCacheFromConfig(ormcache.CacheConfig{
+    Type:          ormcache.CacheTypeFailover,
+    FallbackOrder: []ormcache.CacheType{ormcache.CacheTypeRedis, ormcache.CacheTypeMemcache},
+    RedisConfig:   &redis.Config{Host: "127.0.0.1", Port: 6379},
+    KeyPrefix:     "myapp:",
+})
+cachedDB := orm.NewCachedDB(dbWrapper, cache) // 见 orm 包
+```
+
+构造器：`NewRedisCache`/`NewRedisCacheWithConfig`、`NewMemcacheCache`/
+`NewMemcacheCacheWithConfig`、`NewFailoverCache`/`NewDefaultFailoverCache`/
+`NewFailoverCacheWithConfig`/`NewMemoryFileFailoverCache`/`NewFailoverCacheFromPackage`。

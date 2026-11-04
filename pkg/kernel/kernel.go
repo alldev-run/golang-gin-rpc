@@ -6,7 +6,7 @@
 //
 // 典型用法（组合根）：
 //
-//	import _ "github.com/alldev-run/golang-gin-rpc/plugins/cache" // 空导入触发注册
+//	import _ "github.com/alldev-run/golang-gin-rpc/plugins/cache/redis" // 空导入触发注册
 //
 //	app, err := kernel.NewLoader(configSource).Build()
 //	if err != nil { ... }
