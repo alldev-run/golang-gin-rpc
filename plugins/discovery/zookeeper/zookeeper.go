@@ -21,11 +21,31 @@ type ServiceInstance struct {
 	Payload map[string]string `json:"payload"`
 }
 
+// zkConn abstracts the zookeeper connection operations the registry uses so
+// tests can supply an in-memory fake (*zk.Conn satisfies it directly).
+type zkConn interface {
+	Exists(path string) (bool, *zk.Stat, error)
+	Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error)
+	Delete(path string, version int32) error
+	Children(path string) ([]string, *zk.Stat, error)
+	Get(path string) ([]byte, *zk.Stat, error)
+	Close()
+}
+
 type Registry struct {
-	conn     *zk.Conn
+	conn     zkConn
 	basePath string
 	mu       sync.RWMutex
 	paths    map[string]string
+}
+
+// newRegistryWithConn creates a Registry over an injected connection (for testing).
+func newRegistryWithConn(conn zkConn, basePath string) *Registry {
+	return &Registry{
+		conn:     conn,
+		basePath: normalizePath(basePath),
+		paths:    make(map[string]string),
+	}
 }
 
 func NewRegistry(addr string, timeout time.Duration, options map[string]interface{}) (*Registry, error) {

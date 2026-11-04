@@ -38,6 +38,10 @@ func NewDiscovery(conf Config) (Discovery, error) {
 			return nil, err
 		}
 		return &nacosAdapter{registry: registry}, nil
+	case RegistryTypeStatic:
+		// The static registry keeps instances in process memory and already
+		// implements Discovery, so no adapter is needed.
+		return newStaticRegistry(), nil
 	case "":
 		return nil, errors.New("discovery type is required")
 	default:

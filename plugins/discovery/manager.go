@@ -91,23 +91,24 @@ func NewServiceDiscoveryManager(config ManagerConfig) (*ServiceDiscoveryManager,
 // Start starts the service discovery manager
 func (m *ServiceDiscoveryManager) Start() error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if m.started {
+		m.mu.Unlock()
 		return fmt.Errorf("service discovery manager already started")
 	}
 
 	if !m.config.Enabled {
 		logger.Info("Service discovery is disabled")
 		m.started = true
+		m.mu.Unlock()
 		return nil
 	}
 
 	logger.Info("Starting service discovery manager",
 		zap.String("registry_type", m.config.RegistryType),
 		zap.String("registry_address", m.config.RegistryAddress))
+	m.mu.Unlock()
 
-	// Auto register this service if enabled
+	// Auto register this service if enabled (done without holding the lock to avoid deadlock)
 	if m.config.AutoRegister {
 		if err := m.registerSelf(); err != nil {
 			return fmt.Errorf("failed to register self: %w", err)
@@ -117,7 +118,9 @@ func (m *ServiceDiscoveryManager) Start() error {
 	// Start health check routine
 	go m.healthCheckLoop()
 
+	m.mu.Lock()
 	m.started = true
+	m.mu.Unlock()
 	logger.Info("Service discovery manager started successfully")
 	return nil
 }
@@ -125,9 +128,8 @@ func (m *ServiceDiscoveryManager) Start() error {
 // Stop stops the service discovery manager
 func (m *ServiceDiscoveryManager) Stop() error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if !m.started {
+		m.mu.Unlock()
 		return nil
 	}
 
@@ -135,15 +137,16 @@ func (m *ServiceDiscoveryManager) Stop() error {
 
 	// Stop health check routine
 	close(m.stopCh)
+	m.started = false
+	m.mu.Unlock()
 
-	// Deregister self if auto registered
+	// Deregister self if auto registered (done without holding the lock to avoid deadlock)
 	if m.config.AutoRegister {
 		if err := m.deregisterSelf(); err != nil {
 			logger.Errorf("Failed to deregister self", zap.Error(err))
 		}
 	}
 
-	m.started = false
 	logger.Info("Service discovery manager stopped")
 	return nil
 }
@@ -349,10 +352,14 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 				m.mu.Unlock()
 				continue
 			}
+			m.mu.Unlock()
+
 			registerCtx, registerCancel := context.WithTimeout(context.Background(), m.config.Timeout)
 			registerErr := m.discovery.Register(registerCtx, instance)
 			registerCancel()
-			if registerErr == nil {
+
+			m.mu.Lock()
+			if registerErr == nil && m.instances[instance.ID] == instance && m.unhealthy[instance.ID] {
 				delete(m.unhealthy, instance.ID)
 				logger.Info("Re-registered recovered service instance",
 					zap.String("id", instance.ID),
@@ -372,10 +379,12 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 			m.unhealthy = make(map[string]bool)
 		}
 		m.unhealthy[instance.ID] = true
+		m.mu.Unlock()
+
 		deregisterCtx, deregisterCancel := context.WithTimeout(context.Background(), m.config.Timeout)
 		deregisterErr := m.discovery.Deregister(deregisterCtx, instance)
 		deregisterCancel()
-		m.mu.Unlock()
+
 		if deregisterErr != nil {
 			logger.Warn("Marked service instance unhealthy; registry deregistration failed",
 				zap.String("id", instance.ID),
@@ -392,12 +401,19 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 	}
 }
 
+// defaultServiceWatchInterval is the polling interval used by ServiceWatcher
+// when no explicit interval is configured.
+const defaultServiceWatchInterval = 10 * time.Second
+
 // ServiceWatcher watches for service changes
 type ServiceWatcher struct {
 	manager     *ServiceDiscoveryManager
 	serviceName string
 	watchCh     chan []*ServiceInstance
 	stopCh      chan struct{}
+	// interval controls how often the manager is polled; zero means the
+	// default polling interval is used.
+	interval time.Duration
 }
 
 // NewServiceWatcher creates a new service watcher
@@ -407,6 +423,7 @@ func NewServiceWatcher(manager *ServiceDiscoveryManager, serviceName string) *Se
 		serviceName: serviceName,
 		watchCh:     make(chan []*ServiceInstance, 10),
 		stopCh:      make(chan struct{}),
+		interval:    defaultServiceWatchInterval,
 	}
 }
 
@@ -423,7 +440,11 @@ func (w *ServiceWatcher) Stop() {
 
 // watchLoop runs the watch loop
 func (w *ServiceWatcher) watchLoop(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Second)
+	interval := w.interval
+	if interval <= 0 {
+		interval = defaultServiceWatchInterval
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	var lastInstances []*ServiceInstance

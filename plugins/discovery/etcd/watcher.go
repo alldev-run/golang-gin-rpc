@@ -87,7 +87,11 @@ func (sw *ServiceWatcher) watchLoop() {
 
 // List 直接从本地缓存读取，性能极高
 func (sw *ServiceWatcher) List() []*ServiceInstance {
-	return sw.instances.Load().([]*ServiceInstance)
+	val := sw.instances.Load()
+	if val == nil {
+		return nil
+	}
+	return val.([]*ServiceInstance)
 }
 
 func (sw *ServiceWatcher) Stop() {

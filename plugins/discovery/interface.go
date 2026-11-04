@@ -1,7 +1,7 @@
 package discovery
 
-// This file is kept for backward compatibility
-// All types are now defined in types.go
+// This file is kept for backward compatibility; it defines the core
+// ServiceInstance type and the unified Discovery interface.
 
 import "context"
 
