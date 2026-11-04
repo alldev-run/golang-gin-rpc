@@ -399,6 +399,7 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 				}
 			}
 
+			tm.updateMetrics(result)
 			tm.monitor.OnTransactionRollback(txID, result)
 			return result, result.Error
 		}
@@ -437,6 +438,7 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 					}
 				}
 
+				tm.updateMetrics(result)
 				tm.monitor.OnTransactionRollback(txID, result)
 				return result, result.Error
 			}
@@ -459,6 +461,7 @@ func (tm *TransactionManager) WithTransaction(ctx context.Context, db DB, fn fun
 		}
 	}
 
+	tm.updateMetrics(result)
 	tm.monitor.OnTransactionRollback(txID, result)
 	return result, result.Error
 }

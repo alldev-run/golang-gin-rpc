@@ -48,22 +48,12 @@ func (tm *TransactionManager) updateMetrics(result *TransactionResult) {
 	totalDuration := tm.metrics.AvgDuration * time.Duration(tm.metrics.TotalTransactions-1)
 	tm.metrics.AvgDuration = (totalDuration + result.Duration) / time.Duration(tm.metrics.TotalTransactions)
 
-	// Update Prometheus metrics if available
-	// TODO: Implement metrics integration when metrics package is available
-	/*
-		if metrics.DefaultRegistry != nil {
-			metrics.DefaultRegistry.Counter("orm_transactions_total").Inc()
-			if result.Success {
-				metrics.DefaultRegistry.Counter("orm_transactions_success_total").Inc()
-			} else {
-				metrics.DefaultRegistry.Counter("orm_transactions_failed_total").Inc()
-			}
-			metrics.DefaultRegistry.Histogram("orm_transaction_duration_seconds").Observe(result.Duration.Seconds())
-			if result.Retries > 0 {
-				metrics.DefaultRegistry.Counter("orm_transactions_retried_total").Add(float64(result.Retries))
-			}
-		}
-	*/
+	// Prometheus integration is intentionally not wired here: the metrics
+	// plugin is a separate Go module and importing it would create a module
+	// dependency from this standalone library. Applications that want
+	// Prometheus counters can export GetMetrics()/ResetMetrics() through their
+	// own collector, or install a custom TransactionMonitor via the monitor
+	// interface.
 }
 
 // GetMetrics returns current transaction metrics.
@@ -392,16 +382,24 @@ func (dtm *DefaultTransactionMonitor) OnTransactionCommit(txID string, result *T
 // OnTransactionRollback is called when a transaction rolls back.
 func (dtm *DefaultTransactionMonitor) OnTransactionRollback(txID string, result *TransactionResult) {
 	if dtm.config.EnableMetrics {
+		errMsg := "<nil>"
+		if result != nil && result.Error != nil {
+			errMsg = result.Error.Error()
+		}
 		logWarnf("Transaction rolled back: tx_id=%s, duration=%v, retries=%d, error=%s",
-			txID, result.Duration, result.Retries, result.Error.Error())
+			txID, result.Duration, result.Retries, errMsg)
 	}
 }
 
 // OnTransactionRetry is called when a transaction is retried.
 func (dtm *DefaultTransactionMonitor) OnTransactionRetry(txID string, attempt int, err error) {
 	if dtm.config.EnableMetrics {
+		errMsg := "<nil>"
+		if err != nil {
+			errMsg = err.Error()
+		}
 		logDebugf("Transaction retry: tx_id=%s, attempt=%d, error=%s",
-			txID, attempt, err.Error())
+			txID, attempt, errMsg)
 	}
 }
 

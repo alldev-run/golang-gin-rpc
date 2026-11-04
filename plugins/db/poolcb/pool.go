@@ -98,6 +98,82 @@ func (c *protectedClient) Close() error {
 	return c.client.Close()
 }
 
+// underlyingSQL returns the wrapped client as db.SQLClient.
+func (c *protectedClient) underlyingSQL() (db.SQLClient, bool) {
+	sqlClient, ok := c.client.(db.SQLClient)
+	return sqlClient, ok
+}
+
+// DB exposes the underlying *sql.DB without breaker protection.
+func (c *protectedClient) DB() *sql.DB {
+	if sqlClient, ok := c.underlyingSQL(); ok {
+		return sqlClient.DB()
+	}
+	return nil
+}
+
+// Query executes a query with circuit breaker protection.
+func (c *protectedClient) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	sqlClient, ok := c.underlyingSQL()
+	if !ok {
+		return nil, fmt.Errorf("client is not SQLClient")
+	}
+
+	var rows *sql.Rows
+	err := c.breaker.Execute(ctx, func() error {
+		var err error
+		rows, err = sqlClient.Query(ctx, query, args...)
+		return err
+	})
+	return rows, err
+}
+
+// QueryRow executes a single-row query.
+func (c *protectedClient) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
+	sqlClient, ok := c.underlyingSQL()
+	if !ok {
+		return nil
+	}
+	// The error is only observable at Scan time, so the breaker cannot wrap it.
+	return sqlClient.QueryRow(ctx, query, args...)
+}
+
+// Exec executes a command with circuit breaker protection.
+func (c *protectedClient) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	sqlClient, ok := c.underlyingSQL()
+	if !ok {
+		return nil, fmt.Errorf("client is not SQLClient")
+	}
+
+	var result sql.Result
+	err := c.breaker.Execute(ctx, func() error {
+		var err error
+		result, err = sqlClient.Exec(ctx, query, args...)
+		return err
+	})
+	return result, err
+}
+
+// Begin starts a transaction on the wrapped client.
+func (c *protectedClient) Begin(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	sqlClient, ok := c.underlyingSQL()
+	if !ok {
+		return nil, fmt.Errorf("client is not SQLClient")
+	}
+	return sqlClient.Begin(ctx, opts)
+}
+
+// Transaction executes a function within a transaction with circuit breaker protection.
+func (c *protectedClient) Transaction(ctx context.Context, fn func(*sql.Tx) error) error {
+	sqlClient, ok := c.underlyingSQL()
+	if !ok {
+		return fmt.Errorf("client is not SQLClient")
+	}
+	return c.breaker.Execute(ctx, func() error {
+		return sqlClient.Transaction(ctx, fn)
+	})
+}
+
 // GetPoolStats returns pool statistics.
 func (p *PoolWithBreaker) GetPoolStats() map[string]pool.ClientStats {
 	return p.pool.GetStats()
