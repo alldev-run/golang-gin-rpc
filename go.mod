@@ -227,10 +227,7 @@ require github.com/alldev-run/golang-gin-rpc/plugins/rpc v0.0.0
 
 replace github.com/alldev-run/golang-gin-rpc/plugins/rpc => ./plugins/rpc
 
-require (
-	github.com/coder/websocket v1.8.15 // indirect
-	github.com/hashicorp/go-version v1.8.0 // indirect
-)
+require github.com/coder/websocket v1.8.15 // indirect
 
 replace github.com/alldev-run/golang-gin-rpc/plugins/search => ./plugins/search
 
