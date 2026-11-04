@@ -37,7 +37,7 @@
 │   ├── gateway/              #   例：网关（含 middleware/gin|nethttp、router、httplog）
 │   └── ...                   #   其余 25 个插件模块
 ├── tests/dbintegration/      # 端到端 db 集成测试（//go:build integration，需真实 MySQL）
-├── examples/                 # 各组件示例（每个示例独立子目录）
+├── examples/                 # 各组件示例（独立 Go 模块，自带 go.mod，不进主模块 require 集）
 ├── main.go                   # 主入口
 ├── go.work                   # 工作区：根模块 + ./plugins/*
 ├── start.sh                  # 启动脚本
@@ -449,7 +449,7 @@ go test ./plugins/tracing/...
 go test ./plugins/rpc/...
 ```
 
-说明：`go test ./...` 会包含 `examples` 目录；若本地示例依赖未满足或存在示例编译约束，建议优先执行上面的 `pkg` 级回归命令。
+说明：`examples/` 已拆分为独立 Go 模块（`examples/go.mod`，加入 go.work），主模块的 `go test ./...` 不再包含示例；示例用 `cd examples && go build ./...` 或 `go run ./examples/<name>` 验证。
  
  ## 开发建议
 

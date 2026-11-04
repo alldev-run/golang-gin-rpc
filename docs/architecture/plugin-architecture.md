@@ -26,6 +26,8 @@ pkg/                  核心内核（始终链接）
 
 plugins/<name>/       功能插件，每个子目录一个独立 Go 模块
                       （自带 go.mod；搬去独立仓库时只需改模块名）
+examples/             独立 Go 模块（examples/go.mod）：示例代码不进入
+                      框架主模块的 require 集，go.work 下照常 go run
 ```
 
 当前 27 个插件模块：`actor` `alert` `audit` `auth` `bloomfilter` `cache`
@@ -37,7 +39,35 @@ plugins/<name>/       功能插件，每个子目录一个独立 Go 模块
 > `router`、`httplog`（网关家族）；`plugins/ratelimit` 内含 `ratelimiter`
 > 子包；`plugins/gameserver` 内含 `aoi`（九宫格空间索引）；
 > `plugins/db` 的重型驱动（clickhouse/mongodb）与
-> `plugins/search/elasticsearch` 通过**驱动注册表**自注册。
+> `plugins/search/elasticsearch` 通过**驱动注册表**自注册；redis/memcache
+> 驱动同样自注册，但位于 `plugins/cache` 的对应子包（`plugins/db` 不依赖
+> `plugins/cache`，orm 查询缓存的 redis/memcache/failover 后端在
+> `plugins/cache/ormcache`）。
+
+## 模块依赖边界
+
+框架层与插件模块的依赖方向经过专项解耦（2026-11 审计，CI 的依赖边界以代码为准）：
+
+- **内核零反向依赖**：`pkg/*`（kernel/config/logger/errors/...）不 import 任何
+  `plugins/*`；`pkg/kernel` 只被 `internal/bootstrap` 引用——插件是普通 Go 库，
+  仅由组合根的适配器实现 `kernel.Plugin` 契约。
+- **pkg/bootstrap 是纯 facade**：不 import 任何插件包。插件对象的类型化访问用
+  `bootstrap.Dependency[T](boot, key)`（依赖键如 `"db.factory"`、`"cache"`、
+  `"actor.system"`），应用自行 import 插件包完成断言。
+- **plugins/db 不依赖 plugins/cache**：redis/memcache 驱动由 `plugins/cache`
+  的 `redis/register.go`、`memcache/register.go` 自注册（import 即注册，
+  `db.Config.Redis`/`Memcache` 以 any 携带配置）；依赖方向为 cache -> db。
+- **examples/ 独立模块**：主模块 require 集只保留框架实际引用的插件；
+  被插件子树传递需要的模块以 replace（无 require）形式存在。
+- **插件间无循环依赖**；插件 -> 框架仅使用 `pkg/{logger,cors,panicx,
+  requestid,response,errors}` 少量公共包。
+
+两条组装路径（链接期裁剪的具体落点）：
+
+1. **全量便捷入口**：`pkg/bootstrap`——经组合根装配 10 个内置插件与托管服务，
+   二进制包含全部内置依赖；
+2. **最小组装**：直接用 `pkg/kernel`（依赖闭包不含任何插件），应用按需 import
+   并 `kernel.Register` 插件模块——未引入的插件及其重型 SDK 完全不进二进制。
 
 ## 插件成熟度分级
 
@@ -68,10 +98,10 @@ GA 仅保留审计前已列为 GA、且达到覆盖率门槛、README 完整并�
 | audit | Beta | 78.8% |
 | auth | GA | 71.0% |
 | bloomfilter | Beta | 97.4% |
-| cache | GA | 53.1% |
+| cache | GA | 51.3% |
 | circuitbreaker | Beta | 47.2% |
 | configcenter | Beta | 37.4% |
-| db | Beta | 63.8% |
+| db | Beta | 65.5% |
 | discovery | Beta | 86.5% |
 | gameserver | Beta | 91.0% |
 | gateway | GA | 57.2% |
@@ -102,7 +132,7 @@ GA 仅保留审计前已列为 GA、且达到覆盖率门槛、README 完整并�
 | alert | 88.2% | 通知插件 |
 | audit | 78.8% | 审计日志 |
 | bloomfilter | 97.4% | 布隆过滤器 |
-| db | 63.8% | 核心内置组件，本轮从 33.5% 提升；补齐 orm 事务管理器、postgres/mongodb 客户端与根包适配器测试，修复 poolcb SQLClient 代理缺陷 |
+| db | 65.5% | 核心内置组件，本轮从 33.5% 提升；补齐 orm 事务管理器、postgres/mongodb 客户端与根包适配器测试，修复 poolcb SQLClient 代理缺陷 |
 | discovery | 86.5% | 核心内置组件，本轮从 40.5% 提升；zookeeper 后端引入 zkConn 注入缝并全覆盖（zk 包 92.4%） |
 | gameserver | 91.0% | 游戏服务器 |
 | loadbalancer | 73.9% | 负载均衡 |
@@ -223,6 +253,13 @@ kernel: starting plugin             plugin=metrics
 3. 删除其中的本地 `replace` 段，为框架内核与其他依赖插件补上线上版本
 4. 依赖方全量替换 import 前缀
 5. 本仓库 `go.work` 移除对应 `use` 行、根 go.mod 移除对应 require/replace
+6. `examples/go.mod` 若引用该模块，同步替换其 replace 为线上版本
+
+> 依赖提示：`plugins/cache` 依赖 `plugins/db`（驱动自注册），`plugins/health`
+> 依赖 `plugins/cache`；`gateway`/`rpc`/`middleware` 自身聚合多个插件，
+> 拆仓时子树一并处理。其余插件（alert/auth/bloomfilter/configcenter/gameserver/
+> push/scheduler/loadbalancer/rbac/messaging/metrics/tracing/discovery 等）
+> 只依赖框架内核公共包，可独立拆出。
 
 ## 常见问题
 
