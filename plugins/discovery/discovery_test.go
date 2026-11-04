@@ -12,6 +12,11 @@ import (
 type mockDiscovery struct {
 	mu       sync.RWMutex
 	services map[string][]*ServiceInstance
+	// fail switches force the corresponding operation to return an error so
+	// tests can exercise manager error paths.
+	failRegister  bool
+	failDeregister bool
+	failGet        bool
 }
 
 func newMockDiscovery() *mockDiscovery {
@@ -23,6 +28,9 @@ func newMockDiscovery() *mockDiscovery {
 func (m *mockDiscovery) Register(ctx context.Context, instance *ServiceInstance) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.failRegister {
+		return fmt.Errorf("mock register failure")
+	}
 	if m.services[instance.Name] == nil {
 		m.services[instance.Name] = []*ServiceInstance{}
 	}
@@ -33,6 +41,9 @@ func (m *mockDiscovery) Register(ctx context.Context, instance *ServiceInstance)
 func (m *mockDiscovery) Deregister(ctx context.Context, instance *ServiceInstance) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.failDeregister {
+		return fmt.Errorf("mock deregister failure")
+	}
 	instances := m.services[instance.Name]
 	if instances == nil {
 		return nil
@@ -50,6 +61,9 @@ func (m *mockDiscovery) Deregister(ctx context.Context, instance *ServiceInstanc
 func (m *mockDiscovery) GetService(ctx context.Context, serviceName string) ([]*ServiceInstance, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if m.failGet {
+		return nil, fmt.Errorf("mock get failure")
+	}
 	if instances, ok := m.services[serviceName]; ok {
 		copied := make([]*ServiceInstance, len(instances))
 		copy(copied, instances)
