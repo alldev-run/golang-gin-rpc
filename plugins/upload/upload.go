@@ -137,7 +137,7 @@ func (u *Uploader) Upload(fileHeader *multipart.FileHeader) *UploadResult {
 	result.FilePath = filepath.Join(u.config.UploadDir, newFilename)
 	result.Success = true
 
-	logger.Info("File uploaded successfully",
+	pluginLogger().Info("File uploaded successfully",
 		logger.String("original", fileHeader.Filename),
 		logger.String("saved", newFilename),
 		logger.Int64("size", fileHeader.Size))
@@ -230,7 +230,7 @@ func (u *Uploader) UploadFromBytes(filename string, data []byte) *UploadResult {
 	result.MimeType = mimeType
 	result.Success = true
 
-	logger.Info("File uploaded from bytes successfully",
+	pluginLogger().Info("File uploaded from bytes successfully",
 		logger.String("original", filename),
 		logger.String("saved", newFilename),
 		logger.Int("size", len(data)))
@@ -326,7 +326,7 @@ func (u *Uploader) ServeFile(filename string, w http.ResponseWriter) error {
 		return fmt.Errorf("failed to stream file: %w", err)
 	}
 
-	logger.Info("File served", logger.String("filename", filename))
+	pluginLogger().Info("File served", logger.String("filename", filename))
 	return nil
 }
 

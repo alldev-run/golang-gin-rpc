@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -277,7 +276,7 @@ func NewTracerProvider(config Config) (*TracerProvider, error) {
 	}
 
 	if !config.Enabled {
-		logger.Info("Tracing is disabled")
+		pluginLogger().Info("Tracing is disabled")
 		return &TracerProvider{config: config}, nil
 	}
 
@@ -366,7 +365,7 @@ func newOTLPTracerProvider(config Config) (*TracerProvider, error) {
 	otel.SetTracerProvider(provider)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
-	logger.Info("OTLP tracing initialized",
+	pluginLogger().Info("OTLP tracing initialized",
 		zap.String("service", config.ServiceName),
 		zap.String("endpoint", endpoint),
 		zap.String("path", config.Endpoint),
@@ -416,7 +415,7 @@ func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 		return nil
 	}
 
-	logger.Info("Shutting down tracer provider")
+	pluginLogger().Info("Shutting down tracer provider")
 	return tp.provider.Shutdown(ctx)
 }
 

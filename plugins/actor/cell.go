@@ -38,7 +38,7 @@ func (c *actorCell) run() {
 	defer close(c.done)
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Errorf("actor goroutine panic recovered",
+			pluginLogger().Error("actor goroutine panic recovered",
 				logger.String("pid", string(c.pid)),
 				logger.Any("panic", r))
 		}
@@ -94,7 +94,7 @@ func (c *actorCell) handlePanic(env Envelope, r interface{}) {
 	func() {
 		defer func() {
 			if rr := recover(); rr != nil {
-				logger.Errorf("actor supervision callback panic recovered",
+				pluginLogger().Error("actor supervision callback panic recovered",
 					logger.String("pid", string(c.pid)), logger.Any("panic", rr))
 			}
 		}()
@@ -109,7 +109,7 @@ func (c *actorCell) handlePanic(env Envelope, r interface{}) {
 			func() {
 				defer func() {
 					if rr := recover(); rr != nil {
-						logger.Errorf("actor giveup callback panic recovered",
+						pluginLogger().Error("actor giveup callback panic recovered",
 							logger.String("pid", string(c.pid)), logger.Any("panic", rr))
 					}
 				}()
@@ -141,7 +141,7 @@ func (c *actorCell) process(env Envelope) (panicked bool, panicVal interface{}) 
 		if r := recover(); r != nil {
 			panicked = true
 			panicVal = r
-			logger.Errorf("actor message panic recovered",
+			pluginLogger().Error("actor message panic recovered",
 				logger.String("pid", string(c.pid)),
 				logger.Any("panic", r),
 				logger.Any("message", env.Message))
@@ -160,7 +160,7 @@ func (c *actorCell) process(env Envelope) (panicked bool, panicVal interface{}) 
 func (c *actorCell) invoke(f func(Context)) {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Errorf("actor lifecycle panic recovered",
+			pluginLogger().Error("actor lifecycle panic recovered",
 				logger.String("pid", string(c.pid)),
 				logger.Any("panic", r))
 		}

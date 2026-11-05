@@ -66,7 +66,9 @@ examples/             独立 Go 模块（examples/go.mod）：示例代码不进
   （同名时实例注册表优先）。
 - **聚合插件依赖小接口**：`rpc.NewMetricsObserver` 接受 `rpc.MetricsRecorder`，
   `middleware.RequirePermission`/`RequireAnyPermission` 接受 `middleware.PermissionChecker`；
-  rpc、gateway、middleware 支持 `SetLogger(*zap.Logger)` 注入日志器，默认仍使用 `logger.L()`。
+  gateway 的 RBAC 使用 `gateway.PermissionChecker`；直接使用全局 logger 的插件包
+  （rpc、gateway、middleware、actor、audit、circuitbreaker、discovery、health、metrics、
+  tracing、upload、websocket）支持 `SetLogger(*zap.Logger)` 注入，默认仍使用 `logger.L()`。
 - **托管服务依赖可声明**：自定义服务经 `RegisterServiceFactory` 注册，并可用
   `RegisterServiceDependencies` 声明所需依赖键，交给 `ValidateDependencyCoverage` 校验。
 - **plugins/db 不依赖 plugins/cache**：redis/memcache 驱动由 `plugins/cache`

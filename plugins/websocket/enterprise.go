@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -185,33 +184,33 @@ type LoggingObserver struct{}
 
 func NewLoggingObserver() *LoggingObserver { return &LoggingObserver{} }
 func (o *LoggingObserver) OnConnect(identity Identity) {
-	logger.Info("websocket connected", zap.String("connection_id", identity.ConnectionID), zap.String("client_id", identity.ClientID), zap.String("user_id", identity.UserID), zap.String("tenant_id", identity.TenantID), zap.String("path", identity.Path), zap.String("remote_addr", identity.RemoteAddr))
+	pluginLogger().Info("websocket connected", zap.String("connection_id", identity.ConnectionID), zap.String("client_id", identity.ClientID), zap.String("user_id", identity.UserID), zap.String("tenant_id", identity.TenantID), zap.String("path", identity.Path), zap.String("remote_addr", identity.RemoteAddr))
 }
 func (o *LoggingObserver) OnDisconnect(identity Identity, code CloseCode, err error) {
 	fields := []zap.Field{zap.String("connection_id", identity.ConnectionID), zap.String("client_id", identity.ClientID), zap.String("user_id", identity.UserID), zap.String("tenant_id", identity.TenantID), zap.String("code", string(code))}
 	if err != nil {
 		fields = append(fields, zap.Error(err))
 	}
-	logger.Info("websocket disconnected", fields...)
+	pluginLogger().Info("websocket disconnected", fields...)
 }
 func (o *LoggingObserver) OnAuthFailed(path string, err error) {
-	logger.Warn("websocket auth failed", zap.String("path", path), zap.Error(err))
+	pluginLogger().Warn("websocket auth failed", zap.String("path", path), zap.Error(err))
 }
 func (o *LoggingObserver) OnBroadcast(target string, count int, err error) {
 	fields := []zap.Field{zap.String("target", target), zap.Int("count", count)}
 	if err != nil {
 		fields = append(fields, zap.Error(err))
 	}
-	logger.Info("websocket broadcast", fields...)
+	pluginLogger().Info("websocket broadcast", fields...)
 }
 func (o *LoggingObserver) OnMessage(direction string, identity Identity, size int) {
-	logger.Debug("websocket message", zap.String("direction", direction), zap.String("connection_id", identity.ConnectionID), zap.Int("size", size))
+	pluginLogger().Debug("websocket message", zap.String("direction", direction), zap.String("connection_id", identity.ConnectionID), zap.Int("size", size))
 }
 func (o *LoggingObserver) OnReconnectAttempt(url string, attempt int, delay time.Duration) {
-	logger.Info("websocket reconnect attempt", zap.String("url", url), zap.Int("attempt", attempt), zap.Duration("delay", delay))
+	pluginLogger().Info("websocket reconnect attempt", zap.String("url", url), zap.Int("attempt", attempt), zap.Duration("delay", delay))
 }
 func (o *LoggingObserver) OnHeartbeatTimeout(identity Identity) {
-	logger.Warn("websocket heartbeat timeout", zap.String("connection_id", identity.ConnectionID), zap.String("user_id", identity.UserID))
+	pluginLogger().Warn("websocket heartbeat timeout", zap.String("connection_id", identity.ConnectionID), zap.String("user_id", identity.UserID))
 }
 
 func newIdentity(r *http.Request, auth *AuthResult) Identity {

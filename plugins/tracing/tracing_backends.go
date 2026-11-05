@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -163,7 +162,7 @@ func newZipkinTracerProvider(config Config) (*TracerProvider, error) {
 	otel.SetTracerProvider(provider)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
-	logger.Info("Zipkin tracing initialized",
+	pluginLogger().Info("Zipkin tracing initialized",
 		zap.String("service", config.ServiceName),
 		zap.String("url", config.GetURL()),
 		zap.Float64("sample_rate", config.SampleRate),
@@ -182,7 +181,7 @@ func newJaegerTracerProvider(config Config) (*TracerProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jaeger OTLP exporter: %w", err)
 	}
-	logger.Info("Jaeger tracing initialized using OTLP",
+	pluginLogger().Info("Jaeger tracing initialized using OTLP",
 		zap.String("service", config.ServiceName),
 		zap.String("endpoint", fmt.Sprintf("%s:%d", config.Host, config.Port)),
 	)

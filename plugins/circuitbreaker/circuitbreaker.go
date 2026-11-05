@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.uber.org/zap"
 )
 
@@ -54,7 +53,7 @@ func DefaultConfig() Config {
 		Timeout:     time.Minute,
 		ReadyToTrip: func(counts Counts) bool { return counts.ConsecutiveFailures > 5 },
 		OnStateChange: func(name string, from, to State) {
-			logger.Info("Circuit breaker state changed",
+			pluginLogger().Info("Circuit breaker state changed",
 				zap.String("name", name),
 				zap.String("from", from.String()),
 				zap.String("to", to.String()))

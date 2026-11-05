@@ -280,7 +280,7 @@ func (hm *HealthManager) HTTPHandler() http.HandlerFunc {
 			}
 
 			if err := json.NewEncoder(w).Encode(result); err != nil {
-				logger.Errorf("Failed to encode health check response", logger.Error(fmt.Errorf("encode: %w", err)))
+				pluginLogger().Error("Failed to encode health check response", logger.Error(fmt.Errorf("encode: %w", err)))
 			}
 			return
 		}
@@ -299,7 +299,7 @@ func (hm *HealthManager) HTTPHandler() http.HandlerFunc {
 		}
 
 		if err := json.NewEncoder(w).Encode(report); err != nil {
-			logger.Errorf("Failed to encode health report", logger.Error(fmt.Errorf("encode: %w", err)))
+			pluginLogger().Error("Failed to encode health report", logger.Error(fmt.Errorf("encode: %w", err)))
 		}
 	}
 }

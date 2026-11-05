@@ -44,7 +44,7 @@ func (LogSink) Write(ctx context.Context, event Event) error {
 		recordAuditWriteMetric("log", "error", time.Since(start))
 		return err
 	}
-	logger.Info("audit_event", logger.String("payload", string(raw)))
+	pluginLogger().Info("audit_event", logger.String("payload", string(raw)))
 	recordAuditWriteMetric("log", "success", time.Since(start))
 	return nil
 }

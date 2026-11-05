@@ -440,7 +440,7 @@ func (m *MetricsCollector) StartMetricsServer(addr string) error {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
-	logger.Info("Starting metrics server", zap.String("address", addr))
+	pluginLogger().Info("Starting metrics server", zap.String("address", addr))
 	return http.ListenAndServe(addr, mux)
 }
 
@@ -454,13 +454,13 @@ func (m *MetricsCollector) StartMetricsServerWithContext(ctx context.Context, ad
 		Handler: mux,
 	}
 
-	logger.Info("Starting metrics server", zap.String("address", addr))
+	pluginLogger().Info("Starting metrics server", zap.String("address", addr))
 
 	go func() {
 		<-ctx.Done()
-		logger.Info("Shutting down metrics server")
+		pluginLogger().Info("Shutting down metrics server")
 		if err := server.Shutdown(ctx); err != nil {
-			logger.Errorf("Failed to shut down metrics server", logger.Error(fmt.Errorf("shutdown: %w", err)))
+			pluginLogger().Error("Failed to shut down metrics server", logger.Error(fmt.Errorf("shutdown: %w", err)))
 		}
 	}()
 

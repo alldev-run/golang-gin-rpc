@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.uber.org/zap"
 )
 
@@ -97,13 +96,13 @@ func (m *ServiceDiscoveryManager) Start() error {
 	}
 
 	if !m.config.Enabled {
-		logger.Info("Service discovery is disabled")
+		pluginLogger().Info("Service discovery is disabled")
 		m.started = true
 		m.mu.Unlock()
 		return nil
 	}
 
-	logger.Info("Starting service discovery manager",
+	pluginLogger().Info("Starting service discovery manager",
 		zap.String("registry_type", m.config.RegistryType),
 		zap.String("registry_address", m.config.RegistryAddress))
 	m.mu.Unlock()
@@ -121,7 +120,7 @@ func (m *ServiceDiscoveryManager) Start() error {
 	m.mu.Lock()
 	m.started = true
 	m.mu.Unlock()
-	logger.Info("Service discovery manager started successfully")
+	pluginLogger().Info("Service discovery manager started successfully")
 	return nil
 }
 
@@ -133,7 +132,7 @@ func (m *ServiceDiscoveryManager) Stop() error {
 		return nil
 	}
 
-	logger.Info("Stopping service discovery manager")
+	pluginLogger().Info("Stopping service discovery manager")
 
 	// Stop health check routine
 	close(m.stopCh)
@@ -143,11 +142,11 @@ func (m *ServiceDiscoveryManager) Stop() error {
 	// Deregister self if auto registered (done without holding the lock to avoid deadlock)
 	if m.config.AutoRegister {
 		if err := m.deregisterSelf(); err != nil {
-			logger.Errorf("Failed to deregister self", zap.Error(err))
+			pluginLogger().Error("Failed to deregister self", zap.Error(err))
 		}
 	}
 
-	logger.Info("Service discovery manager stopped")
+	pluginLogger().Info("Service discovery manager stopped")
 	return nil
 }
 
@@ -166,7 +165,7 @@ func (m *ServiceDiscoveryManager) Register(ctx context.Context, instance *Servic
 
 	m.instances[instance.ID] = instance
 	delete(m.unhealthy, instance.ID)
-	logger.Info("Service registered",
+	pluginLogger().Info("Service registered",
 		zap.String("id", instance.ID),
 		zap.String("name", instance.Name),
 		zap.String("address", fmt.Sprintf("%s:%d", instance.Address, instance.Port)))
@@ -189,7 +188,7 @@ func (m *ServiceDiscoveryManager) Deregister(ctx context.Context, instance *Serv
 
 	delete(m.instances, instance.ID)
 	delete(m.unhealthy, instance.ID)
-	logger.Info("Service deregistered",
+	pluginLogger().Info("Service deregistered",
 		zap.String("id", instance.ID),
 		zap.String("name", instance.Name))
 
@@ -207,7 +206,7 @@ func (m *ServiceDiscoveryManager) GetService(ctx context.Context, serviceName st
 		return nil, fmt.Errorf("failed to get service %s: %w", serviceName, err)
 	}
 
-	logger.Debug("Retrieved service instances",
+	pluginLogger().Debug("Retrieved service instances",
 		zap.String("service_name", serviceName),
 		zap.Int("instance_count", len(instances)))
 
@@ -361,7 +360,7 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 			m.mu.Lock()
 			if registerErr == nil && m.instances[instance.ID] == instance && m.unhealthy[instance.ID] {
 				delete(m.unhealthy, instance.ID)
-				logger.Info("Re-registered recovered service instance",
+				pluginLogger().Info("Re-registered recovered service instance",
 					zap.String("id", instance.ID),
 					zap.String("service", instance.Name),
 					zap.String("address", address))
@@ -386,14 +385,14 @@ func (m *ServiceDiscoveryManager) performHealthCheck() {
 		deregisterCancel()
 
 		if deregisterErr != nil {
-			logger.Warn("Marked service instance unhealthy; registry deregistration failed",
+			pluginLogger().Warn("Marked service instance unhealthy; registry deregistration failed",
 				zap.String("id", instance.ID),
 				zap.String("service", instance.Name),
 				zap.String("address", address),
 				zap.Error(deregisterErr))
 			continue
 		}
-		logger.Warn("Deregistered unhealthy service instance",
+		pluginLogger().Warn("Deregistered unhealthy service instance",
 			zap.String("id", instance.ID),
 			zap.String("service", instance.Name),
 			zap.String("address", address),
@@ -458,7 +457,7 @@ func (w *ServiceWatcher) watchLoop(ctx context.Context) {
 		case <-ticker.C:
 			instances, err := w.manager.GetService(ctx, w.serviceName)
 			if err != nil {
-				logger.Errorf("Failed to get service during watch",
+				pluginLogger().Error("Failed to get service during watch",
 					zap.String("service", w.serviceName),
 					zap.Error(err))
 				continue

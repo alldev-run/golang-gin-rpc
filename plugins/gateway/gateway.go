@@ -28,7 +28,7 @@ type Gateway struct {
 	proxy       *Proxy       // HTTP proxy
 	auth        *GatewayAuth // Authentication middleware
 	auditConfig middlewarepkg.AuditConfig
-	rbacPolicy  *rbac.Policy
+	rbacPolicy  PermissionChecker
 	mu          sync.RWMutex
 	started     bool
 	ctx         context.Context
@@ -82,7 +82,7 @@ func NewGateway(config *Config) *Gateway {
 		auditCfg.SensitiveKeys = append([]string(nil), config.Audit.SensitiveKeys...)
 	}
 
-	var rbacPolicy *rbac.Policy
+	var rbacPolicy PermissionChecker
 	if config.RBAC.Enabled {
 		rbacPolicy = rbac.NewPolicy(config.RBAC.RolePermissions)
 	}
@@ -344,15 +344,26 @@ func (g *Gateway) GetAuditConfig() middlewarepkg.AuditConfig {
 	return g.auditConfig
 }
 
-// SetRBACPolicy sets RBAC policy used by route permission checks.
-func (g *Gateway) SetRBACPolicy(policy *rbac.Policy) {
+// PermissionChecker is the authorization backend used by route permission
+// checks. *rbac.Policy satisfies it.
+type PermissionChecker interface {
+	HasPermission(roles []string, permission string) bool
+	HasAnyPermission(roles []string, permissions []string) bool
+	HasAllPermissions(roles []string, permissions []string) bool
+}
+
+// SetRBACPolicy sets the policy used by route permission checks.
+func (g *Gateway) SetRBACPolicy(policy PermissionChecker) {
+	if p, ok := policy.(*rbac.Policy); ok && p == nil {
+		policy = nil
+	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.rbacPolicy = policy
 }
 
-// GetRBACPolicy returns current RBAC policy.
-func (g *Gateway) GetRBACPolicy() *rbac.Policy {
+// GetRBACPolicy returns the current route permission checker.
+func (g *Gateway) GetRBACPolicy() PermissionChecker {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return g.rbacPolicy
