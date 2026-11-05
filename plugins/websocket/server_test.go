@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	userpb "github.com/alldev-run/golang-gin-rpc/proto"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func TestServer_ClientEcho(t *testing.T) {
@@ -86,7 +86,7 @@ func TestServer_ReceiveMessage_ProtoByConfigFrameTypeMismatch(t *testing.T) {
 	server := NewServer(ServerConfig{Path: "/ws", MessageFormat: MessageFormatProtobuf, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second})
 	server.Handle("/ws", func(ctx context.Context, conn *Conn) {
 		defer conn.Close()
-		var req userpb.UserRequest
+		var req wrapperspb.Int64Value
 		errCh <- conn.ReceiveMessage(ctx, &req)
 	})
 

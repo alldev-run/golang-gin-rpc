@@ -2,15 +2,13 @@ module github.com/alldev-run/golang-gin-rpc/plugins/health
 
 go 1.25.7
 
-require (
-	github.com/alldev-run/golang-gin-rpc v0.0.0
-	github.com/alldev-run/golang-gin-rpc/plugins/cache v0.0.0
-)
+require github.com/alldev-run/golang-gin-rpc/plugins/cache v0.0.0
 
 require github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/db v0.0.0 // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -32,9 +30,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace (
-	github.com/alldev-run/golang-gin-rpc => ../..
-	github.com/alldev-run/golang-gin-rpc/plugins/cache => ../cache
-)
+replace github.com/alldev-run/golang-gin-rpc/plugins/cache => ../cache
 
 replace github.com/alldev-run/golang-gin-rpc/plugins/db => ../db
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

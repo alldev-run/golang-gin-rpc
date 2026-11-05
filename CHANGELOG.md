@@ -15,10 +15,13 @@ and this project adheres to semantic versioning.
 - Redis and Memcached fallback configuration for failover caches.
 - TCP health checks and metadata-weighted service selection for discovery.
 - File-based APNs and FCM credentials.
+- `bootstrap.Dep*` constants (for example `bootstrap.DepDBFactory`, `bootstrap.DepTracer`) for the dependency-container keys; the string values are unchanged.
 - `tracing.SetGlobalTracer` for installing (or, with `nil`, resetting) the process-wide tracer provider.
 
 ### Changed
 
+- **Breaking:** `pkg/` is now a separate Go module, `github.com/alldev-run/golang-gin-rpc/pkg`. Plugin modules require it instead of the root module. Import paths are unchanged; modules that build against a local checkout need `require github.com/alldev-run/golang-gin-rpc/pkg v0.0.0` plus a `replace` pointing at `pkg/`.
+- **Breaking:** `github.com/alldev-run/golang-gin-rpc/pkg/bootstrap` moved to `github.com/alldev-run/golang-gin-rpc/bootstrap`. Its API is unchanged; update the import path. It links every built-in plugin, so it cannot live in the plugin-free core module.
 - Documentation is now organized into category directories under `docs/`; see [the documentation index](docs/README.md).
 - **Breaking:** WebSocket servers now use the WebSocket library's same-origin policy when `origin_patterns` is empty. Set `allow_any_origin: true` only when unrestricted cross-origin access is intentional.
 - **Breaking:** `bootstrap.StopFramework` now returns an error; callers should handle shutdown errors.

@@ -3,13 +3,17 @@ module github.com/alldev-run/golang-gin-rpc/plugins/discovery
 go 1.25.7
 
 require (
-	github.com/alldev-run/golang-gin-rpc v0.0.0
 	github.com/go-zookeeper/zk v1.0.4
 	github.com/hashicorp/consul/api v1.33.4
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
 	go.etcd.io/etcd/api/v3 v3.6.8
 	go.etcd.io/etcd/client/v3 v3.6.8
 	go.uber.org/zap v1.27.1
+)
+
+require (
+	github.com/hashicorp/go-version v1.8.0 // indirect
+	go.opentelemetry.io/otel v1.42.0 // indirect
 )
 
 require (
@@ -34,6 +38,7 @@ require (
 	github.com/aliyun/alibabacloud-dkms-transfer-go-sdk v0.1.8 // indirect
 	github.com/aliyun/aliyun-secretsmanager-client-go v1.1.5 // indirect
 	github.com/aliyun/credentials-go v1.4.3 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -92,4 +97,4 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
 
-replace github.com/alldev-run/golang-gin-rpc => ../..
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

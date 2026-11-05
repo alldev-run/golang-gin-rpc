@@ -45,7 +45,7 @@ package main
 
 import (
     "github.com/alldev-run/golang-gin-rpc/plugins/rpc"
-    "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/bootstrap"
 )
 
 func main() {

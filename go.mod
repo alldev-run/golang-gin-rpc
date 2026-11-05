@@ -32,7 +32,7 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/grpc v1.79.2
 	google.golang.org/protobuf v1.36.11
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -240,8 +240,11 @@ require github.com/alldev-run/golang-gin-rpc/plugins/upload v0.0.0
 replace github.com/alldev-run/golang-gin-rpc/plugins/upload => ./plugins/upload
 
 require (
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/actor v0.0.0-00010101000000-000000000000
 	github.com/alldev-run/golang-gin-rpc/plugins/websocket v0.0.0
 )
 
 replace github.com/alldev-run/golang-gin-rpc/plugins/websocket => ./plugins/websocket
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ./pkg

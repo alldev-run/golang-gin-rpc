@@ -4,13 +4,12 @@
 
  ## 功能概览
 
-- **核心内核（`pkg/`，始终链接）**
+- **核心内核（`pkg/`，独立 core 模块 `github.com/alldev-run/golang-gin-rpc/pkg`，始终链接）**
   - `pkg/kernel`：插件契约、注册表、生命周期加载器（拓扑排序 / 环检测 / 回滚）
   - `pkg/config`：统一配置加载与管理（支持插件按段自解析配置）
   - `pkg/logger`：结构化日志
   - `pkg/errors`、`pkg/panicx`、`pkg/status_code`、`pkg/response`：错误与响应
   - `pkg/requestid`、`pkg/cors`、`pkg/utils`、`pkg/version`：通用辅助
-  - `pkg/bootstrap`：应用组合根门面（内部由 kernel 驱动）
 - **插件模块（`plugins/<name>`，各自独立 go.mod，按需引入）**
   - 服务通信：`rpc`（gRPC/JSON-RPC）、`gateway`（网关 + HTTP 中间件 + router）、`websocket`（游戏协议层：envelope 路由/会话恢复/房间/发送背压）、`messaging`（Kafka/NATS/RabbitMQ + 请求-应答）
   - 数据与状态：`db`（驱动注册表：mysql/postgres/clickhouse/mongodb/elasticsearch…）、`cache`（redis/memcache/failover）、`search`
@@ -19,6 +18,8 @@
   - 中间件库：`middleware`（独立 net/http 中间件：audit/auth/apikey/cors/ip_filter/rate_limiter/recovery 等）
   - 游戏服：`gameserver`（九宫格 AOI 空间管理，供实时游戏房间/大世界邻居查询）
   - 工具类：`alert`、`bloomfilter`、`scheduler`
+
+- **全量组合根（`bootstrap/`，根模块）**：`bootstrap.NewBootstrap` + `StartFramework` 装配全部内置插件（内部由 kernel 驱动）
 
 > 插件机制详见 [插件架构文档](docs/architecture/plugin-architecture.md)。
  
@@ -31,6 +32,7 @@
 │   ├── app/                  # 应用启动与 HTTP Server 封装
 │   ├── bootstrap/            # 组合根：内置插件适配器 + kernel 驱动启动
 │   └── router/               # 路由注册
+├── bootstrap/                # 全量组合根门面（链接全部内置插件）
 ├── pkg/                      # 核心内核（kernel/config/logger/errors/...）
 ├── plugins/                  # 功能插件（每个子目录一个独立 Go 模块）
 │   ├── db/                   #   例：数据库（驱动注册表 + mysql/postgres/... 子包）

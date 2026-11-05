@@ -1,4 +1,5 @@
-// Package bootstrap 是框架的便捷组装入口（纯 facade，不 import 任何插件模块）。
+// Package bootstrap 是框架的全量便捷组装入口。它经 internal/bootstrap 链接全部
+// 内置插件；只需要内核时请直接使用 pkg/kernel。
 //
 // 两条组装路径：
 //  1. 全量便捷入口（本包）：NewBootstrap + StartFramework 经组合根装配 10 个
@@ -31,6 +32,25 @@ type FrameworkOptions = internalbootstrap.FrameworkOptions
 type APIGatewayServiceOptions = internalbootstrap.APIGatewayServiceOptions
 
 type WebSocketServiceOptions = internalbootstrap.WebSocketServiceOptions
+
+// Dependency keys accepted by Dependency and Bootstrap.GetDependency.
+const (
+	DepDBFactory          = internalbootstrap.DepDBFactory
+	DepCache              = internalbootstrap.DepCache
+	DepRPCManager         = internalbootstrap.DepRPCManager
+	DepDiscoveryManager   = internalbootstrap.DepDiscoveryManager
+	DepErrorsInitialized  = internalbootstrap.DepErrorsInitialized
+	DepHealthManager      = internalbootstrap.DepHealthManager
+	DepMetricsCollector   = internalbootstrap.DepMetricsCollector
+	DepAuthManager        = internalbootstrap.DepAuthManager
+	DepTracer             = internalbootstrap.DepTracer
+	DepUploader           = internalbootstrap.DepUploader
+	DepActorSystem        = internalbootstrap.DepActorSystem
+	DepGateway            = internalbootstrap.DepGateway
+	DepGatewayHTTPService = internalbootstrap.DepGatewayHTTPService
+	DepWebSocketServer    = internalbootstrap.DepWebSocketServer
+	DepWebSocketManager   = internalbootstrap.DepWebSocketManager
+)
 
 func NewBootstrap(configPath string) (*Bootstrap, error) {
 	return internalbootstrap.NewBootstrap(configPath)
@@ -209,13 +229,10 @@ func LoadDatabaseConfig(boot *Bootstrap, dbConfigPath string) error {
 // Dependency 按依赖键取回插件对象并断言为具体类型。本包不 import 任何插件
 // 模块（链接期裁剪：应用自行 import 需要的插件包后在此做类型断言），例如：
 //
-//	factory, err := bootstrap.Dependency[*db.Factory](boot, "db.factory")
-//	system, err := bootstrap.Dependency[*actor.System](boot, "actor.system")
+//	factory, err := bootstrap.Dependency[*db.Factory](boot, bootstrap.DepDBFactory)
+//	system, err := bootstrap.Dependency[*actor.System](boot, bootstrap.DepActorSystem)
 //
-// 依赖键与 internal/bootstrap 的依赖容器一致："db.factory"、"cache"、
-// "rpc.manager"、"discovery.manager"、"tracer"、"auth.manager"、
-// "metrics.collector"、"upload.uploader"、"actor.system"、
-// "gateway"、"websocket.server" 等。
+// 依赖键使用本包导出的 Dep* 常量（值与历史字符串键保持一致）。
 func Dependency[T any](boot *Bootstrap, key string) (T, error) {
 	var zero T
 	if boot == nil {

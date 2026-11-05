@@ -3,12 +3,13 @@ module github.com/alldev-run/golang-gin-rpc/plugins/actor
 go 1.25.7
 
 require (
-	github.com/alldev-run/golang-gin-rpc v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/discovery v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/messaging v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 )
+
+require go.opentelemetry.io/otel/sdk v1.42.0 // indirect
 
 require (
 	github.com/IBM/sarama v1.47.0 // indirect
@@ -33,6 +34,7 @@ require (
 	github.com/aliyun/alibabacloud-dkms-transfer-go-sdk v0.1.8 // indirect
 	github.com/aliyun/aliyun-secretsmanager-client-go v1.1.5 // indirect
 	github.com/aliyun/credentials-go v1.4.3 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -93,6 +95,8 @@ require (
 	go.etcd.io/etcd/api/v3 v3.6.8 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.8 // indirect
 	go.etcd.io/etcd/client/v3 v3.6.8 // indirect
+	go.opentelemetry.io/otel/metric v1.42.0 // indirect
+	go.opentelemetry.io/otel/trace v1.42.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
@@ -113,7 +117,8 @@ require (
 )
 
 replace (
-	github.com/alldev-run/golang-gin-rpc => ../..
 	github.com/alldev-run/golang-gin-rpc/plugins/discovery => ../discovery
 	github.com/alldev-run/golang-gin-rpc/plugins/messaging => ../messaging
 )
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

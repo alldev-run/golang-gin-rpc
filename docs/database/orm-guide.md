@@ -24,7 +24,7 @@ import (
     "context"
     "database/sql"
     
-    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    bootstrap "github.com/alldev-run/golang-gin-rpc/bootstrap"
     "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
@@ -99,7 +99,7 @@ package main
 import (
     "context"
     
-    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    bootstrap "github.com/alldev-run/golang-gin-rpc/bootstrap"
     "github.com/alldev-run/golang-gin-rpc/plugins/db"
 )
 

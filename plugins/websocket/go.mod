@@ -3,7 +3,6 @@ module github.com/alldev-run/golang-gin-rpc/plugins/websocket
 go 1.25.7
 
 require (
-	github.com/alldev-run/golang-gin-rpc v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/messaging v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/tracing v0.0.0
 	github.com/coder/websocket v1.8.15
@@ -17,6 +16,7 @@ require (
 
 require (
 	github.com/IBM/sarama v1.47.0 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
@@ -82,7 +82,8 @@ require (
 )
 
 replace (
-	github.com/alldev-run/golang-gin-rpc => ../..
 	github.com/alldev-run/golang-gin-rpc/plugins/messaging => ../messaging
 	github.com/alldev-run/golang-gin-rpc/plugins/tracing => ../tracing
 )
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

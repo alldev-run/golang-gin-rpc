@@ -3,6 +3,7 @@ go 1.25.7
 use (
 	.
 	./examples
+	./pkg
 	./plugins/actor
 	./plugins/alert
 	./plugins/audit

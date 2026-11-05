@@ -48,23 +48,29 @@ examples/             独立 Go 模块（examples/go.mod）：示例代码不进
 
 框架层与插件模块的依赖方向经过专项解耦（2026-11 审计，CI 的依赖边界以代码为准）：
 
-- **内核零反向依赖**：`pkg/*`（kernel/config/logger/errors/...）不 import 任何
-  `plugins/*`；`pkg/kernel` 只被 `internal/bootstrap` 引用——插件是普通 Go 库，
-  仅由组合根的适配器实现 `kernel.Plugin` 契约。
-- **pkg/bootstrap 是纯 facade**：不 import 任何插件包。插件对象的类型化访问用
-  `bootstrap.Dependency[T](boot, key)`（依赖键如 `"db.factory"`、`"cache"`、
-  `"actor.system"`），应用自行 import 插件包完成断言。
+- **core 模块独立**：`pkg/` 是独立 Go 模块 `github.com/alldev-run/golang-gin-rpc/pkg`
+  （kernel/config/logger/errors/...），不 import 任何 `plugins/*` 或 `internal/*`，
+  CI 的 `core module (pkg)` job 用 `go list -deps` 强制检查。
+- **插件只依赖 core 模块**：插件 go.mod require `.../pkg`（本地以 `replace => ../../pkg`
+  指向），不再 require 根模块；根模块与插件模块之间不存在双向依赖，插件可连同
+  `pkg` 模块单独拆出。
+- **bootstrap 是全量组合根**：根模块的 `bootstrap` 包（原 `pkg/bootstrap`）经
+  `internal/bootstrap` 链接全部内置插件，并非零依赖 facade。插件对象的类型化访问用
+  `bootstrap.Dependency[T](boot, key)`，依赖键使用导出常量（如 `bootstrap.DepDBFactory`、
+  `bootstrap.DepCache`、`bootstrap.DepActorSystem`），值与历史字符串键一致。
 - **plugins/db 不依赖 plugins/cache**：redis/memcache 驱动由 `plugins/cache`
   的 `redis/register.go`、`memcache/register.go` 自注册（import 即注册，
   `db.Config.Redis`/`Memcache` 以 any 携带配置）；依赖方向为 cache -> db。
+  通过 cache 间接依赖 db 的插件（如 gateway、health、rpc）需要在 go.mod 中保留
+  `plugins/db` 的 replace，`GOWORK=off go mod tidy` 才能解析。
 - **examples/ 独立模块**：主模块 require 集只保留框架实际引用的插件；
   被插件子树传递需要的模块以 replace（无 require）形式存在。
-- **插件间无循环依赖**；插件 -> 框架仅使用 `pkg/{logger,cors,panicx,
-  requestid,response,errors}` 少量公共包。
+- **插件间无循环依赖**；插件 -> 框架仅使用 `pkg/{logger,config,cors,panicx,
+  requestid,response,errors}` 等 core 包。
 
 两条组装路径（链接期裁剪的具体落点）：
 
-1. **全量便捷入口**：`pkg/bootstrap`——经组合根装配 10 个内置插件与托管服务，
+1. **全量便捷入口**：`bootstrap`（根模块）——经组合根装配 10 个内置插件与托管服务，
    二进制包含全部内置依赖；
 2. **最小组装**：直接用 `pkg/kernel`（依赖闭包不含任何插件），应用按需 import
    并 `kernel.Register` 插件模块——未引入的插件及其重型 SDK 完全不进二进制。

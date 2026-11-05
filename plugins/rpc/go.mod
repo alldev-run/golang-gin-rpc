@@ -3,7 +3,6 @@ module github.com/alldev-run/golang-gin-rpc/plugins/rpc
 go 1.25.7
 
 require (
-	github.com/alldev-run/golang-gin-rpc v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/circuitbreaker v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/discovery v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/health v0.0.0
@@ -42,6 +41,7 @@ require (
 	github.com/aliyun/alibabacloud-dkms-transfer-go-sdk v0.1.8 // indirect
 	github.com/aliyun/aliyun-secretsmanager-client-go v1.1.5 // indirect
 	github.com/aliyun/credentials-go v1.4.3 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/cache v0.0.0 // indirect
 	github.com/alldev-run/golang-gin-rpc/plugins/db v0.0.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
@@ -141,7 +141,6 @@ require (
 )
 
 replace (
-	github.com/alldev-run/golang-gin-rpc => ../..
 	github.com/alldev-run/golang-gin-rpc/plugins/cache => ../cache
 	github.com/alldev-run/golang-gin-rpc/plugins/circuitbreaker => ../circuitbreaker
 	github.com/alldev-run/golang-gin-rpc/plugins/discovery => ../discovery
@@ -152,3 +151,5 @@ replace (
 )
 
 replace github.com/alldev-run/golang-gin-rpc/plugins/db => ../db
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

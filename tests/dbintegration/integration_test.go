@@ -10,7 +10,7 @@ import (
 	"time"
 
 	internalbootstrap "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 	"github.com/alldev-run/golang-gin-rpc/plugins/db/orm"

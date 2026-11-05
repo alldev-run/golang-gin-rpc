@@ -39,8 +39,8 @@ build: ## Build the application and all plugin modules
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME) .
-	@echo "Building plugin modules..."
-	@for d in plugins/*/; do (cd $$d && $(GOBUILD) ./... >/dev/null) || exit 1; done
+	@echo "Building core and plugin modules..."
+	@for d in pkg/ plugins/*/; do (cd $$d && $(GOBUILD) ./... >/dev/null) || exit 1; done
 	@echo "Build completed: $(BUILD_DIR)/$(APP_NAME) (+ `ls -d plugins/*/ | wc -l | tr -d ' '` plugin modules)"
 
 build-debug: ## Build the application with debug symbols
@@ -70,8 +70,8 @@ fmt: ## Format Go code
 	@echo "Formatting Go code..."
 	$(GOCMD) fmt ./...
 
-vet-plugins: ## Run go vet on all plugin modules
-	@for d in plugins/*/; do (cd $$d && $(GOVET) ./... ) || exit 1; done
+vet-plugins: ## Run go vet on the core module and all plugin modules
+	@for d in pkg/ plugins/*/; do (cd $$d && $(GOVET) ./... ) || exit 1; done
 
 vet: ## Run go vet
 	@echo "Running go vet..."
@@ -85,11 +85,11 @@ lint: ## Run linter (requires golangci-lint)
 		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi
 
-test: ## Run tests (root module + all plugin modules)
+test: ## Run tests (root, core and plugin modules)
 	@echo "Running tests (root module)..."
 	$(GOTEST) ./...
-	@echo "Running tests (plugin modules)..."
-	@failed=0; for d in plugins/*/; do \
+	@echo "Running tests (core and plugin modules)..."
+	@failed=0; for d in pkg/ plugins/*/; do \
 		(cd $$d && $(GOTEST) ./... ) || failed=1; \
 	done; exit $$failed
 

@@ -162,7 +162,7 @@ upload:
 ```go
 import (
     "github.com/alldev-run/golang-gin-rpc/internal/bootstrap"
-    "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/bootstrap"
 )
 
 // Initialize bootstrap

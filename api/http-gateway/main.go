@@ -15,7 +15,7 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/httpapi"
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/mw"
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/routes"
-	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"

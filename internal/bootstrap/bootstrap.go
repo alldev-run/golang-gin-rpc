@@ -358,7 +358,7 @@ func (b *Bootstrap) InitializeDatabases() error {
 		}
 
 		b.db = factory
-		b.setDependency("db.factory", factory)
+		b.setDependency(DepDBFactory, factory)
 		// Set global factory for db helper functions
 		db.SetGlobalFactory(factory)
 		logger.Info("Database initialization completed")
@@ -422,7 +422,7 @@ func (b *Bootstrap) InitializeDatabases() error {
 	}
 
 	b.db = factory
-	b.setDependency("db.factory", factory)
+	b.setDependency(DepDBFactory, factory)
 	// Set global factory for db helper functions
 	db.SetGlobalFactory(factory)
 	logger.Info("Database initialization completed")
@@ -450,7 +450,7 @@ func (b *Bootstrap) InitializeCache() error {
 	}
 
 	b.cache = cacheInstance
-	b.setDependency("cache", cacheInstance)
+	b.setDependency(DepCache, cacheInstance)
 	logger.Info("Redis cache initialized")
 
 	return nil
@@ -492,7 +492,7 @@ func (b *Bootstrap) InitializeRPC() error {
 	}
 
 	b.rpcManager = rpc.NewManager(managerConfig)
-	b.setDependency("rpc.manager", b.rpcManager)
+	b.setDependency(DepRPCManager, b.rpcManager)
 
 	if b.config.RPC.Degradation.Enabled {
 		dmConfig := rpc.DefaultDegradationConfig()
@@ -567,7 +567,7 @@ func (b *Bootstrap) InitializeDiscovery() error {
 	}
 
 	b.discoveryManager = manager
-	b.setDependency("discovery.manager", manager)
+	b.setDependency(DepDiscoveryManager, manager)
 
 	if b.rpcManager != nil {
 		if err := b.rpcManager.SetDiscoveryIntegration(manager, rpc.DiscoveryRegistrationConfig{
@@ -587,7 +587,7 @@ func (b *Bootstrap) InitializeDiscovery() error {
 
 // InitializeErrors initializes error handling
 func (b *Bootstrap) InitializeErrors() error {
-	b.setDependency("errors.initialized", true)
+	b.setDependency(DepErrorsInitialized, true)
 	logger.Info("Error handling initialized successfully")
 	return nil
 }
@@ -626,7 +626,7 @@ func (b *Bootstrap) InitializeHealth() error {
 	}
 
 	b.healthManager = healthManager
-	b.setDependency("health.manager", healthManager)
+	b.setDependency(DepHealthManager, healthManager)
 
 	logger.Info("Health check services initialized successfully")
 	return nil
@@ -641,7 +641,7 @@ func (b *Bootstrap) InitializeMetrics() error {
 
 	metricsCollector := metrics.NewMetricsCollector()
 	b.metricsCollector = metricsCollector
-	b.setDependency("metrics.collector", metricsCollector)
+	b.setDependency(DepMetricsCollector, metricsCollector)
 
 	// Start metrics server in background
 	go func() {
@@ -681,7 +681,7 @@ func (b *Bootstrap) InitializeAuth() error {
 		},
 	})
 	b.authManager = authManager
-	b.setDependency("auth.manager", authManager)
+	b.setDependency(DepAuthManager, authManager)
 
 	logger.Info("Authentication services initialized successfully")
 	return nil
@@ -710,7 +710,7 @@ func (b *Bootstrap) InitializeTracing() error {
 
 	b.tracer = tracer
 	tracing.SetGlobalTracer(tracer)
-	b.setDependency("tracer", tracer)
+	b.setDependency(DepTracer, tracer)
 
 	logger.Info("Tracing services initialized successfully")
 	return nil
@@ -742,7 +742,7 @@ func (b *Bootstrap) InitializeUpload() error {
 
 	uploader := upload.NewUploader(&uploadCfg.Config)
 	b.uploader = uploader
-	b.setDependency("upload.uploader", uploader)
+	b.setDependency(DepUploader, uploader)
 
 	logger.Info("Upload service initialized successfully",
 		logger.String("upload_dir", uploadCfg.Config.UploadDir),
@@ -779,7 +779,7 @@ func (b *Bootstrap) InitializeActor() error {
 		}
 	}
 	b.actorSystem = actor.NewWithOptions(opts)
-	b.setDependency("actor.system", b.actorSystem)
+	b.setDependency(DepActorSystem, b.actorSystem)
 
 	logger.Info("Actor system initialized",
 		logger.Int("mailbox_size", opts.DefaultMailboxSize),
@@ -810,7 +810,7 @@ func (b *Bootstrap) InitializeGateway() error {
 	gatewayConfig.Discovery.Timeout = b.config.Discovery.Timeout
 
 	b.gateway = gateway.NewGateway(gatewayConfig)
-	b.setDependency("gateway", b.gateway)
+	b.setDependency(DepGateway, b.gateway)
 
 	// Initialize gateway
 	if err := b.gateway.Initialize(); err != nil {

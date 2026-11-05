@@ -8,14 +8,14 @@ import (
 
 // componentDependencyKeys 内置组件插件 → 依赖容器键。
 var componentDependencyKeys = map[string]string{
-	"db":        "db.factory",
-	"cache":     "cache",
-	"discovery": "discovery.manager",
-	"tracing":   "tracer",
-	"auth":      "auth.manager",
-	"metrics":   "metrics.collector",
-	"health":    "health.manager",
-	"errors":    "errors.initialized",
+	"db":        DepDBFactory,
+	"cache":     DepCache,
+	"discovery": DepDiscoveryManager,
+	"tracing":   DepTracer,
+	"auth":      DepAuthManager,
+	"metrics":   DepMetricsCollector,
+	"health":    DepHealthManager,
+	"errors":    DepErrorsInitialized,
 }
 
 // ValidateDependencyCoverage checks whether required framework dependencies
@@ -34,19 +34,19 @@ func (b *Bootstrap) ValidateDependencyCoverage(options FrameworkOptions) error {
 		svc := strings.TrimSpace(service)
 		switch svc {
 		case ServiceRPC:
-			required["rpc.manager"] = struct{}{}
+			required[DepRPCManager] = struct{}{}
 		case ServiceAPIGateway:
-			required["gateway"] = struct{}{}
-			required["gateway.http_service"] = struct{}{}
+			required[DepGateway] = struct{}{}
+			required[DepGatewayHTTPService] = struct{}{}
 		case ServiceWebSocket:
-			required["websocket.server"] = struct{}{}
+			required[DepWebSocketServer] = struct{}{}
 		default:
 			if strings.HasPrefix(svc, "api-gateway") {
-				required["gateway"] = struct{}{}
-				required["gateway.http_service"] = struct{}{}
+				required[DepGateway] = struct{}{}
+				required[DepGatewayHTTPService] = struct{}{}
 			}
 			if strings.HasPrefix(svc, "websocket") {
-				required["websocket.server"] = struct{}{}
+				required[DepWebSocketServer] = struct{}{}
 			}
 		}
 	}

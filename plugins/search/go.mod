@@ -10,7 +10,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/alldev-run/golang-gin-rpc v0.0.0 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.9.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -20,6 +20,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.42.0 // indirect
 	go.opentelemetry.io/otel/metric v1.42.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.42.0 // indirect
 	go.opentelemetry.io/otel/trace v1.42.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
@@ -28,7 +29,8 @@ require (
 )
 
 replace (
-	github.com/alldev-run/golang-gin-rpc => ../..
 	github.com/alldev-run/golang-gin-rpc/plugins/cache => ../cache
 	github.com/alldev-run/golang-gin-rpc/plugins/db => ../db
 )
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

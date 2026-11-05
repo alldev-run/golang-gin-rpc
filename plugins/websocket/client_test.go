@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	userpb "github.com/alldev-run/golang-gin-rpc/proto"
 	nws "github.com/coder/websocket"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func newTestWebsocketServer(t *testing.T) *httptest.Server {
@@ -108,18 +108,18 @@ func TestClient_SendReceiveProto(t *testing.T) {
 	}
 	defer client.Close()
 
-	msg := &userpb.UserRequest{Id: 42}
+	msg := wrapperspb.Int64(42)
 	if err := client.SendProto(ctx, msg); err != nil {
 		t.Fatalf("SendProto() error = %v", err)
 	}
 
-	var got userpb.UserRequest
+	var got wrapperspb.Int64Value
 	if err := client.ReceiveProto(ctx, &got); err != nil {
 		t.Fatalf("ReceiveProto() error = %v", err)
 	}
 
-	if got.Id != 42 {
-		t.Fatalf("expected id 42, got %d", got.Id)
+	if got.Value != 42 {
+		t.Fatalf("expected id 42, got %d", got.Value)
 	}
 }
 
@@ -164,18 +164,18 @@ func TestClient_SendReceiveMessage_ProtoByConfig(t *testing.T) {
 	}
 	defer client.Close()
 
-	sent := &userpb.UserRequest{Id: 99}
+	sent := wrapperspb.Int64(99)
 	if err := client.SendMessage(ctx, sent); err != nil {
 		t.Fatalf("SendMessage() error = %v", err)
 	}
 
-	var got userpb.UserRequest
+	var got wrapperspb.Int64Value
 	if err := client.ReceiveMessage(ctx, &got); err != nil {
 		t.Fatalf("ReceiveMessage() error = %v", err)
 	}
 
-	if got.Id != 99 {
-		t.Fatalf("expected id 99, got %d", got.Id)
+	if got.Value != 99 {
+		t.Fatalf("expected id 99, got %d", got.Value)
 	}
 }
 
@@ -196,7 +196,7 @@ func TestClient_ReceiveMessage_ProtoByConfigFrameTypeMismatch(t *testing.T) {
 		t.Fatalf("SendText() error = %v", err)
 	}
 
-	var got userpb.UserRequest
+	var got wrapperspb.Int64Value
 	if err := client.ReceiveMessage(ctx, &got); !IsProtobufFrameTypeMismatchError(err) {
 		t.Fatalf("expected protobuf frame type mismatch error, got err=%v", err)
 	}

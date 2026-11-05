@@ -5,7 +5,6 @@ go 1.25.7
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/alldev-run/golang-gin-rpc v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/metrics v0.0.0
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/lib/pq v1.11.2
@@ -21,6 +20,7 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/ClickHouse/ch-go v0.71.0 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -55,7 +55,8 @@ require (
 )
 
 replace (
-	github.com/alldev-run/golang-gin-rpc => ../..
 	github.com/alldev-run/golang-gin-rpc/plugins/metrics => ../metrics
 	github.com/alldev-run/golang-gin-rpc/plugins/search => ../search
 )
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

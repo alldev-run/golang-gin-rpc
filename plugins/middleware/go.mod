@@ -3,7 +3,6 @@ module github.com/alldev-run/golang-gin-rpc/plugins/middleware
 go 1.25.7
 
 require (
-	github.com/alldev-run/golang-gin-rpc v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/audit v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/auth v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/configcenter v0.0.0
@@ -20,10 +19,14 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	go.opentelemetry.io/otel/metric v1.42.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.42.0 // indirect
+	go.opentelemetry.io/otel/trace v1.42.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/metrics v0.0.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -94,7 +97,6 @@ require (
 )
 
 replace (
-	github.com/alldev-run/golang-gin-rpc => ../..
 	github.com/alldev-run/golang-gin-rpc/plugins/audit => ../audit
 	github.com/alldev-run/golang-gin-rpc/plugins/auth => ../auth
 	github.com/alldev-run/golang-gin-rpc/plugins/configcenter => ../configcenter
@@ -103,3 +105,5 @@ replace (
 	github.com/alldev-run/golang-gin-rpc/plugins/ratelimit => ../ratelimit
 	github.com/alldev-run/golang-gin-rpc/plugins/rbac => ../rbac
 )
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

@@ -71,7 +71,7 @@ import (
     "context"
     "log"
 
-    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    bootstrap "github.com/alldev-run/golang-gin-rpc/bootstrap"
 )
 
 func main() {
@@ -202,7 +202,7 @@ package main
 import (
     "log"
 
-    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    bootstrap "github.com/alldev-run/golang-gin-rpc/bootstrap"
 )
 
 func wire() {
@@ -289,7 +289,7 @@ package main
 import (
     "log"
 
-    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    bootstrap "github.com/alldev-run/golang-gin-rpc/bootstrap"
     "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
@@ -390,7 +390,7 @@ import (
     "context"
     "log"
 
-    bootstrap "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    bootstrap "github.com/alldev-run/golang-gin-rpc/bootstrap"
     "github.com/alldev-run/golang-gin-rpc/plugins/db"
     "github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )

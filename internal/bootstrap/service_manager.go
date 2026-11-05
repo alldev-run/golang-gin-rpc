@@ -48,8 +48,8 @@ func (b *Bootstrap) RegisterAPIGatewayServiceFactory(options APIGatewayServiceOp
 				}
 				if service.httpService != nil {
 					boot.gateway = service.httpService.Gateway()
-					boot.setDependency("gateway", boot.gateway)
-					boot.setDependency("gateway.http_service", service.httpService)
+					boot.setDependency(DepGateway, boot.gateway)
+					boot.setDependency(DepGatewayHTTPService, service.httpService)
 				}
 				return nil
 			},
@@ -207,8 +207,8 @@ func (b *Bootstrap) RegisterDefaultServiceFactories() error {
 				}
 				if service.httpService != nil {
 					boot.gateway = service.httpService.Gateway()
-					boot.setDependency("gateway", boot.gateway)
-					boot.setDependency("gateway.http_service", service.httpService)
+					boot.setDependency(DepGateway, boot.gateway)
+					boot.setDependency(DepGatewayHTTPService, service.httpService)
 				}
 				return nil
 			},
@@ -306,9 +306,9 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 						handler(hctx, conn)
 					})
 					boot.websocketServer = server
-					boot.setDependency("websocket.server", server)
+					boot.setDependency(DepWebSocketServer, server)
 					boot.websocketManager = mgr
-					boot.setDependency("websocket.manager", mgr)
+					boot.setDependency(DepWebSocketManager, mgr)
 				}
 				return boot.websocketServer.Start()
 			},

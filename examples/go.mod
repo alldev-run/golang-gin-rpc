@@ -46,6 +46,7 @@ require (
 	github.com/aliyun/alibabacloud-dkms-transfer-go-sdk v0.1.8 // indirect
 	github.com/aliyun/aliyun-secretsmanager-client-go v1.1.5 // indirect
 	github.com/aliyun/credentials-go v1.4.3 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0
 	github.com/alldev-run/golang-gin-rpc/plugins/actor v0.0.0 // indirect
 	github.com/alldev-run/golang-gin-rpc/plugins/auth v0.0.0 // indirect
 	github.com/alldev-run/golang-gin-rpc/plugins/circuitbreaker v0.0.0 // indirect
@@ -203,3 +204,5 @@ replace (
 	github.com/alldev-run/golang-gin-rpc/plugins/upload => ../plugins/upload
 	github.com/alldev-run/golang-gin-rpc/plugins/websocket => ../plugins/websocket
 )
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../pkg

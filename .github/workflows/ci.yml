@@ -37,6 +37,41 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
+  core:
+    name: core module (pkg)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pkg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: pkg/go.sum
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -count=1 -race -cover ./...
+      - name: Dependency boundary
+        run: |
+          if go list -deps ./... | grep -E '^github.com/alldev-run/golang-gin-rpc/(plugins|internal)/'; then
+            echo "core module must not depend on plugins or internal packages" >&2
+            exit 1
+          fi
+      - name: Tidy check
+        run: |
+          GOWORK=off go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: pkg
+          args: --config=${{ github.workspace }}/.golangci.yml
+
   plugins:
     name: plugin ${{ matrix.plugin }}
     runs-on: ubuntu-latest

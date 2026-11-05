@@ -171,7 +171,7 @@ The upload package integrates with the framework's bootstrap system:
 
 ```go
 import (
-    "github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+    "github.com/alldev-run/golang-gin-rpc/bootstrap"
 )
 
 // Get uploader from bootstrap
