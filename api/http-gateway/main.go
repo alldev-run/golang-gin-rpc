@@ -63,7 +63,7 @@ func main() {
 	gatewayLogger.Info("http-gateway starting",
 		logger.String("version", "1.0.0"),
 		logger.String("config", configPath),
-		logger.String("service", gwCfg.ServiceName),
+		logger.String("service_name", gwCfg.ServiceName),
 		logger.String("protocols", getEnabledProtocols(gwCfg)),
 	)
 

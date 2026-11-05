@@ -38,7 +38,7 @@ func NewRouteRegistry() *RouteRegistry {
 		routes:      make([]RouteConfig, 0),
 		groups:      make(map[string]*RouteGroup),
 		middlewares: make(map[string][]gin.HandlerFunc),
-		engine:      gin.New(),
+		engine:      newRegistryEngine(),
 	}
 }
 
@@ -253,4 +253,25 @@ func ChainMiddlewares(handler gin.HandlerFunc, middlewares ...gin.HandlerFunc) g
 		// 最后执行处理器
 		handler(c)
 	}
+}
+
+// newRegistryEngine creates the business-route engine. It is mounted inside the
+// outer gateway engine via gin.WrapH, so context keys set by the outer
+// middlewares are not visible here; the request ID is restored from the
+// X-Request-ID header the outer request-ID middleware already wrote.
+func newRegistryEngine() *gin.Engine {
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) {
+		if _, exists := c.Get("request_id"); !exists {
+			id := c.Writer.Header().Get("X-Request-ID")
+			if id == "" {
+				id = c.GetHeader("X-Request-ID")
+			}
+			if id != "" {
+				c.Set("request_id", id)
+			}
+		}
+		c.Next()
+	})
+	return engine
 }

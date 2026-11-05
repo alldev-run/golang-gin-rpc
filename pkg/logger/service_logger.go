@@ -123,7 +123,6 @@ func createServiceLogger(serviceName string, config ServiceLoggerConfig) *zap.Lo
 
 	// Create logger with options
 	options := []zap.Option{
-		zap.AddCallerSkip(1),
 		zap.AddCaller(),
 	}
 

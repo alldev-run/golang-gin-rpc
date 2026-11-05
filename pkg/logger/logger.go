@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	once     sync.Once
-	defaultL atomic.Pointer[zap.Logger]
+	once        sync.Once
+	defaultL    atomic.Pointer[zap.Logger]
+	defaultBase atomic.Pointer[zap.Logger]
 )
 
 // Init 初始化全局 logger（建议在 main 最开始调用一次）
@@ -120,7 +121,9 @@ func Init(cfg Config) {
 			options = append(options, zap.AddStacktrace(zapcore.ErrorLevel))
 		}
 
-		defaultL.Store(zap.New(core, options...))
+		l := zap.New(core, options...)
+		defaultL.Store(l)
+		defaultBase.Store(l.WithOptions(zap.AddCallerSkip(-1)))
 	})
 }
 
@@ -131,6 +134,17 @@ func L() *zap.Logger {
 	}
 	Init(DefaultConfig())
 	return defaultL.Load()
+}
+
+// Base returns the global logger for direct use. Unlike L(), whose caller skip
+// accounts for this package's Info/Warn/... wrappers, Base reports the
+// immediate call site.
+func Base() *zap.Logger {
+	if l := defaultBase.Load(); l != nil {
+		return l
+	}
+	L()
+	return defaultBase.Load()
 }
 
 // GetServiceLogger gets or creates a service-specific logger using global config
@@ -162,7 +176,7 @@ func NewServiceLogger(serviceName string) *ServiceLogger {
 func NewServiceLoggerFromConfig(serviceName string, config ServiceLoggerConfig) *ServiceLogger {
 	return &ServiceLogger{
 		serviceName: serviceName,
-		logger:      GetServiceLoggerInstance(serviceName, config),
+		logger:      GetServiceLoggerInstance(serviceName, config).WithOptions(zap.AddCallerSkip(1)),
 	}
 }
 

@@ -45,6 +45,9 @@ and this project adheres to semantic versioning.
 
 - Bootstrap tracing is now installed as the global tracer, so RPC, gateway, and WebSocket spans use the configured provider instead of a disabled default. The gateway reuses an active global provider rather than replacing it with its own `tracing` config.
 - **Breaking:** `gateway.Gateway.GetRBACPolicy()` now returns the new `gateway.PermissionChecker` interface instead of `*rbac.Policy`, and `SetRBACPolicy` accepts it. Migration: `*rbac.Policy` still satisfies the interface, so `SetRBACPolicy(policy)` is unchanged; callers that need `*rbac.Policy`-only methods from the getter type-assert with `gw.GetRBACPolicy().(*rbac.Policy)`.
+- `logger.Base()` returns the global logger for direct calls; plugin `SetLogger` defaults use it, so log `caller` fields point at the real call site again (the previous default added an extra caller skip and reported the caller's caller).
+- Service loggers returned by `GetServiceLoggerInstance`/`GetServiceLogger` no longer apply a wrapper caller skip, so direct calls stop reporting `runtime/proc.go` as the caller; the `ServiceLogger` wrapper keeps the skip.
+- Business routes registered through `gateway/router.RouteRegistry` can now read the request ID via `middleware.GetRequestID(c)`; previously it was always empty because the registry engine is mounted with `gin.WrapH` and lost the outer context keys.
 - Removed the unused `plugins/search` replace directive from `plugins/db/go.mod`.
 - Each `Bootstrap` now registers its built-in plugins in its own kernel registry, so a second `Bootstrap` in the same process no longer reuses plugins bound to the first one.
 - Data races on the global tracer provider and the gateway global router factory.
