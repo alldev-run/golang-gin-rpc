@@ -331,8 +331,8 @@ secondary:
 				},
 			},
 			{
-				Type:   TypeRedis,
-				Redis:  map[string]interface{}{"host": "localhost", "port": 6379},
+				Type:  TypeRedis,
+				Redis: map[string]interface{}{"host": "localhost", "port": 6379},
 			},
 			{
 				Type: TypePostgres,

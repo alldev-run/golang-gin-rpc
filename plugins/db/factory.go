@@ -30,7 +30,7 @@ const (
 
 // Config holds configuration for all database types.
 type Config struct {
-	Type Type            `yaml:"type" json:"type"`
+	Type  Type            `yaml:"type" json:"type"`
 	MySQL mysql.Config    `yaml:"mysql" json:"mysql"`
 	PG    postgres.Config `yaml:"postgres" json:"postgres"`
 

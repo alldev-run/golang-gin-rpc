@@ -139,7 +139,6 @@ func TestDelete_FactoryNotInitialized(t *testing.T) {
 	}
 }
 
-
 // ==================== Test PostgreSQL Helper ====================
 
 func TestPostgres_FactoryNotInitialized(t *testing.T) {

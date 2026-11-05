@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package orm
@@ -39,7 +40,7 @@ func getTestDB(t *testing.T) *sql.DB {
 			}
 			_, _ = db2.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS test_orm CHARACTER SET utf8mb4")
 			db2.Close()
-			
+
 			// 重新连接
 			db, err = sql.Open("mysql", dsn)
 			if err != nil {
