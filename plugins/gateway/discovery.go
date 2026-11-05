@@ -76,10 +76,10 @@ func NewServiceDiscovery(config DiscoveryConfig) (*ServiceDiscovery, error) {
 // Initialize initializes the service discovery
 func (sd *ServiceDiscovery) Initialize() error {
 	if sd.discovery != nil {
-		logger.Info("Service discovery initialized",
+		pluginLogger().Info("Service discovery initialized",
 			logger.String("type", "dynamic"))
 	} else {
-		logger.Info("Service discovery initialized",
+		pluginLogger().Info("Service discovery initialized",
 			logger.String("type", "static"))
 	}
 	return nil
@@ -121,7 +121,7 @@ func (sd *ServiceDiscovery) Start() error {
 		discoveryType = "dynamic"
 	}
 
-	logger.Info("Service discovery started",
+	pluginLogger().Info("Service discovery started",
 		logger.String("type", discoveryType))
 
 	return nil
@@ -134,9 +134,9 @@ func (sd *ServiceDiscovery) Stop() error {
 	if sd.discovery != nil {
 		// Existing discovery doesn't have explicit close method
 		// Just log the shutdown
-		logger.Info("Dynamic service discovery stopped")
+		pluginLogger().Info("Dynamic service discovery stopped")
 	} else {
-		logger.Info("Static service discovery stopped")
+		pluginLogger().Info("Static service discovery stopped")
 	}
 
 	return nil
@@ -169,14 +169,14 @@ func (sd *ServiceDiscovery) syncLoop() {
 func (sd *ServiceDiscovery) syncServices() {
 	// With existing discovery package, services are fetched on-demand
 	// No need to maintain local cache
-	logger.Debug("Service discovery sync completed")
+	pluginLogger().Debug("Service discovery sync completed")
 }
 
 // RegisterService registers a service (for testing)
 func (sd *ServiceDiscovery) RegisterService(name string, instances []ServiceInstance) error {
 	if sd.discovery == nil {
 		// Static discovery - just log
-		logger.Info("Static registration for service",
+		pluginLogger().Info("Static registration for service",
 			logger.String("service", name),
 			logger.Int("instances", len(instances)))
 		return nil
@@ -197,7 +197,7 @@ func (sd *ServiceDiscovery) RegisterService(name string, instances []ServiceInst
 		}
 	}
 
-	logger.Info("Registered service",
+	pluginLogger().Info("Registered service",
 		logger.String("service", name),
 		logger.Int("instances", len(instances)))
 	return nil

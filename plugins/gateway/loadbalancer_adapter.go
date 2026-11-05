@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/loadbalancer"
 	"go.uber.org/zap"
 )
@@ -118,19 +117,19 @@ func (a *LoadBalancerAdapter) Close() error {
 type gatewayLoggerAdapter struct{}
 
 func (l *gatewayLoggerAdapter) Debug(msg string, fields ...loadbalancer.Field) {
-	logger.Debug(msg, convertFields(fields)...)
+	pluginLogger().Debug(msg, convertFields(fields)...)
 }
 
 func (l *gatewayLoggerAdapter) Info(msg string, fields ...loadbalancer.Field) {
-	logger.Info(msg, convertFields(fields)...)
+	pluginLogger().Info(msg, convertFields(fields)...)
 }
 
 func (l *gatewayLoggerAdapter) Warn(msg string, fields ...loadbalancer.Field) {
-	logger.Warn(msg, convertFields(fields)...)
+	pluginLogger().Warn(msg, convertFields(fields)...)
 }
 
 func (l *gatewayLoggerAdapter) Error(msg string, fields ...loadbalancer.Field) {
-	logger.Errorf(msg, convertFields(fields)...)
+	pluginLogger().Error(msg, convertFields(fields)...)
 }
 
 func convertFields(lbFields []loadbalancer.Field) []zap.Field {

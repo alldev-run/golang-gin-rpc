@@ -129,26 +129,26 @@ func (g *Gateway) Initialize() error {
 
 	// Initialize service discovery
 	if err := g.initDiscovery(); err != nil {
-		logger.Errorf("Failed to initialize service discovery", logger.Error(err))
+		pluginLogger().Error("Failed to initialize service discovery", logger.Error(err))
 		return err
 	}
 
 	// Initialize load balancer
 	if err := g.initLoadBalancer(); err != nil {
-		logger.Errorf("Failed to initialize load balancer", logger.Error(err))
+		pluginLogger().Error("Failed to initialize load balancer", logger.Error(err))
 		return err
 	}
 
 	// Initialize routes
 	if err := g.initRoutes(); err != nil {
-		logger.Errorf("Failed to initialize routes", logger.Error(err))
+		pluginLogger().Error("Failed to initialize routes", logger.Error(err))
 		return err
 	}
 
 	g.initHealth()
 	g.initTracing()
 
-	logger.Info("Gateway initialized successfully")
+	pluginLogger().Info("Gateway initialized successfully")
 	return nil
 }
 
@@ -167,15 +167,15 @@ func (g *Gateway) initTracing() {
 		// only initialize from the gateway config when none is active.
 		if current := tracing.GlobalTracer(); current.IsEnabled() {
 			g.tracer = current
-			logger.Info("Tracing reuses the active global tracer provider")
+			pluginLogger().Info("Tracing reuses the active global tracer provider")
 		} else {
 			if err := tracing.InitGlobalTracer(*g.config.Tracing); err != nil {
-				logger.Errorf("Failed to initialize tracing", logger.Error(err))
+				pluginLogger().Error("Failed to initialize tracing", logger.Error(err))
 				return
 			}
 			g.tracer = tracing.GlobalTracer()
 		}
-		logger.Info("Tracing initialized successfully",
+		pluginLogger().Info("Tracing initialized successfully",
 			logger.String("type", g.config.Tracing.Type),
 			logger.String("service", g.config.Tracing.ServiceName))
 	}
@@ -200,7 +200,7 @@ func (g *Gateway) Start() error {
 	// Start service discovery
 	if g.discovery != nil {
 		if err := g.discovery.Start(); err != nil {
-			logger.Errorf("Failed to start service discovery", logger.Error(err))
+			pluginLogger().Error("Failed to start service discovery", logger.Error(err))
 		}
 	}
 
@@ -214,7 +214,7 @@ func (g *Gateway) Start() error {
 	go g.healthCheckLoop()
 
 	g.started = true
-	logger.Info("Gateway started successfully",
+	pluginLogger().Info("Gateway started successfully",
 		logger.String("host", g.server.host),
 		logger.Int("port", g.server.port))
 
@@ -230,55 +230,55 @@ func (g *Gateway) Stop() error {
 		return ErrGatewayNotStarted
 	}
 
-	logger.Info("Stopping gateway server...")
+	pluginLogger().Info("Stopping gateway server...")
 
 	// Cancel context to stop all background goroutines
 	g.cancel()
-	logger.Info("Gateway context cancelled")
+	pluginLogger().Info("Gateway context cancelled")
 
 	// Stop service discovery
 	if g.discovery != nil {
 		if err := g.discovery.Stop(); err != nil {
-			logger.Errorf("Failed to stop service discovery", logger.Error(err))
+			pluginLogger().Error("Failed to stop service discovery", logger.Error(err))
 		} else {
-			logger.Info("Service discovery stopped")
+			pluginLogger().Info("Service discovery stopped")
 		}
 	}
 
 	// Stop health manager
 	if g.health != nil {
 		g.health.Stop()
-		logger.Info("Health manager stopped")
+		pluginLogger().Info("Health manager stopped")
 	}
 
 	// Close protocol proxies
 	if g.grpcProxy != nil {
 		if err := g.grpcProxy.Close(); err != nil {
-			logger.Errorf("Failed to close gRPC proxy", logger.Error(err))
+			pluginLogger().Error("Failed to close gRPC proxy", logger.Error(err))
 		} else {
-			logger.Info("gRPC proxy closed")
+			pluginLogger().Info("gRPC proxy closed")
 		}
 	}
 
 	if g.jsonProxy != nil {
 		if err := g.jsonProxy.Close(); err != nil {
-			logger.Errorf("Failed to close JSON-RPC proxy", logger.Error(err))
+			pluginLogger().Error("Failed to close JSON-RPC proxy", logger.Error(err))
 		} else {
-			logger.Info("JSON-RPC proxy closed")
+			pluginLogger().Info("JSON-RPC proxy closed")
 		}
 	}
 
 	// Close HTTP proxy
 	if g.proxy != nil {
 		if err := g.proxy.Close(); err != nil {
-			logger.Errorf("Failed to close HTTP proxy", logger.Error(err))
+			pluginLogger().Error("Failed to close HTTP proxy", logger.Error(err))
 		} else {
-			logger.Info("HTTP proxy closed")
+			pluginLogger().Info("HTTP proxy closed")
 		}
 	}
 
 	g.started = false
-	logger.Info("Gateway stopped successfully")
+	pluginLogger().Info("Gateway stopped successfully")
 
 	return nil
 }
@@ -297,7 +297,7 @@ func (g *Gateway) GetAuth() *GatewayAuth {
 func (g *Gateway) AddAPIKey(key, description string) {
 	if g.auth != nil {
 		g.auth.AddAPIKey(key, description)
-		logger.Info("API key added",
+		pluginLogger().Info("API key added",
 			logger.String("key", key[:min(len(key), 8)]+"..."),
 			logger.String("description", description))
 	}
@@ -307,7 +307,7 @@ func (g *Gateway) AddAPIKey(key, description string) {
 func (g *Gateway) RemoveAPIKey(key string) {
 	if g.auth != nil {
 		g.auth.RemoveAPIKey(key)
-		logger.Info("API key removed",
+		pluginLogger().Info("API key removed",
 			logger.String("key", key[:min(len(key), 8)]+"..."))
 	}
 }
@@ -411,26 +411,26 @@ func (g *Gateway) initRoutes() error {
 			// 只有在服务发现启用时才尝试获取动态端点
 			endpoints, err := g.discovery.GetServiceEndpoints(routeConfig.Service)
 			if err != nil {
-				logger.Debug("Service discovery failed during initialization",
+				pluginLogger().Debug("Service discovery failed during initialization",
 					logger.String("service", routeConfig.Service),
 					logger.String("error", err.Error()))
 				// 使用配置中的静态 targets
 				if len(routeConfig.Targets) > 0 {
 					route.targets = append([]string(nil), routeConfig.Targets...)
-					logger.Debug("Using static targets for service",
+					pluginLogger().Debug("Using static targets for service",
 						logger.String("service", routeConfig.Service),
 						logger.Any("targets", routeConfig.Targets))
 				}
 			} else if len(endpoints) > 0 {
 				route.targets = endpoints
-				logger.Info("Using discovery endpoints for service",
+				pluginLogger().Info("Using discovery endpoints for service",
 					logger.String("service", routeConfig.Service),
 					logger.Any("endpoints", endpoints))
 			} else {
 				// 服务发现返回空结果，使用静态 targets
 				if len(routeConfig.Targets) > 0 {
 					route.targets = append([]string(nil), routeConfig.Targets...)
-					logger.Debug("Discovery returned empty, using static targets for service",
+					pluginLogger().Debug("Discovery returned empty, using static targets for service",
 						logger.String("service", routeConfig.Service),
 						logger.Any("targets", routeConfig.Targets))
 				}
@@ -439,11 +439,11 @@ func (g *Gateway) initRoutes() error {
 			// 服务发现被禁用或不可用，直接使用静态 targets
 			if len(routeConfig.Targets) > 0 {
 				route.targets = append([]string(nil), routeConfig.Targets...)
-				logger.Debug("Service discovery disabled, using static targets for service",
+				pluginLogger().Debug("Service discovery disabled, using static targets for service",
 					logger.String("service", routeConfig.Service),
 					logger.Any("targets", routeConfig.Targets))
 			} else {
-				logger.Warn("No targets available for service",
+				pluginLogger().Warn("No targets available for service",
 					logger.String("service", routeConfig.Service))
 			}
 		}
@@ -452,7 +452,7 @@ func (g *Gateway) initRoutes() error {
 		g.router.routes[key] = route
 	}
 
-	logger.Info("Initialized routes", logger.Int("count", len(g.config.Routes)))
+	pluginLogger().Info("Initialized routes", logger.Int("count", len(g.config.Routes)))
 	return nil
 }
 
@@ -519,14 +519,14 @@ func (g *Gateway) refreshServices() {
 		endpoints, err := g.discovery.GetServiceEndpoints(route.config.Service)
 		if err != nil {
 			// 减少日志噪音：只在第一次或错误类型变化时记录
-			logger.Debug("Service discovery refresh failed",
+			pluginLogger().Debug("Service discovery refresh failed",
 				logger.String("service", route.config.Service),
 				logger.String("error", err.Error()))
 
 			// 使用配置中的静态 targets
 			if len(route.config.Targets) > 0 {
 				route.targets = append([]string(nil), route.config.Targets...)
-				logger.Debug("Using static targets for service",
+				pluginLogger().Debug("Using static targets for service",
 					logger.String("service", route.config.Service),
 					logger.Any("targets", route.config.Targets))
 			}
@@ -536,13 +536,13 @@ func (g *Gateway) refreshServices() {
 		// 如果服务发现返回空结果，使用静态 targets
 		if len(endpoints) == 0 && len(route.config.Targets) > 0 {
 			route.targets = append([]string(nil), route.config.Targets...)
-			logger.Debug("Discovery returned empty, using static targets for service",
+			pluginLogger().Debug("Discovery returned empty, using static targets for service",
 				logger.String("service", route.config.Service),
 				logger.Any("targets", route.config.Targets))
 		} else {
 			// Update route targets
 			route.targets = endpoints
-			logger.Debug("Updated service endpoints from discovery",
+			pluginLogger().Debug("Updated service endpoints from discovery",
 				logger.String("service", route.config.Service),
 				logger.Any("endpoints", endpoints))
 		}

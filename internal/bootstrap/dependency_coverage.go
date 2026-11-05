@@ -32,6 +32,12 @@ func (b *Bootstrap) ValidateDependencyCoverage(options FrameworkOptions) error {
 
 	for _, service := range options.Services {
 		svc := strings.TrimSpace(service)
+		if keys, ok := b.serviceDependencies(svc); ok {
+			for _, key := range keys {
+				required[key] = struct{}{}
+			}
+			continue
+		}
 		switch svc {
 		case ServiceRPC:
 			required[DepRPCManager] = struct{}{}

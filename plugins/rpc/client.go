@@ -209,7 +209,7 @@ func (c *GRPCClient) Connect() error {
 	}
 
 	c.conn = conn
-	logger.Info("RPC client connected",
+	pluginLogger().Info("RPC client connected",
 		logger.String("type", string(ClientTypeGRPC)),
 		logger.String("target", addr))
 	return nil
@@ -325,7 +325,7 @@ func (c *GRPCClient) Invoke(ctx context.Context, method string, req, reply inter
 		if !c.shouldRetryGRPC(method, lastErr) {
 			break
 		}
-		logger.Warn("RPC client retrying grpc invoke",
+		pluginLogger().Warn("RPC client retrying grpc invoke",
 			logger.String("method", method),
 			logger.Int("attempt", attempt+1),
 			logger.Error(lastErr))
@@ -563,7 +563,7 @@ func (c *GRPCClient) resolveGRPCTarget(ctx context.Context) (string, error) {
 		c.storeTargets(targets)
 		selected, err := c.selectHealthyTarget(targets)
 		if err == nil {
-			logger.Debug("RPC client resolved discovery target",
+			pluginLogger().Debug("RPC client resolved discovery target",
 				logger.String("type", string(ClientTypeGRPC)),
 				logger.String("service", c.config.ServiceName),
 				logger.String("target", selected))
@@ -604,7 +604,7 @@ func (c *JSONRPCClient) refreshJSONRPCBaseURL(ctx context.Context) error {
 		return err
 	}
 	c.setBaseURL(selected)
-	logger.Debug("RPC client resolved discovery target",
+	pluginLogger().Debug("RPC client resolved discovery target",
 		logger.String("type", string(ClientTypeJSONRPC)),
 		logger.String("service", c.config.ServiceName),
 		logger.String("target", selected))
@@ -702,7 +702,7 @@ func (c *JSONRPCClient) doJSONRPCRequestWithRetry(req *http.Request) (*http.Resp
 		if c.observer != nil {
 			c.observer.RecordRetry(ClientTypeJSONRPC, req.URL.Path, attempt+1)
 		}
-		logger.Warn("RPC client retrying request",
+		pluginLogger().Warn("RPC client retrying request",
 			logger.String("type", string(ClientTypeJSONRPC)),
 			logger.String("url", req.URL.String()),
 			logger.Int("attempt", attempt+1),

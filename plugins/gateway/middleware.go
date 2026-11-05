@@ -59,7 +59,7 @@ func (a *GatewayAuth) Execute() gin.HandlerFunc {
 		// 提取 API key from request
 		apiKey, err := a.extractAPIKey(c)
 		if err != nil {
-			logger.Warn("API key extraction failed",
+			pluginLogger().Warn("API key extraction failed",
 				logger.String("path", c.Request.URL.Path),
 				logger.String("method", c.Request.Method),
 				logger.String("client_ip", c.ClientIP()),
@@ -75,7 +75,7 @@ func (a *GatewayAuth) Execute() gin.HandlerFunc {
 
 		// 验证 API key
 		if !a.validateAPIKey(apiKey) {
-			logger.Warn("Invalid API key provided",
+			pluginLogger().Warn("Invalid API key provided",
 				logger.String("path", c.Request.URL.Path),
 				logger.String("method", c.Request.Method),
 				logger.String("client_ip", c.ClientIP()),
@@ -94,7 +94,7 @@ func (a *GatewayAuth) Execute() gin.HandlerFunc {
 		c.Set("api_user", a.config.APIKeys[apiKey])
 		c.Set("authenticated", true)
 
-		logger.Debug("RPC API key authentication successful",
+		pluginLogger().Debug("RPC API key authentication successful",
 			logger.String("path", c.Request.URL.Path),
 			logger.String("method", c.Request.Method),
 			logger.String("api_user", a.config.APIKeys[apiKey]))
@@ -346,7 +346,7 @@ func rateLimitMiddleware(config RateLimitConfig) gin.HandlerFunc {
 		if limiter.Allow(clientIP) {
 			c.Next()
 		} else {
-			logger.Warn("Rate limit exceeded",
+			pluginLogger().Warn("Rate limit exceeded",
 				logger.String("client", clientIP),
 				logger.Int("limit", config.Requests))
 			c.JSON(http.StatusTooManyRequests, gin.H{

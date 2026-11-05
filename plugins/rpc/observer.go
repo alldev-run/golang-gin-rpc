@@ -7,8 +7,20 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/plugins/metrics"
 )
 
+// MetricsRecorder is the subset of a metrics backend used by MetricsObserver.
+// *metrics.MetricsCollector satisfies it.
+type MetricsRecorder interface {
+	RecordRPCRequest(service, method, status string, duration time.Duration)
+	RecordRPCRequestDetailed(protocol, service, method, target, status string, duration time.Duration)
+	RecordRPCError(service, method, errorType string)
+	RecordRPCGovernanceEvent(protocol, service, method, event string)
+	RecordAuthAttempt(protocol, service, method string)
+	RecordAuthFailure(protocol, service, method string)
+	RecordRateLimitHit(protocol, service, method string)
+}
+
 type MetricsObserver struct {
-	collector *metrics.MetricsCollector
+	collector MetricsRecorder
 	service   string
 }
 
@@ -16,7 +28,10 @@ type governanceObserver interface {
 	RecordGovernance(clientType ClientType, method, event string)
 }
 
-func NewMetricsObserver(service string, collector *metrics.MetricsCollector) *MetricsObserver {
+func NewMetricsObserver(service string, collector MetricsRecorder) *MetricsObserver {
+	if c, ok := collector.(*metrics.MetricsCollector); ok && c == nil {
+		collector = nil
+	}
 	return &MetricsObserver{collector: collector, service: service}
 }
 

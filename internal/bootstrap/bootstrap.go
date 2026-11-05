@@ -77,6 +77,7 @@ type Bootstrap struct {
 	serviceFactories map[string]ServiceFactory
 	managedServices  map[string]ManagedService
 	serviceOrder     []string
+	serviceDeps      map[string][]string
 
 	pluginMu  sync.RWMutex
 	pluginApp *kernel.App

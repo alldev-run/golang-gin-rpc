@@ -353,6 +353,25 @@ func (b *Bootstrap) RegisterServiceFactory(name string, factory ServiceFactory) 
 	return nil
 }
 
+// RegisterServiceDependencies declares the dependency-container keys a managed
+// service needs; ValidateDependencyCoverage checks them when the service is
+// requested. Built-in services fall back to their historical requirements.
+func (b *Bootstrap) RegisterServiceDependencies(name string, keys ...string) {
+	b.serviceMu.Lock()
+	defer b.serviceMu.Unlock()
+	if b.serviceDeps == nil {
+		b.serviceDeps = make(map[string][]string)
+	}
+	b.serviceDeps[name] = append([]string(nil), keys...)
+}
+
+func (b *Bootstrap) serviceDependencies(name string) ([]string, bool) {
+	b.serviceMu.RLock()
+	defer b.serviceMu.RUnlock()
+	keys, ok := b.serviceDeps[name]
+	return keys, ok
+}
+
 // StartServices builds and starts managed services in registration order.
 func (b *Bootstrap) StartServices(ctx context.Context, names ...string) error {
 	serviceNames := b.resolveServiceNames(names...)

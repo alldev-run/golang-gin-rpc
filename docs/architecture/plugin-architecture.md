@@ -64,6 +64,11 @@ examples/             独立 Go 模块（examples/go.mod）：示例代码不进
 - **每个 Bootstrap 独占注册表**：内置插件注册到 `kernel.NewRegistry()` 创建的实例注册表，
   经 `kernel.WithRegistry` 交给 Loader；空导入自注册的插件仍在默认注册表中，Loader 合并两者
   （同名时实例注册表优先）。
+- **聚合插件依赖小接口**：`rpc.NewMetricsObserver` 接受 `rpc.MetricsRecorder`，
+  `middleware.RequirePermission`/`RequireAnyPermission` 接受 `middleware.PermissionChecker`；
+  rpc、gateway、middleware 支持 `SetLogger(*zap.Logger)` 注入日志器，默认仍使用 `logger.L()`。
+- **托管服务依赖可声明**：自定义服务经 `RegisterServiceFactory` 注册，并可用
+  `RegisterServiceDependencies` 声明所需依赖键，交给 `ValidateDependencyCoverage` 校验。
 - **plugins/db 不依赖 plugins/cache**：redis/memcache 驱动由 `plugins/cache`
   的 `redis/register.go`、`memcache/register.go` 自注册（import 即注册，
   `db.Config.Redis`/`Memcache` 以 any 携带配置）；依赖方向为 cache -> db。

@@ -156,7 +156,7 @@ func (p *GRPCProxy) getOrCreateGRPCClient(target string) (*grpc.Client, error) {
 
 // Close closes all gRPC clients
 func (p *GRPCProxy) Close() error {
-	logger.Info("Starting gRPC proxy close...")
+	pluginLogger().Info("Starting gRPC proxy close...")
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -166,16 +166,16 @@ func (p *GRPCProxy) Close() error {
 
 	for target, client := range p.clients {
 		clientCount++
-		logger.Debug("Closing gRPC client", logger.String("target", target))
+		pluginLogger().Debug("Closing gRPC client", logger.String("target", target))
 		if err := client.Close(); err != nil {
-			logger.Debug("Failed to close gRPC client", logger.Error(err))
+			pluginLogger().Debug("Failed to close gRPC client", logger.Error(err))
 			lastErr = err
 		}
 	}
 	p.clients = make(map[string]*grpc.Client)
 
-	logger.Info("Found gRPC clients to close", logger.Int("count", clientCount))
-	logger.Info("gRPC proxy closed successfully")
+	pluginLogger().Info("Found gRPC clients to close", logger.Int("count", clientCount))
+	pluginLogger().Info("gRPC proxy closed successfully")
 	return lastErr
 }
 
@@ -321,7 +321,7 @@ func (p *JSONRPCProxy) getOrCreateJSONRPCClient(target string) (*jsonrpc.Client,
 
 // Close closes all JSON-RPC clients
 func (p *JSONRPCProxy) Close() error {
-	logger.Info("Starting JSON-RPC proxy close...")
+	pluginLogger().Info("Starting JSON-RPC proxy close...")
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -330,7 +330,7 @@ func (p *JSONRPCProxy) Close() error {
 
 	p.clients = make(map[string]*jsonrpc.Client)
 
-	logger.Info("Found JSON-RPC clients to close", logger.Int("count", clientCount))
-	logger.Info("JSON-RPC proxy closed successfully")
+	pluginLogger().Info("Found JSON-RPC clients to close", logger.Int("count", clientCount))
+	pluginLogger().Info("JSON-RPC proxy closed successfully")
 	return nil
 }

@@ -37,7 +37,7 @@ func NewProxy(gateway *Gateway) *Proxy {
 func (p *Proxy) Close() error {
 	if p.client != nil {
 		p.client.CloseIdleConnections()
-		logger.Info("HTTP proxy client closed")
+		pluginLogger().Info("HTTP proxy client closed")
 	}
 	return nil
 }
@@ -52,7 +52,7 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 	// Add authentication middleware
 	if g.config.Protocols.Security.Auth.Enabled {
 		engine.Use(g.auth.Execute())
-		logger.Info("Authentication middleware enabled",
+		pluginLogger().Info("Authentication middleware enabled",
 			logger.String("type", g.config.Protocols.Security.Auth.Type),
 			logger.Int("api_keys_count", len(g.config.Protocols.Security.Auth.APIKeys)))
 	}
@@ -96,7 +96,7 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 				}
 				if g.grpcProxy != nil {
 					if err := g.grpcProxy.ProxyGRPC(c, routeObj); err != nil {
-						logger.Errorf("gRPC proxy error", logger.Error(err))
+						pluginLogger().Error("gRPC proxy error", logger.Error(err))
 					}
 				} else {
 					c.JSON(http.StatusNotImplemented, gin.H{"error": "gRPC proxy not initialized"})
@@ -113,7 +113,7 @@ func (g *Gateway) SetupRoutes(engine *gin.Engine) {
 				}
 				if g.jsonProxy != nil {
 					if err := g.jsonProxy.ProxyJSONRPC(c, routeObj); err != nil {
-						logger.Errorf("JSON-RPC proxy error", logger.Error(err))
+						pluginLogger().Error("JSON-RPC proxy error", logger.Error(err))
 					}
 				} else {
 					c.JSON(http.StatusNotImplemented, gin.H{"error": "JSON-RPC proxy not initialized"})
@@ -231,7 +231,7 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 		target, err := p.gateway.balancer.Select(selectTargets)
 		if err != nil {
 			observeUpstreamError(route.config.Service, "select")
-			logger.Errorf("Failed to select target", logger.Error(err))
+			pluginLogger().Error("Failed to select target", logger.Error(err))
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Service unavailable"})
 			return
 		}
@@ -239,7 +239,7 @@ func (p *Proxy) handleRoute(routeConfig RouteConfig) gin.HandlerFunc {
 		// Proxy request
 		if err := p.proxyRequest(ctx, c, target, route); err != nil {
 			observeUpstreamError(route.config.Service, "proxy")
-			logger.Errorf("Proxy request failed", logger.Error(err))
+			pluginLogger().Error("Proxy request failed", logger.Error(err))
 			p.handleProxyError(c, err)
 			return
 		}

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/pkg/panicx"
 	"github.com/alldev-run/golang-gin-rpc/pkg/response"
 
@@ -71,7 +70,7 @@ func defaultLogger(c *gin.Context, err interface{}) {
 	}
 
 	// Log the panic with context
-	logger.Errorf("Panic recovered",
+	pluginLogger().Error("Panic recovered",
 		zap.String("error", panicx.ErrorString(err)),
 		zap.String("method", method),
 		zap.String("path", path),
@@ -113,7 +112,7 @@ func logRequest(c *gin.Context, bodyLimit int64) {
 	duration := time.Since(start)
 	statusCode := c.Writer.Status()
 
-	logger.Info("Request completed",
+	pluginLogger().Info("Request completed",
 		zap.String("method", c.Request.Method),
 		zap.String("path", c.Request.URL.Path),
 		zap.Int("status", statusCode),
@@ -143,7 +142,7 @@ func RecoveryWithRequestLogging(bodyLimit int64) gin.HandlerFunc {
 // HandlePanic is a helper function to handle panics in goroutines
 func HandlePanic(operation string) {
 	if err := recover(); err != nil {
-		logger.Errorf("Panic in goroutine",
+		pluginLogger().Error("Panic in goroutine",
 			zap.String("operation", operation),
 			zap.String("error", panicx.ErrorString(err)),
 			zap.String("stack", panicx.Stack()),
@@ -161,7 +160,7 @@ func SafeGo(fn func()) {
 
 // ErrorHandler is a custom error handler that can be used with gin.Error()
 func ErrorHandler(c *gin.Context, err error) {
-	logger.Errorf("Request error",
+	pluginLogger().Error("Request error",
 		zap.String("error", err.Error()),
 		zap.String("method", c.Request.Method),
 		zap.String("path", c.Request.URL.Path),

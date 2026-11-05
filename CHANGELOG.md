@@ -17,6 +17,9 @@ and this project adheres to semantic versioning.
 - File-based APNs and FCM credentials.
 - `bootstrap.Dep*` constants (for example `bootstrap.DepDBFactory`, `bootstrap.DepTracer`) for the dependency-container keys; the string values are unchanged.
 - `kernel.NewRegistry`, `kernel.DefaultRegistry`, and the `kernel.WithRegistry` loader option for per-instance plugin registries; the default registry still provides blank-import self-registration.
+- `SetLogger(*zap.Logger)` in the rpc, gateway and middleware packages to inject a logger; the default remains `pkg/logger`'s global logger.
+- `rpc.MetricsRecorder` and `middleware.PermissionChecker` interfaces. `rpc.NewMetricsObserver`, `middleware.RequirePermission` and `middleware.RequireAnyPermission` accept them, and `*metrics.MetricsCollector` / `*rbac.Policy` still satisfy them, so existing callers compile unchanged.
+- `Bootstrap.RegisterServiceDependencies(name, keys...)` declares the dependency keys a custom managed service needs, so `ValidateDependencyCoverage` checks them; the built-in `rpc`, `api-gateway` and `websocket` services keep their existing requirements.
 - `tracing.SetGlobalTracer` for installing (or, with `nil`, resetting) the process-wide tracer provider.
 
 ### Changed
@@ -41,6 +44,7 @@ and this project adheres to semantic versioning.
 ### Fixed
 
 - Bootstrap tracing is now installed as the global tracer, so RPC, gateway, and WebSocket spans use the configured provider instead of a disabled default. The gateway reuses an active global provider rather than replacing it with its own `tracing` config.
+- Removed the unused `plugins/search` replace directive from `plugins/db/go.mod`.
 - Each `Bootstrap` now registers its built-in plugins in its own kernel registry, so a second `Bootstrap` in the same process no longer reuses plugins bound to the first one.
 - Data races on the global tracer provider and the gateway global router factory.
 - Cache singleflight wait-group publication ordering and its concurrent result behavior.

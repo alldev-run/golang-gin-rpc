@@ -60,9 +60,24 @@ func JWT(config AuthConfig) gin.HandlerFunc {
 }
 
 // RequirePermission creates a middleware that requires one RBAC permission.
-func RequirePermission(policy *rbac.Policy, permission string) gin.HandlerFunc {
+// PermissionChecker is the authorization backend used by the permission
+// middlewares. *rbac.Policy satisfies it.
+type PermissionChecker interface {
+	HasPermission(roles []string, permission string) bool
+	HasAnyPermission(roles []string, permissions []string) bool
+}
+
+func nilChecker(policy PermissionChecker) bool {
+	if policy == nil {
+		return true
+	}
+	p, ok := policy.(*rbac.Policy)
+	return ok && p == nil
+}
+
+func RequirePermission(policy PermissionChecker, permission string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if policy == nil {
+		if nilChecker(policy) {
 			response.Error(c, "RBAC policy is not configured", nil)
 			c.Abort()
 			return
@@ -98,9 +113,9 @@ func RequirePermission(policy *rbac.Policy, permission string) gin.HandlerFunc {
 }
 
 // RequireAnyPermission creates a middleware that requires any of the given permissions.
-func RequireAnyPermission(policy *rbac.Policy, permissions ...string) gin.HandlerFunc {
+func RequireAnyPermission(policy PermissionChecker, permissions ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if policy == nil {
+		if nilChecker(policy) {
 			response.Error(c, "RBAC policy is not configured", nil)
 			c.Abort()
 			return

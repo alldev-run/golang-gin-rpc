@@ -54,9 +54,6 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
 
-replace (
-	github.com/alldev-run/golang-gin-rpc/plugins/metrics => ../metrics
-	github.com/alldev-run/golang-gin-rpc/plugins/search => ../search
-)
+replace github.com/alldev-run/golang-gin-rpc/plugins/metrics => ../metrics
 
 replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

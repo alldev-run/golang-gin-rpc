@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"github.com/alldev-run/golang-gin-rpc/plugins/discovery"
 	"github.com/alldev-run/golang-gin-rpc/plugins/ratelimit/ratelimiter"
 	"go.uber.org/zap"
@@ -95,7 +94,7 @@ func NewManager(config ManagerConfig) *Manager {
 	for name, serverConfig := range config.Servers {
 		server, err := NewServer(serverConfig)
 		if err != nil {
-			logger.Errorf("Failed to create RPC server from config",
+			pluginLogger().Error("Failed to create RPC server from config",
 				zap.String("name", name),
 				zap.Error(err))
 			continue
@@ -137,7 +136,7 @@ func (m *Manager) AddServer(name string, config Config) error {
 	}
 	m.servers[name] = server
 
-	logger.Info("Added RPC server",
+	pluginLogger().Info("Added RPC server",
 		zap.String("name", name),
 		zap.String("type", string(config.Type)),
 		zap.String("address", fmt.Sprintf("%s:%d", config.Host, config.Port)))
@@ -160,7 +159,7 @@ func (m *Manager) RemoveServer(name string) error {
 
 	delete(m.servers, name)
 
-	logger.Info("Removed RPC server", zap.String("name", name))
+	pluginLogger().Info("Removed RPC server", zap.String("name", name))
 
 	return nil
 }
@@ -182,7 +181,7 @@ func (m *Manager) RegisterService(service Service) error {
 	m.services[serviceName] = service
 	m.registry.Register(serviceName, service)
 
-	logger.Info("Registered RPC service", zap.String("name", serviceName))
+	pluginLogger().Info("Registered RPC service", zap.String("name", serviceName))
 
 	return nil
 }
@@ -203,7 +202,7 @@ func (m *Manager) UnregisterService(name string) error {
 	delete(m.services, name)
 	m.registry.Unregister(name)
 
-	logger.Info("Unregistered RPC service", zap.String("name", name))
+	pluginLogger().Info("Unregistered RPC service", zap.String("name", name))
 
 	return nil
 }
@@ -214,12 +213,12 @@ func (m *Manager) AddMiddleware(middleware *Middleware) {
 	defer m.mu.Unlock()
 
 	if m.started {
-		logger.Warn("Cannot add middleware after manager has started")
+		pluginLogger().Warn("Cannot add middleware after manager has started")
 		return
 	}
 
 	m.middleware.Add(middleware)
-	logger.Info("Added RPC middleware", zap.String("name", middleware.Name()))
+	pluginLogger().Info("Added RPC middleware", zap.String("name", middleware.Name()))
 }
 
 // SetDegradationManager sets degradation manager for all registered servers
@@ -297,17 +296,17 @@ func (m *Manager) Start() error {
 
 	for name, server := range m.servers {
 		go func(serverName string, rpcServer Server) {
-			logger.Info("Starting RPC server",
+			pluginLogger().Info("Starting RPC server",
 				zap.String("name", serverName),
 				zap.String("type", string(rpcServer.Type())),
 				zap.String("address", rpcServer.Addr()))
 
 			if err := rpcServer.Start(); err != nil {
-				logger.Errorf("Failed to start RPC server",
+				pluginLogger().Error("Failed to start RPC server",
 					zap.String("name", serverName),
 					zap.Error(err))
 			} else {
-				logger.Info("RPC server started successfully",
+				pluginLogger().Info("RPC server started successfully",
 					zap.String("name", serverName),
 					zap.String("address", rpcServer.Addr()))
 			}
@@ -317,7 +316,7 @@ func (m *Manager) Start() error {
 	m.started = true
 	m.startTime = time.Now()
 
-	logger.Info("RPC manager started",
+	pluginLogger().Info("RPC manager started",
 		zap.Int("servers", len(m.servers)),
 		zap.Int("services", len(m.services)))
 
@@ -333,7 +332,7 @@ func (m *Manager) Stop() error {
 		return fmt.Errorf("manager not started")
 	}
 
-	logger.Info("Stopping RPC manager...")
+	pluginLogger().Info("Stopping RPC manager...")
 
 	shutdownTimeout := m.config.GracefulShutdownTimeout
 	if shutdownTimeout <= 0 {
@@ -351,17 +350,17 @@ func (m *Manager) Stop() error {
 		wg.Add(1)
 		go func(serverName string, rpcServer Server) {
 			defer wg.Done()
-			logger.Info("Stopping RPC server", zap.String("name", serverName))
+			pluginLogger().Info("Stopping RPC server", zap.String("name", serverName))
 
 			if err := rpcServer.Stop(); err != nil {
 				errMu.Lock()
 				errors = append(errors, fmt.Errorf("server %s stop failed: %w", serverName, err))
 				errMu.Unlock()
-				logger.Errorf("Failed to stop RPC server",
+				pluginLogger().Error("Failed to stop RPC server",
 					zap.String("name", serverName),
 					zap.Error(err))
 			} else {
-				logger.Info("RPC server stopped successfully", zap.String("name", serverName))
+				pluginLogger().Info("RPC server stopped successfully", zap.String("name", serverName))
 			}
 		}(name, server)
 	}
@@ -374,9 +373,9 @@ func (m *Manager) Stop() error {
 
 	select {
 	case <-done:
-		logger.Info("All RPC servers stopped gracefully")
+		pluginLogger().Info("All RPC servers stopped gracefully")
 	case <-ctx.Done():
-		logger.Warn("Graceful shutdown timeout, forcing stop")
+		pluginLogger().Warn("Graceful shutdown timeout, forcing stop")
 		errMu.Lock()
 		errors = append(errors, fmt.Errorf("graceful shutdown timeout"))
 		errMu.Unlock()
