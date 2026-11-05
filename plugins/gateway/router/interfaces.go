@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 )
@@ -53,19 +54,26 @@ func NewRouterFactory() RouterFactory {
 }
 
 // 全局路由工厂实例
-var globalRouterFactory RouterFactory = NewRouterFactory()
+var (
+	globalRouterFactoryMu sync.RWMutex
+	globalRouterFactory   RouterFactory = NewRouterFactory()
+)
 
 // SetRouterFactory 设置全局路由工厂（用于替换路由实现）
 func SetRouterFactory(factory RouterFactory) {
+	globalRouterFactoryMu.Lock()
+	defer globalRouterFactoryMu.Unlock()
 	globalRouterFactory = factory
 }
 
 // GetRouterFactory 获取全局路由工厂
 func GetRouterFactory() RouterFactory {
+	globalRouterFactoryMu.RLock()
+	defer globalRouterFactoryMu.RUnlock()
 	return globalRouterFactory
 }
 
 // CreateRouter 使用全局工厂创建路由
 func CreateRouter(cfg *gateway.Config) IRouterBuilder {
-	return globalRouterFactory.CreateRouterBuilder(cfg)
+	return GetRouterFactory().CreateRouterBuilder(cfg)
 }

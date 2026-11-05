@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -154,5 +155,38 @@ func TestGlobalTracerLifecycle(t *testing.T) {
 	}
 	if _, err := NewTracer(Config{Type: "zipkin", ServiceName: "compat", Enabled: false}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGlobalTracerConcurrentAccess(t *testing.T) {
+	t.Cleanup(func() { SetGlobalTracer(nil) })
+
+	tp, err := NewTracerProvider(Config{Type: "zipkin", ServiceName: "concurrent", Enabled: false})
+	if err != nil {
+		t.Fatalf("NewTracerProvider() error = %v", err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			SetGlobalTracer(tp)
+		}()
+		go func() {
+			defer wg.Done()
+			if GlobalTracer() == nil {
+				t.Error("GlobalTracer() returned nil")
+			}
+		}()
+	}
+	wg.Wait()
+
+	if GlobalTracer() != tp {
+		t.Fatal("GlobalTracer() did not return the provider set by SetGlobalTracer")
+	}
+	SetGlobalTracer(nil)
+	if GlobalTracer().IsEnabled() {
+		t.Fatal("GlobalTracer() should fall back to a disabled provider after reset")
 	}
 }

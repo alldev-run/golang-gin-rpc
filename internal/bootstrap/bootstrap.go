@@ -709,10 +709,19 @@ func (b *Bootstrap) InitializeTracing() error {
 	}
 
 	b.tracer = tracer
+	tracing.SetGlobalTracer(tracer)
 	b.setDependency("tracer", tracer)
 
 	logger.Info("Tracing services initialized successfully")
 	return nil
+}
+
+// shutdownTracer stops the bootstrap tracer and clears it from the global slot.
+func (b *Bootstrap) shutdownTracer(ctx context.Context) error {
+	if tracing.GlobalTracer() == b.tracer {
+		tracing.SetGlobalTracer(nil)
+	}
+	return b.tracer.Shutdown(ctx)
 }
 
 // InitializeUpload initializes upload service if enabled.
@@ -1069,7 +1078,7 @@ func (b *Bootstrap) Close() error {
 
 	if b.tracer != nil && !b.pluginStopped("tracing") {
 		ctx := context.Background()
-		if err := b.tracer.Shutdown(ctx); err != nil {
+		if err := b.shutdownTracer(ctx); err != nil {
 			errors = append(errors, fmt.Errorf("tracer close error: %w", err))
 		}
 	}

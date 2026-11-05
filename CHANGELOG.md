@@ -15,6 +15,7 @@ and this project adheres to semantic versioning.
 - Redis and Memcached fallback configuration for failover caches.
 - TCP health checks and metadata-weighted service selection for discovery.
 - File-based APNs and FCM credentials.
+- `tracing.SetGlobalTracer` for installing (or, with `nil`, resetting) the process-wide tracer provider.
 
 ### Changed
 
@@ -34,6 +35,8 @@ and this project adheres to semantic versioning.
 
 ### Fixed
 
+- Bootstrap tracing is now installed as the global tracer, so RPC, gateway, and WebSocket spans use the configured provider instead of a disabled default. The gateway reuses an active global provider rather than replacing it with its own `tracing` config.
+- Data races on the global tracer provider and the gateway global router factory.
 - Cache singleflight wait-group publication ordering and its concurrent result behavior.
 - Declaration-order scanning and nullable pointer handling for `StructScanRow`.
 - Nondeterministic timing assumptions in the hash-performance and rate-limiter concurrency tests.

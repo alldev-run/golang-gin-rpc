@@ -84,7 +84,7 @@ func registerBuiltinPlugins(boot *Bootstrap) {
 			startFn:   func(b *Bootstrap) error { return b.InitializeTracing() },
 			stopFn: func(b *Bootstrap, ctx stdctx.Context) error {
 				if b.tracer != nil {
-					return b.tracer.Shutdown(ctx)
+					return b.shutdownTracer(ctx)
 				}
 				return nil
 			},

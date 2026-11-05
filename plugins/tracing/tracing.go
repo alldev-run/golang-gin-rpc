@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
 	"go.opentelemetry.io/otel"
@@ -447,8 +448,11 @@ func (tp *TracerProvider) StartSpanWithParent(ctx context.Context, name string, 
 	return tracer.Start(ctx, name, opts...)
 }
 
-// Global tracer provider instance
-var globalTracerProvider *TracerProvider
+// globalTracerProvider holds the process-wide provider; nil means unset.
+var globalTracerProvider atomic.Pointer[TracerProvider]
+
+// disabledTracerProvider is returned by GlobalTracer until a provider is set.
+var disabledTracerProvider = &TracerProvider{config: DefaultConfig()}
 
 // InitGlobalTracer initializes the global tracer provider
 func InitGlobalTracer(config Config) error {
@@ -456,23 +460,29 @@ func InitGlobalTracer(config Config) error {
 	if err != nil {
 		return err
 	}
-	globalTracerProvider = tp
+	SetGlobalTracer(tp)
 	return nil
 }
 
-// GlobalTracer returns the global tracer provider
+// SetGlobalTracer replaces the global tracer provider. Passing nil resets it
+// to the disabled default.
+func SetGlobalTracer(tp *TracerProvider) {
+	globalTracerProvider.Store(tp)
+}
+
+// GlobalTracer returns the global tracer provider, or a disabled provider
+// when none has been set.
 func GlobalTracer() *TracerProvider {
-	if globalTracerProvider == nil {
-		// Initialize with default config if not already done
-		globalTracerProvider, _ = NewTracerProvider(DefaultConfig())
+	if tp := globalTracerProvider.Load(); tp != nil {
+		return tp
 	}
-	return globalTracerProvider
+	return disabledTracerProvider
 }
 
 // ShutdownGlobalTracer shuts down the global tracer provider
 func ShutdownGlobalTracer(ctx context.Context) error {
-	if globalTracerProvider != nil {
-		return globalTracerProvider.Shutdown(ctx)
+	if tp := globalTracerProvider.Load(); tp != nil {
+		return tp.Shutdown(ctx)
 	}
 	return nil
 }

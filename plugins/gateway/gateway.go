@@ -163,12 +163,18 @@ func (g *Gateway) initHealth() {
 
 func (g *Gateway) initTracing() {
 	if g.config.Tracing != nil && g.config.Tracing.Enabled {
-		// Initialize tracing with the provided configuration
-		if err := tracing.InitGlobalTracer(*g.config.Tracing); err != nil {
-			logger.Errorf("Failed to initialize tracing", logger.Error(err))
-			return
+		// Reuse a provider already installed by the host (e.g. bootstrap);
+		// only initialize from the gateway config when none is active.
+		if current := tracing.GlobalTracer(); current.IsEnabled() {
+			g.tracer = current
+			logger.Info("Tracing reuses the active global tracer provider")
+		} else {
+			if err := tracing.InitGlobalTracer(*g.config.Tracing); err != nil {
+				logger.Errorf("Failed to initialize tracing", logger.Error(err))
+				return
+			}
+			g.tracer = tracing.GlobalTracer()
 		}
-		g.tracer = tracing.GlobalTracer()
 		logger.Info("Tracing initialized successfully",
 			logger.String("type", g.config.Tracing.Type),
 			logger.String("service", g.config.Tracing.ServiceName))
