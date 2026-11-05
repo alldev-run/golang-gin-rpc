@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/bootstrap/pluginconfig"
+
 	"gopkg.in/yaml.v3"
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/httpapi"
@@ -90,7 +92,7 @@ func main() {
 	}
 	defer boot.Close()
 
-	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig())
+	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig(), boot.GetPluginConfig())
 	frameworkGatewayCfg := frameworkGatewayBase
 	if frameworkConfigPath != "" {
 		frameworkGatewayCfg, err = loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
@@ -226,10 +228,13 @@ func unmarshalGatewayConfig(data []byte, cfg *gateway.Config) error {
 	return yaml.Unmarshal(data, cfg)
 }
 
-func buildGatewayConfigFromFramework(cfg *config.GlobalConfig) *gateway.Config {
+func buildGatewayConfigFromFramework(cfg *config.GlobalConfig, plugins *pluginconfig.Config) *gateway.Config {
 	base := gateway.DefaultConfig()
 	if cfg == nil {
 		return base
+	}
+	if plugins == nil {
+		plugins = pluginconfig.Default()
 	}
 
 	base.Host = cfg.Server.HTTP.Host
@@ -239,29 +244,29 @@ func buildGatewayConfigFromFramework(cfg *config.GlobalConfig) *gateway.Config {
 	base.IdleTimeout = cfg.Server.HTTP.IdleTimeout
 	base.ServiceName = cfg.App.Name
 
-	base.CORS.AllowedOrigins = append([]string(nil), cfg.Security.CORS.AllowOrigins...)
-	base.CORS.AllowedMethods = append([]string(nil), cfg.Security.CORS.AllowMethods...)
-	base.CORS.AllowedHeaders = append([]string(nil), cfg.Security.CORS.AllowHeaders...)
-	base.CORS.AllowCredentials = cfg.Security.CORS.AllowCredentials
+	base.CORS.AllowedOrigins = append([]string(nil), plugins.Security.CORS.AllowOrigins...)
+	base.CORS.AllowedMethods = append([]string(nil), plugins.Security.CORS.AllowMethods...)
+	base.CORS.AllowedHeaders = append([]string(nil), plugins.Security.CORS.AllowHeaders...)
+	base.CORS.AllowCredentials = plugins.Security.CORS.AllowCredentials
 
-	base.RateLimit.Enabled = cfg.Security.RateLimit.Enabled
-	base.RateLimit.Requests = cfg.Security.RateLimit.Limit
-	base.RateLimit.Window = cfg.Security.RateLimit.Window.String()
+	base.RateLimit.Enabled = plugins.Security.RateLimit.Enabled
+	base.RateLimit.Requests = plugins.Security.RateLimit.Limit
+	base.RateLimit.Window = plugins.Security.RateLimit.Window.String()
 
-	base.Discovery.Enabled = cfg.Discovery.Enabled
-	base.Discovery.Type = cfg.Discovery.Type
-	base.Discovery.Timeout = cfg.Discovery.Timeout
-	base.Discovery.Namespace = cfg.Discovery.Config["namespace"]
+	base.Discovery.Enabled = plugins.Discovery.Enabled
+	base.Discovery.Type = plugins.Discovery.Type
+	base.Discovery.Timeout = plugins.Discovery.Timeout
+	base.Discovery.Namespace = plugins.Discovery.Config["namespace"]
 	if base.Discovery.Namespace == "" {
 		base.Discovery.Namespace = "default"
 	}
-	if cfg.Discovery.Address != "" {
-		base.Discovery.Endpoints = []string{cfg.Discovery.Address}
+	if plugins.Discovery.Address != "" {
+		base.Discovery.Endpoints = []string{plugins.Discovery.Address}
 	}
 	if base.Discovery.Options == nil {
 		base.Discovery.Options = make(map[string]string)
 	}
-	for k, v := range cfg.Discovery.Config {
+	for k, v := range plugins.Discovery.Config {
 		base.Discovery.Options[k] = v
 	}
 

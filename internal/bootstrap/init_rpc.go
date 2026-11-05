@@ -11,13 +11,13 @@ import (
 
 // InitializeRPC initializes RPC services
 func (b *Bootstrap) InitializeRPC() error {
-	if !b.config.RPC.Enabled {
+	if !b.pluginConfig.RPC.Enabled {
 		logger.Info("No RPC servers configured, skipping RPC initialization")
 		return nil
 	}
 
 	managerConfig := rpc.DefaultManagerConfig()
-	switch b.config.RPC.Protocol {
+	switch b.pluginConfig.RPC.Protocol {
 	case "jsonrpc":
 		managerConfig.Servers = map[string]rpc.Config{
 			"jsonrpc": {
@@ -47,16 +47,16 @@ func (b *Bootstrap) InitializeRPC() error {
 	b.rpcManager = rpc.NewManager(managerConfig)
 	b.setDependency(DepRPCManager, b.rpcManager)
 
-	if b.config.RPC.Degradation.Enabled {
+	if b.pluginConfig.RPC.Degradation.Enabled {
 		dmConfig := rpc.DefaultDegradationConfig()
-		dmConfig.Enabled = b.config.RPC.Degradation.Enabled
-		dmConfig.AutoDetect = b.config.RPC.Degradation.AutoDetect
-		dmConfig.CPUThreshold = b.config.RPC.Degradation.CPUThreshold
-		dmConfig.MemoryThreshold = b.config.RPC.Degradation.MemoryThreshold
-		dmConfig.ErrorRateThreshold = b.config.RPC.Degradation.ErrorRateThreshold
-		dmConfig.LatencyThreshold = b.config.RPC.Degradation.LatencyThreshold
-		dmConfig.EnableCircuitBreaker = b.config.RPC.Degradation.EnableCircuitBreaker
-		dmConfig.Level = parseDegradationLevel(b.config.RPC.Degradation.Level)
+		dmConfig.Enabled = b.pluginConfig.RPC.Degradation.Enabled
+		dmConfig.AutoDetect = b.pluginConfig.RPC.Degradation.AutoDetect
+		dmConfig.CPUThreshold = b.pluginConfig.RPC.Degradation.CPUThreshold
+		dmConfig.MemoryThreshold = b.pluginConfig.RPC.Degradation.MemoryThreshold
+		dmConfig.ErrorRateThreshold = b.pluginConfig.RPC.Degradation.ErrorRateThreshold
+		dmConfig.LatencyThreshold = b.pluginConfig.RPC.Degradation.LatencyThreshold
+		dmConfig.EnableCircuitBreaker = b.pluginConfig.RPC.Degradation.EnableCircuitBreaker
+		dmConfig.Level = parseDegradationLevel(b.pluginConfig.RPC.Degradation.Level)
 
 		dm, err := rpc.NewDegradationManager(dmConfig)
 		if err != nil {
@@ -66,7 +66,7 @@ func (b *Bootstrap) InitializeRPC() error {
 	}
 
 	logger.Info("Initializing RPC services",
-		logger.String("protocol", b.config.RPC.Protocol))
+		logger.String("protocol", b.pluginConfig.RPC.Protocol))
 
 	if err := b.rpcManager.Start(); err != nil {
 		return fmt.Errorf("failed to start RPC manager: %w", err)
@@ -74,11 +74,11 @@ func (b *Bootstrap) InitializeRPC() error {
 
 	if b.discoveryManager != nil {
 		if err := b.rpcManager.SetDiscoveryIntegration(b.discoveryManager, rpc.DiscoveryRegistrationConfig{
-			Enabled:        b.config.Discovery.Enabled,
+			Enabled:        b.pluginConfig.Discovery.Enabled,
 			ServiceName:    b.config.App.Name,
-			ServiceAddress: firstNonEmpty(b.config.Discovery.Config["service_address"], firstNonEmpty(b.config.Server.GRPC.Host, b.config.Server.HTTP.Host)),
-			ServiceTags:    append([]string{"rpc", b.config.RPC.Protocol}, splitAndTrim(b.config.Discovery.Config["rpc_tags"])...),
-			Metadata:       map[string]string(b.config.Discovery.Config),
+			ServiceAddress: firstNonEmpty(b.pluginConfig.Discovery.Config["service_address"], firstNonEmpty(b.config.Server.GRPC.Host, b.config.Server.HTTP.Host)),
+			ServiceTags:    append([]string{"rpc", b.pluginConfig.RPC.Protocol}, splitAndTrim(b.pluginConfig.Discovery.Config["rpc_tags"])...),
+			Metadata:       map[string]string(b.pluginConfig.Discovery.Config),
 		}); err != nil {
 			return fmt.Errorf("failed to connect rpc manager with discovery manager: %w", err)
 		}
@@ -90,21 +90,21 @@ func (b *Bootstrap) InitializeRPC() error {
 
 // InitializeDiscovery initializes service discovery
 func (b *Bootstrap) InitializeDiscovery() error {
-	if !b.config.Discovery.Enabled {
+	if !b.pluginConfig.Discovery.Enabled {
 		logger.Info("Service discovery disabled, skipping discovery initialization")
 		return nil
 	}
 
-	if b.config.Discovery.Address == "" {
+	if b.pluginConfig.Discovery.Address == "" {
 		logger.Warn("Service discovery enabled but no registry address configured, skipping discovery initialization")
 		return nil
 	}
 
 	managerConfig := discovery.DefaultManagerConfig()
-	managerConfig.Enabled = b.config.Discovery.Enabled
-	managerConfig.RegistryType = b.config.Discovery.Type
-	managerConfig.RegistryAddress = b.config.Discovery.Address
-	managerConfig.Timeout = b.config.Discovery.Timeout
+	managerConfig.Enabled = b.pluginConfig.Discovery.Enabled
+	managerConfig.RegistryType = b.pluginConfig.Discovery.Type
+	managerConfig.RegistryAddress = b.pluginConfig.Discovery.Address
+	managerConfig.Timeout = b.pluginConfig.Discovery.Timeout
 	managerConfig.ServiceName = b.config.App.Name
 	managerConfig.ServiceAddress = b.config.Server.HTTP.Host
 	managerConfig.ServicePort = b.config.Server.HTTP.Port
@@ -124,11 +124,11 @@ func (b *Bootstrap) InitializeDiscovery() error {
 
 	if b.rpcManager != nil {
 		if err := b.rpcManager.SetDiscoveryIntegration(manager, rpc.DiscoveryRegistrationConfig{
-			Enabled:        b.config.Discovery.Enabled,
+			Enabled:        b.pluginConfig.Discovery.Enabled,
 			ServiceName:    b.config.App.Name,
-			ServiceAddress: firstNonEmpty(b.config.Discovery.Config["service_address"], firstNonEmpty(b.config.Server.GRPC.Host, b.config.Server.HTTP.Host)),
-			ServiceTags:    append([]string{"rpc", b.config.RPC.Protocol}, splitAndTrim(b.config.Discovery.Config["rpc_tags"])...),
-			Metadata:       map[string]string(b.config.Discovery.Config),
+			ServiceAddress: firstNonEmpty(b.pluginConfig.Discovery.Config["service_address"], firstNonEmpty(b.config.Server.GRPC.Host, b.config.Server.HTTP.Host)),
+			ServiceTags:    append([]string{"rpc", b.pluginConfig.RPC.Protocol}, splitAndTrim(b.pluginConfig.Discovery.Config["rpc_tags"])...),
+			Metadata:       map[string]string(b.pluginConfig.Discovery.Config),
 		}); err != nil {
 			return fmt.Errorf("failed to connect discovery manager with rpc manager: %w", err)
 		}

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alldev-run/golang-gin-rpc/bootstrap/pluginconfig"
+
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
 	"github.com/alldev-run/golang-gin-rpc/pkg/kernel"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
@@ -76,10 +78,12 @@ type Bootstrap struct {
 	managedServices  map[string]ManagedService
 	serviceOrder     []string
 
-	pluginMu   sync.RWMutex
-	pluginApp  *kernel.App
-	registry   *kernel.Registry
-	stoppedSet map[string]bool
+	pluginMu  sync.RWMutex
+	pluginApp *kernel.App
+	// pluginConfig holds the built-in plugin sections (redis, rpc, discovery, ...).
+	pluginConfig *pluginconfig.Config
+	registry     *kernel.Registry
+	stoppedSet   map[string]bool
 
 	depMu        sync.RWMutex
 	dependencies map[string]interface{}
@@ -153,8 +157,14 @@ func NewBootstrap(configPath string) (*Bootstrap, error) {
 	logger.Info("Framework version", logger.String("version", version.GetVersion()))
 	// logger.Info("Configuration loaded successfully")
 
+	pluginCfg, err := pluginconfig.Load(loader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load plugin config: %w", err)
+	}
+
 	boot := &Bootstrap{
 		config:           cfg,
+		pluginConfig:     pluginCfg,
 		loader:           loader,
 		serviceFactories: make(map[string]ServiceFactory),
 		managedServices:  make(map[string]ManagedService),
@@ -323,6 +333,11 @@ func splitAndTrim(value string) []string {
 // GetConfig returns the configuration
 func (b *Bootstrap) GetConfig() *config.GlobalConfig {
 	return b.config
+}
+
+// GetPluginConfig returns the built-in plugin configuration sections.
+func (b *Bootstrap) GetPluginConfig() *pluginconfig.Config {
+	return b.pluginConfig
 }
 
 // GetLogger returns the global logger

@@ -58,6 +58,12 @@ examples/             独立 Go 模块（examples/go.mod）：示例代码不进
   `internal/bootstrap` 链接全部内置插件，并非零依赖 facade。插件对象的类型化访问用
   `bootstrap.Dependency[T](boot, key)`，依赖键使用导出常量（如 `bootstrap.DepDBFactory`、
   `bootstrap.DepCache`、`bootstrap.DepActorSystem`），值与历史字符串键一致。
+- **内置插件配置不在 core**：redis、rpc、discovery、messaging、security 配置段由
+  `bootstrap/pluginconfig.Config` 定义（`boot.GetPluginConfig()` 读取），YAML key 不变；
+  `pkg/config.GlobalConfig` 只保留 app/framework/server/database/logger/observability。
+- **每个 Bootstrap 独占注册表**：内置插件注册到 `kernel.NewRegistry()` 创建的实例注册表，
+  经 `kernel.WithRegistry` 交给 Loader；空导入自注册的插件仍在默认注册表中，Loader 合并两者
+  （同名时实例注册表优先）。
 - **plugins/db 不依赖 plugins/cache**：redis/memcache 驱动由 `plugins/cache`
   的 `redis/register.go`、`memcache/register.go` 自注册（import 即注册，
   `db.Config.Redis`/`Memcache` 以 any 携带配置）；依赖方向为 cache -> db。

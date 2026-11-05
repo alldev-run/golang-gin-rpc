@@ -15,19 +15,19 @@ func (b *Bootstrap) InitializeGateway() error {
 	gatewayConfig.ReadTimeout = b.config.Server.HTTP.ReadTimeout
 	gatewayConfig.WriteTimeout = b.config.Server.HTTP.WriteTimeout
 	gatewayConfig.IdleTimeout = b.config.Server.HTTP.IdleTimeout
-	gatewayConfig.CORS.AllowedOrigins = b.config.Security.CORS.AllowOrigins
-	gatewayConfig.CORS.AllowedMethods = b.config.Security.CORS.AllowMethods
-	gatewayConfig.CORS.AllowedHeaders = b.config.Security.CORS.AllowHeaders
-	gatewayConfig.CORS.AllowCredentials = b.config.Security.CORS.AllowCredentials
-	gatewayConfig.RateLimit.Enabled = b.config.Security.RateLimit.Enabled
-	gatewayConfig.RateLimit.Requests = b.config.Security.RateLimit.Limit
-	gatewayConfig.RateLimit.Window = b.config.Security.RateLimit.Window.String()
-	gatewayConfig.Discovery.Type = b.config.Discovery.Type
-	if b.config.Discovery.Address != "" {
-		gatewayConfig.Discovery.Endpoints = []string{b.config.Discovery.Address}
+	gatewayConfig.CORS.AllowedOrigins = b.pluginConfig.Security.CORS.AllowOrigins
+	gatewayConfig.CORS.AllowedMethods = b.pluginConfig.Security.CORS.AllowMethods
+	gatewayConfig.CORS.AllowedHeaders = b.pluginConfig.Security.CORS.AllowHeaders
+	gatewayConfig.CORS.AllowCredentials = b.pluginConfig.Security.CORS.AllowCredentials
+	gatewayConfig.RateLimit.Enabled = b.pluginConfig.Security.RateLimit.Enabled
+	gatewayConfig.RateLimit.Requests = b.pluginConfig.Security.RateLimit.Limit
+	gatewayConfig.RateLimit.Window = b.pluginConfig.Security.RateLimit.Window.String()
+	gatewayConfig.Discovery.Type = b.pluginConfig.Discovery.Type
+	if b.pluginConfig.Discovery.Address != "" {
+		gatewayConfig.Discovery.Endpoints = []string{b.pluginConfig.Discovery.Address}
 	}
-	gatewayConfig.Discovery.Namespace = firstNonEmpty(b.config.Discovery.Config["namespace"], "default")
-	gatewayConfig.Discovery.Timeout = b.config.Discovery.Timeout
+	gatewayConfig.Discovery.Namespace = firstNonEmpty(b.pluginConfig.Discovery.Config["namespace"], "default")
+	gatewayConfig.Discovery.Timeout = b.pluginConfig.Discovery.Timeout
 
 	b.gateway = gateway.NewGateway(gatewayConfig)
 	b.setDependency(DepGateway, b.gateway)

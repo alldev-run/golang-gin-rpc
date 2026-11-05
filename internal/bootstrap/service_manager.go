@@ -184,19 +184,19 @@ func (b *Bootstrap) RegisterDefaultServiceFactories() error {
 		cfg.ReadTimeout = boot.config.Server.HTTP.ReadTimeout
 		cfg.WriteTimeout = boot.config.Server.HTTP.WriteTimeout
 		cfg.IdleTimeout = boot.config.Server.HTTP.IdleTimeout
-		cfg.CORS.AllowedOrigins = boot.config.Security.CORS.AllowOrigins
-		cfg.CORS.AllowedMethods = boot.config.Security.CORS.AllowMethods
-		cfg.CORS.AllowedHeaders = boot.config.Security.CORS.AllowHeaders
-		cfg.CORS.AllowCredentials = boot.config.Security.CORS.AllowCredentials
-		cfg.RateLimit.Enabled = boot.config.Security.RateLimit.Enabled
-		cfg.RateLimit.Requests = boot.config.Security.RateLimit.Limit
-		cfg.RateLimit.Window = boot.config.Security.RateLimit.Window.String()
-		cfg.Discovery.Type = boot.config.Discovery.Type
-		if boot.config.Discovery.Address != "" {
-			cfg.Discovery.Endpoints = []string{boot.config.Discovery.Address}
+		cfg.CORS.AllowedOrigins = boot.pluginConfig.Security.CORS.AllowOrigins
+		cfg.CORS.AllowedMethods = boot.pluginConfig.Security.CORS.AllowMethods
+		cfg.CORS.AllowedHeaders = boot.pluginConfig.Security.CORS.AllowHeaders
+		cfg.CORS.AllowCredentials = boot.pluginConfig.Security.CORS.AllowCredentials
+		cfg.RateLimit.Enabled = boot.pluginConfig.Security.RateLimit.Enabled
+		cfg.RateLimit.Requests = boot.pluginConfig.Security.RateLimit.Limit
+		cfg.RateLimit.Window = boot.pluginConfig.Security.RateLimit.Window.String()
+		cfg.Discovery.Type = boot.pluginConfig.Discovery.Type
+		if boot.pluginConfig.Discovery.Address != "" {
+			cfg.Discovery.Endpoints = []string{boot.pluginConfig.Discovery.Address}
 		}
-		cfg.Discovery.Namespace = firstNonEmpty(boot.config.Discovery.Config["namespace"], "default")
-		cfg.Discovery.Timeout = boot.config.Discovery.Timeout
+		cfg.Discovery.Namespace = firstNonEmpty(boot.pluginConfig.Discovery.Config["namespace"], "default")
+		cfg.Discovery.Timeout = boot.pluginConfig.Discovery.Timeout
 
 		service := &managedAPIGatewayService{name: ServiceAPIGateway, config: cfg}
 		return &managedServiceAdapter{

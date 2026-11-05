@@ -21,6 +21,7 @@ and this project adheres to semantic versioning.
 
 ### Changed
 
+- **Breaking:** the Redis, RPC, Discovery, Messaging and Security sections moved out of `pkg/config.GlobalConfig` into `github.com/alldev-run/golang-gin-rpc/bootstrap/pluginconfig.Config`. YAML keys are unchanged. Read them with `boot.GetPluginConfig()` instead of `boot.GetConfig()`, for example `boot.GetPluginConfig().Security.JWT`. `Observability` stays in `GlobalConfig` because the core logger reads its `logging` block.
 - **Breaking:** `pkg/` is now a separate Go module, `github.com/alldev-run/golang-gin-rpc/pkg`. Plugin modules require it instead of the root module. Import paths are unchanged; modules that build against a local checkout need `require github.com/alldev-run/golang-gin-rpc/pkg v0.0.0` plus a `replace` pointing at `pkg/`.
 - **Breaking:** `github.com/alldev-run/golang-gin-rpc/pkg/bootstrap` moved to `github.com/alldev-run/golang-gin-rpc/bootstrap`. Its API is unchanged; update the import path. It links every built-in plugin, so it cannot live in the plugin-free core module.
 - Documentation is now organized into category directories under `docs/`; see [the documentation index](docs/README.md).

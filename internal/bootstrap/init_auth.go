@@ -8,17 +8,17 @@ import (
 
 // InitializeAuth initializes authentication services
 func (b *Bootstrap) InitializeAuth() error {
-	if !b.config.Security.JWT.Enabled {
+	if !b.pluginConfig.Security.JWT.Enabled {
 		logger.Info("Authentication services disabled")
 		return nil
 	}
 
 	authManager := auth.NewAuthManager(auth.AuthConfig{
-		Enabled: b.config.Security.JWT.Enabled,
+		Enabled: b.pluginConfig.Security.JWT.Enabled,
 		JWT: jwtx.Config{
-			Secret:          b.config.Security.JWT.Secret,
-			AccessTokenTTL:  b.config.Security.JWT.Expiration,
-			RefreshTokenTTL: b.config.Security.JWT.Expiration * 7,
+			Secret:          b.pluginConfig.Security.JWT.Secret,
+			AccessTokenTTL:  b.pluginConfig.Security.JWT.Expiration,
+			RefreshTokenTTL: b.pluginConfig.Security.JWT.Expiration * 7,
 		},
 	})
 	b.authManager = authManager
