@@ -48,7 +48,8 @@ func (p *builtinPlugin) Stop(ctx *kernel.Context) error {
 	return p.stopFn(p.boot, ctx)
 }
 
-// registerBuiltinPlugins 把框架内置组件注册到 kernel 注册表（幂等）。
+// registerBuiltinPlugins 把框架内置组件注册到该 Bootstrap 独占的 kernel 注册表（幂等），
+// 同一进程内的多个 Bootstrap 互不共享内置插件实例。
 func registerBuiltinPlugins(boot *Bootstrap) {
 	builtin := []*builtinPlugin{
 		{
@@ -127,12 +128,19 @@ func registerBuiltinPlugins(boot *Bootstrap) {
 		},
 	}
 
+	if boot.registry == nil {
+		boot.registry = kernel.NewRegistry()
+	}
 	for _, def := range builtin {
+		// 默认注册表中的同名插件视为应用的替换实现；已注册的保持幂等。
 		if _, exists := kernel.GetRegistered(def.name); exists {
+			continue
+		}
+		if _, exists := boot.registry.Get(def.name); exists {
 			continue
 		}
 		p := *def
 		p.boot = boot
-		kernel.MustRegister(&p)
+		boot.registry.MustRegister(&p)
 	}
 }

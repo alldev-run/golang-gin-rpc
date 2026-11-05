@@ -18,8 +18,9 @@ type pluginToggle struct {
 
 // Loader 从注册表构建一次可启动的插件应用。
 type Loader struct {
-	source ConfigSource
-	log    *zap.Logger
+	source   ConfigSource
+	log      *zap.Logger
+	registry *Registry
 }
 
 // LoaderOption 定制 Loader。
@@ -28,6 +29,12 @@ type LoaderOption func(*Loader)
 // WithLogger 指定框架日志器。
 func WithLogger(l *zap.Logger) LoaderOption {
 	return func(lo *Loader) { lo.log = l }
+}
+
+// WithRegistry 让 Loader 优先使用 r 中的插件；默认注册表中同名插件被 r 覆盖，
+// 其余（如空导入自注册的插件）仍参与构建。
+func WithRegistry(r *Registry) LoaderOption {
+	return func(lo *Loader) { lo.registry = r }
 }
 
 // NewLoader 创建插件加载器。source 用于读取 plugins.* 配置段。
@@ -54,7 +61,7 @@ type App struct {
 // 参与构建的插件 = 已注册 && 配置未显式禁用 && Configure 未返回 ErrDisabled。
 // 任一已启用插件依赖了被禁用或未注册的插件时报错。
 func (l *Loader) Build() (*App, error) {
-	registered := Registered()
+	registered := l.registered()
 
 	// 1. 运行期裁剪：读 plugins.<name>.enabled，默认启用。
 	enabled := make(map[string]Plugin, len(registered))
@@ -96,7 +103,7 @@ func (l *Loader) Build() (*App, error) {
 	}
 
 	// 4. 拓扑排序（Kahn，注册序为稳定次序）。
-	order, err := topoSort(configured)
+	order, err := topoSort(configured, registered)
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +116,20 @@ func (l *Loader) Build() (*App, error) {
 		zap.Int("plugins", len(plugins)),
 		zap.String("order", strings.Join(order, " -> ")))
 	return &App{plugins: plugins, context: shared, log: l.log, services: services}, nil
+}
+
+// registered 返回参与构建的插件：实例注册表在前，其后是默认注册表中未被覆盖的插件。
+func (l *Loader) registered() []Plugin {
+	if l.registry == nil || l.registry == defaultRegistry {
+		return Registered()
+	}
+	out := l.registry.Plugins()
+	for _, p := range Registered() {
+		if _, ok := l.registry.Get(p.Name()); !ok {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // softDepends 返回插件的软依赖列表（未实现 SoftDepender 则为空）。
@@ -138,9 +159,8 @@ func (l *Loader) isEnabled(name string) bool {
 }
 
 // topoSort 对 configured 中的插件按依赖排序；结果确定（依赖相同时按注册序）。
-func topoSort(configured map[string]Plugin) ([]string, error) {
+func topoSort(configured map[string]Plugin, registered []Plugin) ([]string, error) {
 	// 注册序作为平局决胜。
-	registered := Registered()
 	seq := make(map[string]int, len(registered))
 	for i, p := range registered {
 		seq[p.Name()] = i

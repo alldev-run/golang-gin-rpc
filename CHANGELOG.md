@@ -16,6 +16,7 @@ and this project adheres to semantic versioning.
 - TCP health checks and metadata-weighted service selection for discovery.
 - File-based APNs and FCM credentials.
 - `bootstrap.Dep*` constants (for example `bootstrap.DepDBFactory`, `bootstrap.DepTracer`) for the dependency-container keys; the string values are unchanged.
+- `kernel.NewRegistry`, `kernel.DefaultRegistry`, and the `kernel.WithRegistry` loader option for per-instance plugin registries; the default registry still provides blank-import self-registration.
 - `tracing.SetGlobalTracer` for installing (or, with `nil`, resetting) the process-wide tracer provider.
 
 ### Changed
@@ -39,6 +40,7 @@ and this project adheres to semantic versioning.
 ### Fixed
 
 - Bootstrap tracing is now installed as the global tracer, so RPC, gateway, and WebSocket spans use the configured provider instead of a disabled default. The gateway reuses an active global provider rather than replacing it with its own `tracing` config.
+- Each `Bootstrap` now registers its built-in plugins in its own kernel registry, so a second `Bootstrap` in the same process no longer reuses plugins bound to the first one.
 - Data races on the global tracer provider and the gateway global router factory.
 - Cache singleflight wait-group publication ordering and its concurrent result behavior.
 - Declaration-order scanning and nullable pointer handling for `StructScanRow`.

@@ -82,6 +82,7 @@ type Bootstrap struct {
 
 	pluginMu   sync.RWMutex
 	pluginApp  *kernel.App
+	registry   *kernel.Registry
 	stoppedSet map[string]bool
 
 	depMu        sync.RWMutex

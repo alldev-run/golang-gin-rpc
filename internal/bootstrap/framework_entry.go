@@ -80,7 +80,7 @@ func (b *Bootstrap) StartFramework(ctx context.Context, options FrameworkOptions
 	// 注册内置组件适配器（幂等），构建并启动插件应用。
 	registerBuiltinPlugins(b)
 
-	app, err := kernel.NewLoader(b.loader).Build()
+	app, err := kernel.NewLoader(b.loader, kernel.WithRegistry(b.registry)).Build()
 	if err != nil {
 		return fmt.Errorf("failed to build plugin app: %w", err)
 	}
