@@ -136,9 +136,11 @@ func TestRandomLoadBalancer(t *testing.T) {
 		t.Fatalf("UpdateTargets() error = %v", err)
 	}
 
-	// Test random selection
+	// Test random selection. 300 draws keep the odds of a target going
+	// unpicked at (2/3)^300 — practically zero, so the assertion below
+	// cannot flake the way a 30-draw run could (about once per 200).
 	selected := make(map[string]int)
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 300; i++ {
 		target, err := lb.Select(context.Background(), nil)
 		if err != nil {
 			t.Errorf("Select() error = %v", err)
