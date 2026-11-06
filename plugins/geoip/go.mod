@@ -1,6 +1,6 @@
 module github.com/alldev-run/golang-gin-rpc/plugins/geoip
 
-go 1.25.7
+go 1.26.0
 
 require (
 	github.com/oschwald/geoip2-golang v1.11.0
@@ -17,6 +17,6 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )

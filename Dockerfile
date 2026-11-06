@@ -4,7 +4,7 @@
 # 示例:
 #   docker build -t ggr:latest .
 #   docker build --build-arg APP_PATH=./api/demo-app -t demo-app:latest .
-FROM golang:1.25-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 ARG APP_PATH=.
 WORKDIR /src

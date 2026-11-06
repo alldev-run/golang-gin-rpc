@@ -1,6 +1,6 @@
 module github.com/alldev-run/golang-gin-rpc/plugins/circuitbreaker
 
-go 1.25.7
+go 1.26.0
 
 require go.uber.org/zap v1.27.1
 

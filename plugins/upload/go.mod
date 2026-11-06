@@ -1,6 +1,6 @@
 module github.com/alldev-run/golang-gin-rpc/plugins/upload
 
-go 1.25.7
+go 1.26.0
 
 require github.com/google/uuid v1.6.0
 

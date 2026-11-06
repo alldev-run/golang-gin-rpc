@@ -1,6 +1,6 @@
 module github.com/alldev-run/golang-gin-rpc/plugins/ratelimit
 
-go 1.25.7
+go 1.26.0
 
 require golang.org/x/time v0.15.0
 

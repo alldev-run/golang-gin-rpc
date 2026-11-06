@@ -7,7 +7,14 @@ and this project adheres to semantic versioning.
 
 ## [Unreleased]
 
+## [v0.2.0-rc.1] - 2026-11-06
+
 ### Added
+- Gateway listen port resolution: an explicit `gateway.port` wins; otherwise the gateway falls back to the main-app HTTP port + 2 (default 8082), so enabling `api-gateway` no longer steals the main app's :8080 listener (previously the gin server failed to bind and all business routes were served — and rejected — by the gateway proxy).
+- Configurable framework knobs replacing hardcoded values: `server.shutdown_timeout` (graceful shutdown, previously a fixed 30s in main/bootstrap/gateway-service stop), `observability.metrics.listen_addr` (standalone metrics listener, previously hardcoded `:9090`), and full `rpc.servers.*` consumption (type/host/port/network/timeout/max_msg_size/reflection; previously only enabled/protocol/degradation were read).
+- The main binary now accepts the config path as its first CLI argument (defaults to `./configs/config.yaml`); the Docker image `CMD` uses it.
+- Minimal real implementations for the demo routes `GET /api/v1/db/status` (pings every created database client) and `GET/POST/DELETE /api/v1/cache/:key` (real cache reads/writes/deletes via the bootstrap cache dependency); the endpoints report explicit "not initialized" errors instead of fake success when the dependency is absent. `router.NewRouter` now takes `router.Options`.
+- `.air.toml` for `make dev` hot reload; `make setup` falls back to `configs/config.example.yaml`, `start.sh` does the same (replacing its stale embedded config), and `make docker-run` mounts `./configs` read-only and only passes `--env-file` when `.env` exists.
 
 - HTTP webhook delivery for alerts, with configurable headers, context support, and a bounded default client timeout.
 - HTTP distributed-transaction coordinator endpoints and OpenTelemetry transaction tracing through the application's global provider.
@@ -23,6 +30,10 @@ and this project adheres to semantic versioning.
 - `tracing.SetGlobalTracer` for installing (or, with `nil`, resetting) the process-wide tracer provider.
 
 ### Changed
+- **Breaking:** the legacy `framework.init_*` configuration keys and their adapter translation layer were removed (as planned for v0.2). Component toggles are now driven exclusively by the top-level `plugins.<name>.enabled` section; `FrameworkConfig` keeps only `validate_dependency_coverage` and `services`. Configs that relied on `init_databases: false` etc. without a `plugins` section must migrate.
+- **Breaking (compat restored):** `GlobalConfig.Server.HTTP` previously only matched a `server.http` YAML section while shipped configs used a flat `server.host/port`; the loader now maps the legacy flat `server:` keys onto `server.http` (an explicit `server.http` section wins). Shipped configs were migrated to the standard `server.http` schema.
+- **Breaking:** `api/http-gateway` no longer mutates framework init toggles programmatically; component toggles come from the framework config's `plugins` section (`plugins.db.enabled: true` replaces the old `InitDatabases = true` after loading `database.yml`).
+- Vulnerable dependencies upgraded to fixed versions across all modules (root, pkg, examples, plugins): `google.golang.org/grpc` v1.83.2, `golang.org/x/net` v0.60.0, `go.opentelemetry.io/otel/*` v1.45.0, `github.com/klauspost/compress` v1.20.2, `github.com/rabbitmq/amqp091-go` v1.13.0, `github.com/quic-go/quic-go` v0.59.1. The Go toolchain is pinned via `toolchain go1.27.3` (CI and the Docker builder image aligned); `govulncheck ./...` now reports zero reachable vulnerabilities.
 
 - **Breaking:** the Redis, RPC, Discovery, Messaging and Security sections moved out of `pkg/config.GlobalConfig` into `github.com/alldev-run/golang-gin-rpc/bootstrap/pluginconfig.Config`. YAML keys are unchanged. Read them with `boot.GetPluginConfig()` instead of `boot.GetConfig()`, for example `boot.GetPluginConfig().Security.JWT`. `Observability` stays in `GlobalConfig` because the core logger reads its `logging` block.
 - **Breaking:** `pkg/` is now a separate Go module, `github.com/alldev-run/golang-gin-rpc/pkg`. Plugin modules require it instead of the root module. Import paths are unchanged; modules that build against a local checkout need `require github.com/alldev-run/golang-gin-rpc/pkg v0.0.0` plus a `replace` pointing at `pkg/`.
@@ -42,6 +53,8 @@ and this project adheres to semantic versioning.
 - Generated `bin/alldev-gin-rpc` and `scaffold` binaries are no longer tracked.
 
 ### Fixed
+- Dependency-coverage validation no longer reports false `missing` entries for built-in components that started but skipped initialization because their own feature config is disabled (for example auth with `security.jwt.enabled: false`); skipped components are now exempt.
+- `bootstrap` deadlock risk removed: config normalization inside `Load` uses a lock-free section reader instead of re-entering `RWMutex`.
 
 - Bootstrap tracing is now installed as the global tracer, so RPC, gateway, and WebSocket spans use the configured provider instead of a disabled default. The gateway reuses an active global provider rather than replacing it with its own `tracing` config.
 - **Breaking:** `gateway.Gateway.GetRBACPolicy()` now returns the new `gateway.PermissionChecker` interface instead of `*rbac.Policy`, and `SetRBACPolicy` accepts it. Migration: `*rbac.Policy` still satisfies the interface, so `SetRBACPolicy(policy)` is unchanged; callers that need `*rbac.Policy`-only methods from the getter type-assert with `gw.GetRBACPolicy().(*rbac.Policy)`.
@@ -55,6 +68,10 @@ and this project adheres to semantic versioning.
 - Declaration-order scanning and nullable pointer handling for `StructScanRow`.
 - Nondeterministic timing assumptions in the hash-performance and rate-limiter concurrency tests.
 - Cache backend fallback validation and service health checks.
+
+### Security
+
+- `govulncheck ./...` reports zero reachable vulnerabilities after the dependency upgrades and toolchain alignment above (previously 22 reachable findings across gRPC authorization bypass, net/http HTTP/2, OpenTelemetry and compression libraries).
 
 ### Deprecated
 
