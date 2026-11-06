@@ -2,7 +2,7 @@
 
 ## Development environment
 
-- Download and install Go **1.25.7** for your operating system and architecture from
+- Download and install Go **1.27.3** for your operating system and architecture from
   [go.dev/dl](https://go.dev/dl/), put its `bin` directory on `PATH`, and verify
   with `go version`. Use the repository's `go.work` workspace from the repo root.
 - Install `golangci-lint` **2.15.0** for lint checks.

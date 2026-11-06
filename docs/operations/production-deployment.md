@@ -36,7 +36,7 @@
 
 ### 1. 系统要求
 
-- Go 1.25+
+- Go 1.27+（toolchain 固定 1.27.3，见 go.mod）
 - Docker 20.10+ (可选，用于容器化部署)
 - 数据库服务器：MySQL 8.0+ / PostgreSQL 14+ / Redis 7+ / ClickHouse / Elasticsearch 8+
 
@@ -180,7 +180,7 @@ go run ./cmd/scaffold run-migration --dir migrations --driver mysql     --dsn "u
 
 ### 3. Docker 部署
 
-使用仓库根的 [Dockerfile](../../Dockerfile)（多阶段构建，Go 1.25，静态链接，以 `appuser`(uid 10001) 运行）：
+使用仓库根的 [Dockerfile](../../Dockerfile)（多阶段构建，Go 1.27，静态链接，以 `appuser`(uid 10001) 运行）：
 
 ```bash
 # 构建镜像（默认入口为仓库根 main.go；脚手架应用可用 --build-arg APP_PATH=./api/<name> 指定）

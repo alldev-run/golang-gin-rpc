@@ -71,6 +71,8 @@ examples/             独立 Go 模块（examples/go.mod）：示例代码不进
   tracing、upload、websocket）支持 `SetLogger(*zap.Logger)` 注入，默认仍使用 `logger.L()`。
 - **托管服务依赖可声明**：自定义服务经 `RegisterServiceFactory` 注册，并可用
   `RegisterServiceDependencies` 声明所需依赖键，交给 `ValidateDependencyCoverage` 校验。
+  组件级要求由实际启动的内置插件产生；插件因自身配置未启用而主动跳过初始化时
+  （如 `security.jwt.enabled: false` 的 auth），校验对其豁免。
 - **plugins/db 不依赖 plugins/cache**：redis/memcache 驱动由 `plugins/cache`
   的 `redis/register.go`、`memcache/register.go` 自注册（import 即注册，
   `db.Config.Redis`/`Memcache` 以 any 携带配置）；依赖方向为 cache -> db。

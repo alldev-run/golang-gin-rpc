@@ -8,6 +8,12 @@
 go run ./api/http-gateway ./api/http-gateway/config/config.yaml
 ```
 
+**框架配置与组件开关**：网关启动时按 `./configs/config.yaml` → `./config/config.yaml` →
+网关配置路径 的顺序解析框架配置（第二个命令行参数可显式指定）。内置组件（db/cache/auth
+等）的启停由框架配置的顶层 `plugins.<name>.enabled` 段驱动（v0.2 起唯一机制，
+`framework.init_*` 已移除）；需要框架加载数据库时，除提供 `database.yml` 外，
+还需在框架配置中设置 `plugins.db.enabled: true`。
+
 ## 核心端点
 
 示例服务启动后，可直接验证：

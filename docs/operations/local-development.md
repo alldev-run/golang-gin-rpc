@@ -116,6 +116,7 @@ docker run --rm -p 8080:8080 \
 
 | 段 | 框架实际读取 | 说明 |
 |---|---|---|
+| 组件开关 | 顶层 `plugins.<name>.enabled` | v0.2 起唯一机制（kernel 构建期裁剪）；`framework.init_*` 兼容键已移除 |
 | 数据库 | `database.primary`（扁平结构：`enabled/driver/host/port/database/username/password`） | 示例文件中的 `database.mysql_primary` 嵌套格式（`type/mysql/{...}`）是服务级格式，根应用不消费 |
 | Redis | 顶层 `redis:` 段（`mode/host/port/password/database/pool_size`） | 示例文件中的 `cache:` 段当前无消费者 |
 
