@@ -77,6 +77,7 @@
 
 | 文档 | 说明 |
 |---|---|
+| [本地开发与启动](operations/local-development.md) | 启动方式、配置兜底、热重载与 Docker 本地运行。 |
 | [生产部署](operations/production-deployment.md) | 环境准备、部署、监控、排障与验证。 |
 | [审计排障手册](operations/audit-runbook.md) | 审计日志与安全事件排查步骤。 |
 

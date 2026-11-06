@@ -139,19 +139,22 @@ framework:
  当前主配置覆盖以下能力：
  
  - **server**
-   - HTTP / gRPC 服务监听地址与超时
+   - HTTP / gRPC 服务监听地址与超时；`shutdown_timeout` 优雅停机最长等待
+   - 兼容旧版扁平写法（`server.host/port`），`server.http` 段存在时以其为准
  - **database**
    - 主从数据库与连接池
  - **redis**
    - Redis 连接配置
  - **rpc**
-   - gRPC / JSON-RPC 服务配置
+   - gRPC / JSON-RPC 服务配置（`rpc.servers.*` 端口/超时/消息上限/reflection 均可配）
  - **discovery**
    - 服务发现注册信息
  - **messaging**
    - RabbitMQ / Kafka
+ - **gateway**
+   - 网关监听（默认端口顺延至 8082，避免与主应用 8080 冲突；`gateway.port` 可覆盖）
  - **observability**
-   - logging / tracing / metrics
+   - logging / tracing / metrics（`metrics.listen_addr` 控制 metrics 独立监听地址）
  - **security**
    - JWT 等安全配置
  

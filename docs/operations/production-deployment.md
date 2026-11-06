@@ -180,35 +180,32 @@ go run ./cmd/scaffold run-migration --dir migrations --driver mysql     --dsn "u
 
 ### 3. Docker 部署
 
-```dockerfile
-# Dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/app .
-COPY configs/ ./configs/
-EXPOSE 8080
-CMD ["./app"]
-```
-
-构建和运行：
+使用仓库根的 [Dockerfile](../../Dockerfile)（多阶段构建，Go 1.25，静态链接，以 `appuser`(uid 10001) 运行）：
 
 ```bash
+# 构建镜像（默认入口为仓库根 main.go；脚手架应用可用 --build-arg APP_PATH=./api/<name> 指定）
 docker build -t myapp:latest .
+
+# 运行：镜像不含配置文件，必须挂载 configs；CMD 为配置文件路径参数
 docker run -d \
   -p 8080:8080 \
   -e MYSQL_PASSWORD=secret \
   -e REDIS_PASSWORD=secret \
-  -v $(pwd)/configs:/root/configs \
+  -v $(pwd)/configs:/app/configs:ro \
   myapp:latest
+
+# 覆盖配置路径（镜像内任意已挂载路径）
+docker run -d -p 8080:8080 \
+  -v $(pwd)/my-configs:/app/my-configs:ro \
+  myapp:latest /app/my-configs/config.yaml
 ```
+
+本地开发可使用等价的 make 封装：`make docker-build`、`make docker-run`
+（自动挂载 `./configs` 只读，存在 `.env` 时附加 `--env-file`）。详见[本地开发与启动指南](local-development.md)。
+
+配置注入：以挂载的 yaml 文件为准。`pkg/config` 预留了 `env` 结构体标签的环境变量覆盖机制
+（`applyEnvOverrides`），但当前配置结构体尚未声明任何 `env` 标签，因此 `-e MYSQL_PASSWORD=…`
+这类变量**不会**自动覆盖配置值；密码请写入挂载的配置文件（敏感环境建议后续扩展 env 标签或接入密钥管理服务）。
 
 ### 4. Kubernetes 部署
 

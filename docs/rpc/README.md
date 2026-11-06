@@ -61,6 +61,11 @@ rpc:
   graceful_shutdown_timeout: 10s
 ```
 
+> **消费说明**：`rpc.servers.*` 段由 bootstrap 在 `framework.services` 包含 `rpc` 时按配置构建
+> 服务器（`internal/bootstrap/init_rpc.go`）。`timeout` 单位为秒、`max_msg_size` 单位为字节；
+> 字段缺省时回退内置默认值（timeout 30s、max_msg_size 4MB）。未配置 `servers` 段时
+> 按 `rpc.protocol`（grpc/jsonrpc）走内置兜底服务器。
+
 ## 🚀 快速开始
 
 ### 1. 创建 RPC 服务
