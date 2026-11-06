@@ -315,6 +315,24 @@ func firstNonEmpty(value string, fallback string) string {
 	return fallback
 }
 
+// rpcTimeoutOrDefault returns the configured RPC timeout in seconds, falling
+// back to 30s when unset.
+func rpcTimeoutOrDefault(seconds int) int {
+	if seconds > 0 {
+		return seconds
+	}
+	return int((30 * time.Second).Seconds())
+}
+
+// rpcMaxMsgSizeOrDefault returns the configured max message size in bytes,
+// falling back to 4MB when unset.
+func rpcMaxMsgSizeOrDefault(maxMsgSize int) int {
+	if maxMsgSize > 0 {
+		return maxMsgSize
+	}
+	return 4 * 1024 * 1024
+}
+
 func splitAndTrim(value string) []string {
 	if value == "" {
 		return nil
@@ -441,6 +459,15 @@ func (b *Bootstrap) GetUploader() *upload.Uploader {
 	return b.uploader
 }
 
+// shutdownTimeoutOrDefault returns the configured graceful shutdown timeout
+// (server.shutdown_timeout), falling back to 30s when unset.
+func (b *Bootstrap) shutdownTimeoutOrDefault() time.Duration {
+	if b.config != nil && b.config.Server.ShutdownTimeout > 0 {
+		return b.config.Server.ShutdownTimeout
+	}
+	return 30 * time.Second
+}
+
 // Close closes all resources
 func (b *Bootstrap) Close() error {
 	var errors []error
@@ -448,7 +475,7 @@ func (b *Bootstrap) Close() error {
 	// 组件级资源（cache/rpc/discovery/tracer）优先交给插件应用逆序停止；
 	// 已由插件停止的组件跳过下面的逐项关闭，避免重复 Close。
 	if b.pluginStarted("cache") || b.pluginStarted("rpc") || b.pluginStarted("discovery") || b.pluginStarted("tracing") {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), b.shutdownTimeoutOrDefault())
 		if err := b.stopPluginApp(ctx); err != nil {
 			errors = append(errors, fmt.Errorf("plugin app stop error: %w", err))
 		}

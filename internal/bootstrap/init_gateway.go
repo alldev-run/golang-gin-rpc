@@ -7,11 +7,26 @@ import (
 	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 )
 
+// resolveGatewayPort picks the gateway listen port: an explicit gateway.port
+// from the YAML section wins; otherwise fall back to main-app port + 2
+// (port order: main app 8080, JSON-RPC 8081, gateway next) so the gateway
+// never competes with the gin server for the same listener.
+func (b *Bootstrap) resolveGatewayPort() int {
+	port := b.config.Server.HTTP.Port + 2
+	var section struct {
+		Port int `yaml:"port"`
+	}
+	if ok, err := b.loader.UnmarshalSection("gateway", &section); err == nil && ok && section.Port > 0 {
+		port = section.Port
+	}
+	return port
+}
+
 // InitializeGateway initializes the HTTP gateway
 func (b *Bootstrap) InitializeGateway() error {
 	gatewayConfig := gateway.DefaultConfig()
 	gatewayConfig.Host = b.config.Server.HTTP.Host
-	gatewayConfig.Port = b.config.Server.HTTP.Port
+	gatewayConfig.Port = b.resolveGatewayPort()
 	gatewayConfig.ReadTimeout = b.config.Server.HTTP.ReadTimeout
 	gatewayConfig.WriteTimeout = b.config.Server.HTTP.WriteTimeout
 	gatewayConfig.IdleTimeout = b.config.Server.HTTP.IdleTimeout

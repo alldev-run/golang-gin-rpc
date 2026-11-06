@@ -71,6 +71,8 @@ type managedAPIGatewayService struct {
 	name    string
 	config  *gateway.Config
 	httpOpt gateway.HTTPServiceOptions
+	// stopTimeout 来自 server.shutdown_timeout，ctx 为 nil 时的停机兜底超时。
+	stopTimeout time.Duration
 
 	httpService *gateway.HTTPService
 	server      *http.Server
@@ -133,8 +135,12 @@ func (s *managedAPIGatewayService) Stop(ctx context.Context) error {
 	}
 	stopCtx := ctx
 	if stopCtx == nil {
+		timeout := s.stopTimeout
+		if timeout <= 0 {
+			timeout = 30 * time.Second
+		}
 		var cancel context.CancelFunc
-		stopCtx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		stopCtx, cancel = context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 	}
 	err := s.server.Shutdown(stopCtx)
@@ -180,7 +186,7 @@ func (b *Bootstrap) RegisterDefaultServiceFactories() error {
 	if err := b.RegisterServiceFactory(ServiceAPIGateway, func(boot *Bootstrap) (ManagedService, error) {
 		cfg := gateway.DefaultConfig()
 		cfg.Host = boot.config.Server.HTTP.Host
-		cfg.Port = boot.config.Server.HTTP.Port
+		cfg.Port = boot.resolveGatewayPort()
 		cfg.ReadTimeout = boot.config.Server.HTTP.ReadTimeout
 		cfg.WriteTimeout = boot.config.Server.HTTP.WriteTimeout
 		cfg.IdleTimeout = boot.config.Server.HTTP.IdleTimeout
@@ -198,7 +204,7 @@ func (b *Bootstrap) RegisterDefaultServiceFactories() error {
 		cfg.Discovery.Namespace = firstNonEmpty(boot.pluginConfig.Discovery.Config["namespace"], "default")
 		cfg.Discovery.Timeout = boot.pluginConfig.Discovery.Timeout
 
-		service := &managedAPIGatewayService{name: ServiceAPIGateway, config: cfg}
+		service := &managedAPIGatewayService{name: ServiceAPIGateway, config: cfg, stopTimeout: boot.shutdownTimeoutOrDefault()}
 		return &managedServiceAdapter{
 			name: ServiceAPIGateway,
 			startFn: func(ctx context.Context) error {

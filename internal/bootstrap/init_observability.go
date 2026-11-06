@@ -72,14 +72,20 @@ func (b *Bootstrap) InitializeMetrics() error {
 
 	// Start metrics server in background
 	go func() {
-		addr := b.config.Observability.Metrics.Endpoint
+		endpoint := b.config.Observability.Metrics.Endpoint
+		addr := endpoint
 		if addr == "" || strings.HasPrefix(addr, "/") {
-			if strings.HasPrefix(addr, "/") {
-				logger.Warn("Metrics endpoint is a path, using default listen address",
-					logger.String("endpoint", addr),
-					logger.String("fallback_addr", ":9090"))
+			// endpoint 是路径或为空时，独立监听地址取 observability.metrics.listen_addr，
+			// 未配置则回退 :9090。
+			addr = b.config.Observability.Metrics.ListenAddr
+			if addr == "" {
+				addr = ":9090"
 			}
-			addr = ":9090"
+			if strings.HasPrefix(endpoint, "/") {
+				logger.Warn("Metrics endpoint is a path, using standalone listen address",
+					logger.String("endpoint", endpoint),
+					logger.String("listen_addr", addr))
+			}
 		}
 		if err := metricsCollector.StartMetricsServer(addr); err != nil {
 			logger.Errorf("Failed to start metrics server", logger.Error(err))

@@ -67,8 +67,9 @@ type FrameworkConfig struct {
 
 // ServerConfig server configuration
 type ServerConfig struct {
-	HTTP HTTPConfig `yaml:"http" json:"http"`
-	GRPC GRPCConfig `yaml:"grpc" json:"grpc"`
+	HTTP            HTTPConfig    `yaml:"http" json:"http"`
+	GRPC            GRPCConfig    `yaml:"grpc" json:"grpc"`
+	ShutdownTimeout time.Duration `yaml:"shutdown_timeout" json:"shutdown_timeout"`
 }
 
 // HTTPConfig HTTP server configuration
@@ -141,10 +142,11 @@ type ObservabilityConfig struct {
 
 // MetricsConfig metrics configuration
 type MetricsConfig struct {
-	Enabled   bool   `yaml:"enabled" json:"enabled"`
-	Type      string `yaml:"type" json:"type"`
-	Endpoint  string `yaml:"endpoint" json:"endpoint"`
-	Namespace string `yaml:"namespace" json:"namespace"`
+	Enabled    bool   `yaml:"enabled" json:"enabled"`
+	Type       string `yaml:"type" json:"type"`
+	Endpoint   string `yaml:"endpoint" json:"endpoint"`
+	ListenAddr string `yaml:"listen_addr" json:"listen_addr"`
+	Namespace  string `yaml:"namespace" json:"namespace"`
 }
 
 // TracingConfig tracing configuration
@@ -314,6 +316,9 @@ func (l *Loader) Load(path string) error {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	// 兼容旧版扁平 server 段（host/port 直接位于 server 下）：映射到 server.http。
+	l.normalizeFlatServer()
+
 	// Apply environment variable overrides
 	l.applyEnvOverrides(l.config)
 
@@ -330,6 +335,12 @@ func (l *Loader) Load(path string) error {
 func (l *Loader) UnmarshalSection(name string, out any) (bool, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
+	return l.unmarshalSectionLocked(name, out)
+}
+
+// unmarshalSectionLocked 是 UnmarshalSection 的无锁版本，供已持有
+// l.mu（如 Load 内部）的调用方复用，避免 RWMutex 不可重入导致死锁。
+func (l *Loader) unmarshalSectionLocked(name string, out any) (bool, error) {
 	if l.raw == nil || l.raw.Kind != yaml.DocumentNode || len(l.raw.Content) == 0 {
 		return false, nil
 	}
@@ -439,6 +450,37 @@ func (l *Loader) setFieldValue(field reflect.Value, value string) {
 	}
 }
 
+// normalizeFlatServer 兼容旧版扁平 server 段：host/port 直接位于 server: 下时
+// 覆盖到 Server.HTTP（默认值由 DefaultConfig 预填，扁平段的存在即视为显式配置）。
+// 存在 server.http 段时以 server.http 为准，本函数不覆盖。
+func (l *Loader) normalizeFlatServer() {
+	var sec struct {
+		Host string      `yaml:"host"`
+		Port interface{} `yaml:"port"` // 兼容 int 与带引号字符串两种写法
+		HTTP *struct {
+			Host string `yaml:"host"`
+			Port int    `yaml:"port"`
+		} `yaml:"http"`
+	}
+	ok, err := l.unmarshalSectionLocked("server", &sec)
+	if err != nil || !ok || sec.HTTP != nil {
+		return
+	}
+	if sec.Host != "" {
+		l.config.Server.HTTP.Host = sec.Host
+	}
+	if sec.Port != nil {
+		switch v := sec.Port.(type) {
+		case int:
+			l.config.Server.HTTP.Port = v
+		case string:
+			if p, convErr := strconv.Atoi(v); convErr == nil {
+				l.config.Server.HTTP.Port = p
+			}
+		}
+	}
+}
+
 // validate validates the configuration
 func (l *Loader) validate() error {
 	config := l.config
@@ -486,6 +528,7 @@ func DefaultConfig() *GlobalConfig {
 			Services:                   []string{"rpc"},
 		},
 		Server: ServerConfig{
+			ShutdownTimeout: 30 * time.Second,
 			HTTP: HTTPConfig{
 				Enabled:        true,
 				Host:           "0.0.0.0",

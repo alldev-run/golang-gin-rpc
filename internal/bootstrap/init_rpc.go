@@ -17,30 +17,50 @@ func (b *Bootstrap) InitializeRPC() error {
 	}
 
 	managerConfig := rpc.DefaultManagerConfig()
-	switch b.pluginConfig.RPC.Protocol {
-	case "jsonrpc":
-		managerConfig.Servers = map[string]rpc.Config{
-			"jsonrpc": {
-				Type:    rpc.ServerTypeJSONRPC,
-				Host:    b.config.Server.HTTP.Host,
-				Port:    b.config.Server.HTTP.Port,
-				Network: "tcp",
-				Timeout: int((30 * time.Second).Seconds()),
-			},
+	if servers := b.pluginConfig.RPC.Servers; len(servers) > 0 {
+		// rpc.servers 段存在时完全按配置构建（端口/超时/消息上限/reflection 均可配）。
+		managerConfig.Servers = make(map[string]rpc.Config, len(servers))
+		for name, s := range servers {
+			serverType := rpc.ServerTypeGRPC
+			if s.Type == "jsonrpc" {
+				serverType = rpc.ServerTypeJSONRPC
+			}
+			managerConfig.Servers[name] = rpc.Config{
+				Type:       serverType,
+				Host:       s.Host,
+				Port:       s.Port,
+				Network:    firstNonEmpty(s.Network, "tcp"),
+				Timeout:    rpcTimeoutOrDefault(s.Timeout),
+				MaxMsgSize: rpcMaxMsgSizeOrDefault(s.MaxMsgSize),
+				Reflection: s.Reflection,
+			}
 		}
-	case "grpc":
-		fallthrough
-	default:
-		managerConfig.Servers = map[string]rpc.Config{
-			"grpc": {
-				Type:       rpc.ServerTypeGRPC,
-				Host:       b.config.Server.GRPC.Host,
-				Port:       b.config.Server.GRPC.Port,
-				Network:    "tcp",
-				Timeout:    int((30 * time.Second).Seconds()),
-				MaxMsgSize: 4 * 1024 * 1024,
-				Reflection: true,
-			},
+	} else {
+		switch b.pluginConfig.RPC.Protocol {
+		case "jsonrpc":
+			managerConfig.Servers = map[string]rpc.Config{
+				"jsonrpc": {
+					Type:    rpc.ServerTypeJSONRPC,
+					Host:    b.config.Server.HTTP.Host,
+					Port:    b.config.Server.HTTP.Port,
+					Network: "tcp",
+					Timeout: int((30 * time.Second).Seconds()),
+				},
+			}
+		case "grpc":
+			fallthrough
+		default:
+			managerConfig.Servers = map[string]rpc.Config{
+				"grpc": {
+					Type:       rpc.ServerTypeGRPC,
+					Host:       b.config.Server.GRPC.Host,
+					Port:       b.config.Server.GRPC.Port,
+					Network:    "tcp",
+					Timeout:    int((30 * time.Second).Seconds()),
+					MaxMsgSize: 4 * 1024 * 1024,
+					Reflection: true,
+				},
+			}
 		}
 	}
 
