@@ -81,7 +81,7 @@ func (e *zipkinExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadO
 			if zipkinSpan.Tags == nil {
 				zipkinSpan.Tags = make(map[string]string)
 			}
-			zipkinSpan.Tags[string(attribute.Key)] = attribute.Value.Emit()
+			zipkinSpan.Tags[string(attribute.Key)] = attribute.Value.String()
 		}
 		if status := span.Status(); status.Code == codes.Error {
 			if zipkinSpan.Tags == nil {
