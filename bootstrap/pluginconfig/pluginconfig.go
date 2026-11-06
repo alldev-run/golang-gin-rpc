@@ -125,23 +125,23 @@ type RedisNode struct {
 
 // RPCConfig RPC configuration
 type RPCConfig struct {
-	Enabled     bool                        `yaml:"enabled" json:"enabled"`
-	Protocol    string                      `yaml:"protocol" json:"protocol"`
-	Servers     map[string]RPCServerConfig  `yaml:"servers" json:"servers"`
-	Degradation DegradationCfg              `yaml:"degradation" json:"degradation"`
+	Enabled     bool                       `yaml:"enabled" json:"enabled"`
+	Protocol    string                     `yaml:"protocol" json:"protocol"`
+	Servers     map[string]RPCServerConfig `yaml:"servers" json:"servers"`
+	Degradation DegradationCfg             `yaml:"degradation" json:"degradation"`
 }
 
 // RPCServerConfig single RPC server configuration, mirrors the rpc.servers.*
 // YAML section. Empty/zero fields fall back to bootstrap defaults.
 type RPCServerConfig struct {
-	Type        string `yaml:"type" json:"type"`               // grpc, jsonrpc
-	Host        string `yaml:"host" json:"host"`
-	Port        int    `yaml:"port" json:"port"`
-	Network     string `yaml:"network" json:"network"`         // tcp, tcp4, tcp6
-	Timeout     int    `yaml:"timeout" json:"timeout"`         // seconds
-	MaxMsgSize  int    `yaml:"max_msg_size" json:"max_msg_size"` // bytes
-	EnableTLS   bool   `yaml:"enable_tls" json:"enable_tls"`
-	Reflection  bool   `yaml:"reflection" json:"reflection"`
+	Type       string `yaml:"type" json:"type"` // grpc, jsonrpc
+	Host       string `yaml:"host" json:"host"`
+	Port       int    `yaml:"port" json:"port"`
+	Network    string `yaml:"network" json:"network"`           // tcp, tcp4, tcp6
+	Timeout    int    `yaml:"timeout" json:"timeout"`           // seconds
+	MaxMsgSize int    `yaml:"max_msg_size" json:"max_msg_size"` // bytes
+	EnableTLS  bool   `yaml:"enable_tls" json:"enable_tls"`
+	Reflection bool   `yaml:"reflection" json:"reflection"`
 }
 
 // DegradationCfg RPC degradation configuration
