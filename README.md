@@ -542,7 +542,7 @@ Apache License 2.0 - See `LICENSE` file for details.
 ## 相关文档
 
 文档总索引（含完整指南及各插件 README）：[docs/README.md](docs/README.md)。
-[变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md)
+[变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md) · [发布政策](docs/operations/release-policy.md) · [代码政策](docs/operations/code-policy.md)
 
 - [架构](docs/README.md#架构) · [数据库](docs/README.md#数据库) · [缓存](docs/README.md#缓存)
 - [RPC](docs/README.md#rpc) · [网关](docs/README.md#网关) · [服务发现](docs/README.md#服务发现)

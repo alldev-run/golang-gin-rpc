@@ -46,3 +46,9 @@ coverage reports, credentials, or generated local binaries.
 - Open pull requests against `develop`; include the checks run and any known
   limitations in the description.
 - Do not add dependencies without a concrete need and review.
+- Versioning, release, and deprecation rules are defined in the
+  [release policy](docs/operations/release-policy.md) (Chinese:
+  [release-policy.zh-CN.md](docs/operations/release-policy.zh-CN.md)); current
+  engineering conventions are summarized in the
+  [code policy](docs/operations/code-policy.md) (Chinese:
+  [code-policy.zh-CN.md](docs/operations/code-policy.zh-CN.md)).

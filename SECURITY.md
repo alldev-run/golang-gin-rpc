@@ -3,7 +3,9 @@
 ## Supported versions
 
 Security fixes are maintained for the latest `develop` and `main` branches.
-Older revisions may not receive security updates.
+Older revisions may not receive security updates. Releases are maintained on
+`release-N.M` branches; fixes ship as patch tags on those branches (see the
+[release policy](docs/operations/release-policy.md)).
 
 ## Reporting a vulnerability
 

@@ -81,9 +81,16 @@
 | [生产部署](operations/production-deployment.md) | 环境准备、部署、监控、排障与验证。 |
 | [审计排障手册](operations/audit-runbook.md) | 审计日志与安全事件排查步骤。 |
 
-## 项目与插件参考
+## 项目治理
+
+| 文档 | 说明 |
+|---|---|
+| [版本与发布政策](operations/release-policy.md)（[中文](operations/release-policy.zh-CN.md)） | 0.x 非稳定 / 1.x 稳定的版本模型、大小版本规则、发布分支与打标策略、发布前框架版本变更与发布流程。 |
+| [代码政策](operations/code-policy.md)（[中文](operations/code-policy.zh-CN.md)） | 现行工程规范：分支与提交、质量门禁、模块边界、插件成熟度、依赖与配置约定。 |
 
 - [贡献指南](../CONTRIBUTING.md) · [安全策略](../SECURITY.md) · [变更日志](../CHANGELOG.md)
+
+## 项目与插件参考
 
 | 插件 | README | 说明 |
 |---|---|---|

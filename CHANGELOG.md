@@ -7,6 +7,23 @@ and this project adheres to semantic versioning.
 
 ## [Unreleased]
 
+### Added
+- Release policy (`docs/operations/release-policy.md`, Chinese translation
+  `docs/operations/release-policy.zh-CN.md`) covering the 0.x-unstable /
+  1.x-stable versioning model, major/minor/patch rules, pre-release tags,
+  the release-branch policy (rc tags on `main`; feature and patch releases
+  tagged on `release-N.M` branches), the pre-release framework-version bump
+  in `pkg/version`, multi-module tagging, and the release checklist, with
+  industry precedents from Go, Kubernetes, Gin, Terraform, and Node.js.
+- `pkg/version` now exposes `Major` and `Minor` constants alongside
+  `Version`; `Version` tracks the release line (`0.2.0-rc.1`) and is bumped
+  in a release-prep commit before every release.
+- Code policy (`docs/operations/code-policy.md`, Chinese translation
+  `docs/operations/code-policy.zh-CN.md`) summarizing the engineering
+  conventions enforced by CI and review: branching and commits, style, quality
+  gates, module dependency boundaries, plugin maturity, dependencies and
+  toolchain, configuration, documentation, repository hygiene, and security.
+
 ## [v0.2.0-rc.1] - 2026-11-06
 
 ### Added
