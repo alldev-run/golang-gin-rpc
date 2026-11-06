@@ -20,12 +20,13 @@ var componentDependencyKeys = map[string]string{
 
 // ValidateDependencyCoverage checks whether required framework dependencies
 // have been injected into bootstrap dependency container.
-// 组件级要求由实际启动的内置插件决定；服务级要求仍由 options.Services 决定。
+// 组件级要求由实际启动且未主动跳过的内置插件决定（组件因自身配置未启用而
+// 跳过时豁免）；服务级要求仍由 options.Services 决定。
 func (b *Bootstrap) ValidateDependencyCoverage(options FrameworkOptions) error {
 	required := make(map[string]struct{})
 
 	for plugin, key := range componentDependencyKeys {
-		if b.pluginStarted(plugin) {
+		if b.pluginStarted(plugin) && !b.componentSkipped(plugin) {
 			required[key] = struct{}{}
 		}
 	}

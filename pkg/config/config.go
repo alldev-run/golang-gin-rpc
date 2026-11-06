@@ -52,15 +52,9 @@ type AppConfig struct {
 }
 
 // FrameworkConfig controls bootstrap-managed dependency and service composition.
+// 组件插件开关由顶层 plugins.<name>.enabled 段驱动（v0.2 起不再支持
+// framework.init_* 兼容键）。
 type FrameworkConfig struct {
-	InitDatabases              bool     `yaml:"init_databases" json:"init_databases"`
-	InitCache                  bool     `yaml:"init_cache" json:"init_cache"`
-	InitDiscovery              bool     `yaml:"init_discovery" json:"init_discovery"`
-	InitTracing                bool     `yaml:"init_tracing" json:"init_tracing"`
-	InitAuth                   bool     `yaml:"init_auth" json:"init_auth"`
-	InitMetrics                bool     `yaml:"init_metrics" json:"init_metrics"`
-	InitHealth                 bool     `yaml:"init_health" json:"init_health"`
-	InitErrors                 bool     `yaml:"init_errors" json:"init_errors"`
 	ValidateDependencyCoverage bool     `yaml:"validate_dependency_coverage" json:"validate_dependency_coverage"`
 	Services                   []string `yaml:"services" json:"services"`
 }
@@ -516,14 +510,6 @@ func DefaultConfig() *GlobalConfig {
 			Labels:      map[string]string{},
 		},
 		Framework: FrameworkConfig{
-			InitDatabases:              true,
-			InitCache:                  true,
-			InitDiscovery:              true,
-			InitTracing:                true,
-			InitAuth:                   true,
-			InitMetrics:                true,
-			InitHealth:                 true,
-			InitErrors:                 true,
 			ValidateDependencyCoverage: true,
 			Services:                   []string{"rpc"},
 		},

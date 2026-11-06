@@ -48,8 +48,11 @@ func main() {
 		IdleTimeout:  config.Server.HTTP.IdleTimeout,
 	})
 
-	// Register routes
-	router := router.NewRouter(application)
+	// Register routes (wire framework-managed dependencies into demo routes)
+	router := router.NewRouter(application, router.Options{
+		DBFactory: boot.GetDatabaseFactory(),
+		Cache:     boot.GetCache(),
+	})
 	router.RegisterRoutes()
 
 	// Handle signals

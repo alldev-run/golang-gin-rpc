@@ -112,11 +112,13 @@ func (b *Bootstrap) InitializeRPC() error {
 func (b *Bootstrap) InitializeDiscovery() error {
 	if !b.pluginConfig.Discovery.Enabled {
 		logger.Info("Service discovery disabled, skipping discovery initialization")
+		b.markComponentSkipped("discovery")
 		return nil
 	}
 
 	if b.pluginConfig.Discovery.Address == "" {
 		logger.Warn("Service discovery enabled but no registry address configured, skipping discovery initialization")
+		b.markComponentSkipped("discovery")
 		return nil
 	}
 

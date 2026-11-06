@@ -6,9 +6,7 @@ app:
   debug: true
 
 # Framework Runtime Configuration
-# 框架插件开关（新机制，推荐）：控制内置组件插件是否启用，默认全部启用。
-# 与下方 framework.init_* 等价；二者同时存在时以 plugins 段为准。
-# 计划在 v0.2 移除 framework.init_* 兼容层，届时仅保留本段。
+# plugins 段：内置组件插件开关（kernel 构建期裁剪，默认启用）。
 plugins:
   db:        { enabled: false }
   cache:     { enabled: false }
@@ -20,24 +18,11 @@ plugins:
   errors:    { enabled: true }
   upload:    { enabled: false }
 
-# Deprecated: 请使用上方 plugins 段控制组件开关；本段（framework.init_*）
-# 仅为兼容保留，计划于 v0.2 移除。
+# framework.services: 托管服务清单（api-gateway / rpc / websocket）。
 framework:
-  init_databases: false
-  init_cache: false
-  init_discovery: false
-  init_tracing: false
-  init_auth: false
-  init_metrics: true
-  init_health: true
-  init_errors: true
   validate_dependency_coverage: true
   services: ["api-gateway"]
 
-# Server Configuration
-# http: 主应用 HTTP 监听(业务路由与 /health)；shutdown_timeout: 优雅停机最长等待。
-# 运行模式由 app.environment/app.debug 决定。兼容旧版扁平写法(server.host/port)，
-# 但 server.http 段存在时以 server.http 为准。
 server:
   http:
     host: "0.0.0.0"

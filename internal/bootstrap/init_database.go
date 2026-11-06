@@ -165,6 +165,7 @@ func (b *Bootstrap) InitializeDatabases() error {
 		// Fallback to framework database configuration
 		if !b.config.Database.Primary.Enabled && !b.config.Database.Replica.Enabled {
 			logger.Info("No database configuration found, skipping database initialization")
+			b.markComponentSkipped("db")
 			return nil
 		}
 

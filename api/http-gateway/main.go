@@ -128,27 +128,18 @@ func main() {
 		if err := bootstrap.LoadDatabaseConfig(boot, serviceDBConfigPath); err != nil {
 			log.Fatalf("failed to load service database config: %v", err)
 		}
-		boot.GetConfig().Framework.InitDatabases = true
+		// v0.2 起组件启停由 plugins 段声明式控制（framework.init_* 已移除）。
+		// 若框架配置的 plugins 段禁用了 db，这里提示修正配置。
 		gatewayLogger.Info("service database config loaded and overrides framework database config",
 			logger.String("path", serviceDBConfigPath),
 		)
-	} else if frameworkConfigPath == "" {
-		boot.GetConfig().Framework.InitDatabases = false
-	}
-
-	if frameworkConfigPath == "" {
-		framework := &boot.GetConfig().Framework
-		framework.InitCache = false
-		framework.InitDiscovery = false
-		framework.InitTracing = false
-		framework.InitAuth = false
-		framework.InitMetrics = false
-		framework.InitHealth = true
-		framework.InitErrors = true
-		framework.ValidateDependencyCoverage = false
 	}
 
 	frameworkOptions := boot.FrameworkOptionsFromConfig()
+	if frameworkConfigPath == "" {
+		// 无框架配置文件时依赖全部走默认空值跳过，跳过覆盖校验。
+		frameworkOptions.ValidateDependencyCoverage = false
+	}
 	frameworkOptions.Services = []string{gatewayServiceName}
 	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
 		log.Fatalf("failed to start framework services: %v", err)

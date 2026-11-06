@@ -10,6 +10,7 @@ import (
 func (b *Bootstrap) InitializeAuth() error {
 	if !b.pluginConfig.Security.JWT.Enabled {
 		logger.Info("Authentication services disabled")
+		b.markComponentSkipped("auth")
 		return nil
 	}
 

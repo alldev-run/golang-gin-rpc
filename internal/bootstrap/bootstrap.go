@@ -85,6 +85,8 @@ type Bootstrap struct {
 	pluginConfig *pluginconfig.Config
 	registry     *kernel.Registry
 	stoppedSet   map[string]bool
+	// skippedComponents 记录因自身配置未启用而主动跳过初始化的内置组件。
+	skippedComponents map[string]bool
 
 	depMu        sync.RWMutex
 	dependencies map[string]interface{}
@@ -97,6 +99,25 @@ func (b *Bootstrap) pluginStarted(name string) bool {
 	b.pluginMu.RLock()
 	defer b.pluginMu.RUnlock()
 	return b.pluginApp != nil && b.pluginApp.Started(name)
+}
+
+// markComponentSkipped 记录某内置组件因自身配置未启用而主动跳过初始化
+// （例如 security.jwt.enabled=false 时的 auth 组件）。该组件虽然 Start 成功，
+// 但不会向依赖容器注入依赖，依赖覆盖校验应对其豁免。
+func (b *Bootstrap) markComponentSkipped(name string) {
+	b.pluginMu.Lock()
+	defer b.pluginMu.Unlock()
+	if b.skippedComponents == nil {
+		b.skippedComponents = make(map[string]bool)
+	}
+	b.skippedComponents[name] = true
+}
+
+// componentSkipped 返回组件是否被标记为主动跳过。
+func (b *Bootstrap) componentSkipped(name string) bool {
+	b.pluginMu.RLock()
+	defer b.pluginMu.RUnlock()
+	return b.skippedComponents[name]
 }
 
 // pluginStopped 返回内置组件插件是否已被插件机制关闭

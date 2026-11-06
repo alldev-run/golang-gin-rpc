@@ -12,6 +12,7 @@ import (
 func (b *Bootstrap) InitializeCache() error {
 	if b.pluginConfig.Redis.Host == "" {
 		logger.Info("No cache configuration found, skipping cache initialization")
+		b.markComponentSkipped("cache")
 		return nil
 	}
 

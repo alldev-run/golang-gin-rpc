@@ -68,18 +68,13 @@
 组件启停现在由 kernel 插件机制承接，两种配置方式等价（`plugins` 优先）：
 
 ```yaml
-# 方式一（推荐）：插件开关
+# 组件插件开关（唯一机制；v0.2 起已移除 framework.init_* 兼容键）
 plugins:
   db:        { enabled: true }
   cache:     { enabled: true }
   discovery: { enabled: true }
   health:    { enabled: true }   # db/cache 为软依赖,禁用时自动降级
   metrics:   { enabled: true }
-
-# 方式二（兼容保留）：旧 framework 开关
-framework:
-  init_databases: true
-  init_cache: true
   ...
 ```
 

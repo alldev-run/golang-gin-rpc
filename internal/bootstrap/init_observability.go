@@ -102,6 +102,7 @@ func (b *Bootstrap) InitializeMetrics() error {
 func (b *Bootstrap) InitializeTracing() error {
 	if !b.config.Observability.Tracing.Enabled {
 		logger.Info("Tracing services disabled")
+		b.markComponentSkipped("tracing")
 		return nil
 	}
 

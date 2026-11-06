@@ -9,27 +9,9 @@ import (
 )
 
 // FrameworkOptions defines what bootstrap should initialize and manage.
-// 注意：组件级开关（Init*）现已由 kernel 插件机制承接 —— 配置里既可用
-// plugins.<name>.enabled（新），也兼容 framework.init_*（旧，由适配器翻译）。
+// 组件级开关由 plugins.<name>.enabled 配置段驱动（kernel.Loader 构建期裁剪）；
+// v0.2 起不再支持旧的 framework.init_* 兼容键。
 type FrameworkOptions struct {
-	// Deprecated: 组件启停由 plugins.<name>.enabled / framework.init_* 配置驱动。
-	// 计划于 v0.2 移除对应 framework.init_* 配置键与翻译层，届时仅保留 plugins 段。
-	InitDatabases bool
-	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
-	InitCache bool
-	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
-	InitDiscovery bool
-	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
-	InitTracing bool
-	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
-	InitAuth bool
-	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
-	InitMetrics bool
-	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
-	InitHealth bool
-	// Deprecated: 见 InitDatabases 说明，计划 v0.2 移除。
-	InitErrors bool
-
 	ValidateDependencyCoverage bool
 
 	WebSocket *WebSocketServiceOptions
@@ -39,14 +21,6 @@ type FrameworkOptions struct {
 // DefaultFrameworkOptions returns a production-friendly default.
 func DefaultFrameworkOptions() FrameworkOptions {
 	return FrameworkOptions{
-		InitDatabases:              true,
-		InitCache:                  true,
-		InitDiscovery:              true,
-		InitTracing:                true,
-		InitAuth:                   true,
-		InitMetrics:                true,
-		InitHealth:                 true,
-		InitErrors:                 true,
 		ValidateDependencyCoverage: true,
 		Services:                   []string{ServiceRPC, ServiceAPIGateway},
 	}
@@ -58,14 +32,6 @@ func (b *Bootstrap) FrameworkOptionsFromConfig() FrameworkOptions {
 		return DefaultFrameworkOptions()
 	}
 	return FrameworkOptions{
-		InitDatabases:              b.config.Framework.InitDatabases,
-		InitCache:                  b.config.Framework.InitCache,
-		InitDiscovery:              b.config.Framework.InitDiscovery,
-		InitTracing:                b.config.Framework.InitTracing,
-		InitAuth:                   b.config.Framework.InitAuth,
-		InitMetrics:                b.config.Framework.InitMetrics,
-		InitHealth:                 b.config.Framework.InitHealth,
-		InitErrors:                 b.config.Framework.InitErrors,
 		ValidateDependencyCoverage: b.config.Framework.ValidateDependencyCoverage,
 		Services:                   append([]string(nil), b.config.Framework.Services...),
 	}
