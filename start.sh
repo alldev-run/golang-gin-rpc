@@ -37,49 +37,15 @@ check_go() {
 # Check if config file exists
 check_config() {
     if [ ! -f "./configs/config.yaml" ]; then
-        print_warning "Configuration file not found, creating default config..."
-        mkdir -p ./configs
-        cat > ./configs/config.yaml << EOF
-# Application Configuration
-server:
-  host: "localhost"
-  port: "8080"
-  mode: "debug"
-
-# Database Configuration
-database:
-  mysql_primary:
-    type: "mysql"
-    mysql:
-      host: "localhost"
-      port: 3306
-      database: "myapp"
-      username: "root"
-      password: "secret"
-      charset: "utf8mb4"
-      max_open_conns: 25
-      max_idle_conns: 10
-      conn_max_lifetime: "1h"
-      conn_max_idle_time: "30m"
-
-# Cache Configuration
-cache:
-  type: "redis"
-  redis:
-    host: "localhost"
-    port: 6379
-    password: ""
-    database: 0
-    pool_size: 10
-    min_idle_conns: 2
-
-# Logger Configuration
-logger:
-  level: "info"
-  env: "dev"
-  log_path: "./logs/app.log"
-EOF
-        print_status "Default configuration file created"
+        if [ -f "./configs/config.example.yaml" ]; then
+            print_status "Configuration file not found, creating from configs/config.example.yaml..."
+            mkdir -p ./configs
+            cp ./configs/config.example.yaml ./configs/config.yaml
+            print_status "Default configuration file created"
+        else
+            print_error "configs/config.yaml and configs/config.example.yaml not found"
+            exit 1
+        fi
     fi
 }
 

@@ -22,7 +22,7 @@ USER appuser
 
 COPY --from=builder /out/app /usr/local/bin/app
 
-# 配置与静态资源按需挂载:/app/configs
+# 配置按需挂载:/app/configs。CMD 为配置文件路径,可用 docker run <image> <path> 覆盖。
 WORKDIR /app
 EXPOSE 8080
 

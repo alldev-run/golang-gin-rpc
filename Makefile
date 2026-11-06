@@ -133,9 +133,13 @@ docker-build: ## Build Docker image
 	@echo "Building Docker image..."
 	docker build -t $(APP_NAME):latest .
 
-docker-run: ## Run Docker container
+docker-run: ## Run Docker container (mounts ./configs read-only; uses .env when present)
 	@echo "Running Docker container..."
-	docker run -p 8080:8080 --env-file .env $(APP_NAME):latest
+	@if [ -f .env ]; then \
+		docker run --rm -p 8080:8080 -v $(CURDIR)/configs:/app/configs:ro --env-file .env $(APP_NAME):latest; \
+	else \
+		docker run --rm -p 8080:8080 -v $(CURDIR)/configs:/app/configs:ro $(APP_NAME):latest; \
+	fi
 
 docker-compose-up: ## Start services with docker-compose
 	@echo "Starting services with docker-compose..."
@@ -146,12 +150,12 @@ docker-compose-down: ## Stop services with docker-compose
 	docker-compose down
 
 # Setup targets
-setup: ## Initial project setup
+setup: ## Initial project setup (dirs, default config, dependencies)
 	@echo "Setting up project..."
 	@mkdir -p $(CONFIG_DIR) $(LOG_DIR) $(TEMP_DIR)
 	@if [ ! -f $(CONFIG_DIR)/config.yaml ]; then \
 		echo "Creating default config file..."; \
-		cp $(CONFIG_DIR)/config.example.yaml $(CONFIG_DIR)/config.yaml 2>/dev/null || echo "Please create $(CONFIG_DIR)/config.yaml manually"; \
+		cp $(CONFIG_DIR)/config.example.yaml $(CONFIG_DIR)/config.yaml || { echo "Failed to copy $(CONFIG_DIR)/config.example.yaml; please create $(CONFIG_DIR)/config.yaml manually"; exit 1; }; \
 	fi
 	$(MAKE) deps
 

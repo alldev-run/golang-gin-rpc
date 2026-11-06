@@ -11,5 +11,8 @@
 .zcode/
 /bin/
 /scaffold
+/temp/
+.env
+/configs/config.local.yaml
 coverage.out
 coverage.html
