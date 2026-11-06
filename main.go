@@ -15,15 +15,18 @@ import (
 )
 
 func main() {
-	// Initialize bootstrap
-	boot, err := bootstrap.NewBootstrap("./configs/config.yaml")
+	// Initialize bootstrap (config path may be overridden via the first CLI argument)
+	configPath := "./configs/config.yaml"
+	if len(os.Args) > 1 {
+		configPath = os.Args[1]
+	}
+	boot, err := bootstrap.NewBootstrap(configPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize bootstrap: %v", err)
 	}
 	defer boot.Close()
 
-	frameworkOptions := bootstrap.DefaultFrameworkOptions()
-	frameworkOptions = boot.FrameworkOptionsFromConfig()
+	frameworkOptions := boot.FrameworkOptionsFromConfig()
 	if len(frameworkOptions.Services) == 0 {
 		frameworkOptions.Services = []string{bootstrap.ServiceRPC}
 	}
@@ -45,8 +48,11 @@ func main() {
 		IdleTimeout:  config.Server.HTTP.IdleTimeout,
 	})
 
-	// Register routes
-	router := router.NewRouter(application)
+	// Register routes (wire framework-managed dependencies into demo routes)
+	router := router.NewRouter(application, router.Options{
+		DBFactory: boot.GetDatabaseFactory(),
+		Cache:     boot.GetCache(),
+	})
 	router.RegisterRoutes()
 
 	// Handle signals
@@ -64,10 +70,14 @@ func main() {
 	<-sigCh
 	log.Println("Shutting down application...")
 
-	// Shutdown application
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Shutdown application (graceful period from server.shutdown_timeout, default 30s)
+	shutdownTimeout := config.Server.ShutdownTimeout
+	if shutdownTimeout <= 0 {
+		shutdownTimeout = 30 * time.Second
+	}
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdownCancel()
-	
+
 	if err := application.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Error during shutdown: %v", err)
 	}

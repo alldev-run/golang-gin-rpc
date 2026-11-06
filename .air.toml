@@ -1,0 +1,22 @@
+# Air hot-reload config for `make dev` (https://github.com/air-verse/air)
+root = "."
+tmp_dir = "temp"
+
+[build]
+# Root module only; pkg/ and plugins/ are separate workspace modules and are
+# picked up through the root build via go.work + replace directives.
+cmd = "go build -o ./temp/alldev-gin-rpc ."
+bin = "./temp/alldev-gin-rpc"
+include_ext = ["go", "yaml", "yml"]
+exclude_dir = ["bin", "temp", "logs", "examples", "deploy", "docs", "tests", "api", "script", "scripts", ".git", ".github", ".idea", ".history", ".trunk", ".zcode"]
+# Scaffolded apps under api/ are standalone modules; root changes don't affect them.
+delay = 1000
+stop_on_error = true
+send_interrupt = true
+kill_delay = "5s"
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true

@@ -6,53 +6,54 @@ import (
 	"strings"
 )
 
+// componentDependencyKeys 内置组件插件 → 依赖容器键。
+var componentDependencyKeys = map[string]string{
+	"db":        DepDBFactory,
+	"cache":     DepCache,
+	"discovery": DepDiscoveryManager,
+	"tracing":   DepTracer,
+	"auth":      DepAuthManager,
+	"metrics":   DepMetricsCollector,
+	"health":    DepHealthManager,
+	"errors":    DepErrorsInitialized,
+}
+
 // ValidateDependencyCoverage checks whether required framework dependencies
 // have been injected into bootstrap dependency container.
+// 组件级要求由实际启动且未主动跳过的内置插件决定（组件因自身配置未启用而
+// 跳过时豁免）；服务级要求仍由 options.Services 决定。
 func (b *Bootstrap) ValidateDependencyCoverage(options FrameworkOptions) error {
 	required := make(map[string]struct{})
 
-	if options.InitDatabases {
-		required["db.factory"] = struct{}{}
-	}
-	if options.InitCache {
-		required["cache"] = struct{}{}
-	}
-	if options.InitDiscovery {
-		required["discovery.manager"] = struct{}{}
-	}
-	if options.InitTracing {
-		required["tracer"] = struct{}{}
-	}
-	if options.InitAuth {
-		required["auth.manager"] = struct{}{}
-	}
-	if options.InitMetrics {
-		required["metrics.collector"] = struct{}{}
-	}
-	if options.InitHealth {
-		required["health.manager"] = struct{}{}
-	}
-	if options.InitErrors {
-		required["errors.initialized"] = struct{}{}
+	for plugin, key := range componentDependencyKeys {
+		if b.pluginStarted(plugin) && !b.componentSkipped(plugin) {
+			required[key] = struct{}{}
+		}
 	}
 
 	for _, service := range options.Services {
 		svc := strings.TrimSpace(service)
+		if keys, ok := b.serviceDependencies(svc); ok {
+			for _, key := range keys {
+				required[key] = struct{}{}
+			}
+			continue
+		}
 		switch svc {
 		case ServiceRPC:
-			required["rpc.manager"] = struct{}{}
+			required[DepRPCManager] = struct{}{}
 		case ServiceAPIGateway:
-			required["gateway"] = struct{}{}
-			required["gateway.http_service"] = struct{}{}
+			required[DepGateway] = struct{}{}
+			required[DepGatewayHTTPService] = struct{}{}
 		case ServiceWebSocket:
-			required["websocket.server"] = struct{}{}
+			required[DepWebSocketServer] = struct{}{}
 		default:
 			if strings.HasPrefix(svc, "api-gateway") {
-				required["gateway"] = struct{}{}
-				required["gateway.http_service"] = struct{}{}
+				required[DepGateway] = struct{}{}
+				required[DepGatewayHTTPService] = struct{}{}
 			}
 			if strings.HasPrefix(svc, "websocket") {
-				required["websocket.server"] = struct{}{}
+				required[DepWebSocketServer] = struct{}{}
 			}
 		}
 	}

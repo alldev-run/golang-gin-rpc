@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/websocket"
+	"github.com/alldev-run/golang-gin-rpc/plugins/websocket"
 	"github.com/gin-gonic/gin"
 )
 

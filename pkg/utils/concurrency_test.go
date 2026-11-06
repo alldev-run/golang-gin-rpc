@@ -11,12 +11,12 @@ import (
 func TestConcurrentRandomString(t *testing.T) {
 	const numGoroutines = 100
 	const numIterations = 10
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	errors := make(chan error, numGoroutines*numIterations)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
@@ -33,10 +33,10 @@ func TestConcurrentRandomString(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 	close(errors)
-	
+
 	for err := range errors {
 		t.Error(err)
 	}
@@ -46,12 +46,12 @@ func TestConcurrentRandomString(t *testing.T) {
 func TestConcurrentRandomHex(t *testing.T) {
 	const numGoroutines = 50
 	const numIterations = 5
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	errors := make(chan error, numGoroutines*numIterations)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
@@ -68,10 +68,10 @@ func TestConcurrentRandomHex(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 	close(errors)
-	
+
 	for err := range errors {
 		t.Error(err)
 	}
@@ -80,10 +80,10 @@ func TestConcurrentRandomHex(t *testing.T) {
 // TestConcurrentStringOperations tests thread safety of string operations
 func TestConcurrentStringOperations(t *testing.T) {
 	const numGoroutines = 50
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	testData := [][]string{
 		{"a", "b", "a", "c", "b"},
 		{"  hello  ", " world ", "  test  "},
@@ -91,24 +91,24 @@ func TestConcurrentStringOperations(t *testing.T) {
 		{"single"},
 		{},
 	}
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
-			
+
 			for _, data := range testData {
 				// Test StringRemoveDuplicates
 				deduped := StringRemoveDuplicates(data)
 				if len(deduped) > len(data) {
 					t.Errorf("goroutine %d: StringRemoveDuplicates returned more elements than input", id)
 				}
-				
+
 				// Test StringTrimSlice
 				trimmed := StringTrimSlice(data)
 				if len(trimmed) != len(data) {
 					t.Errorf("goroutine %d: StringTrimSlice changed slice length", id)
 				}
-				
+
 				// Test StringFilterEmpty
 				filtered := StringFilterEmpty(data)
 				for _, s := range filtered {
@@ -116,7 +116,7 @@ func TestConcurrentStringOperations(t *testing.T) {
 						t.Errorf("goroutine %d: StringFilterEmpty returned empty string", id)
 					}
 				}
-				
+
 				// Test StringJoinNonEmpty
 				joined := StringJoinNonEmpty(data, ",")
 				if len(data) > 0 && len(joined) == 0 {
@@ -125,36 +125,36 @@ func TestConcurrentStringOperations(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 }
 
 // TestConcurrentJSONOperations tests thread safety of JSON operations
 func TestConcurrentJSONOperations(t *testing.T) {
 	const numGoroutines = 30
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	testData := map[string]interface{}{
 		"name":  "test",
 		"value": 123,
 		"items": []string{"a", "b", "c"},
 	}
-	
+
 	errors := make(chan error, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Test ToJSON
 			jsonStr, err := ToJSON(testData)
 			if err != nil {
 				errors <- fmt.Errorf("goroutine %d: ToJSON failed: %v", id, err)
 				return
 			}
-			
+
 			// Test FromJSON
 			var result map[string]interface{}
 			err = FromJSON(jsonStr, &result)
@@ -162,7 +162,7 @@ func TestConcurrentJSONOperations(t *testing.T) {
 				errors <- fmt.Errorf("goroutine %d: FromJSON failed: %v", id, err)
 				return
 			}
-			
+
 			// Test SafeFromJSON
 			var safeResult map[string]interface{}
 			err = SafeFromJSON(jsonStr, &safeResult)
@@ -172,10 +172,10 @@ func TestConcurrentJSONOperations(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 	close(errors)
-	
+
 	for err := range errors {
 		t.Error(err)
 	}
@@ -185,26 +185,26 @@ func TestConcurrentJSONOperations(t *testing.T) {
 func TestMemoryPressure(t *testing.T) {
 	const numGoroutines = 100
 	const numIterations = 1000
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	// Measure memory before
 	var m1, m2 runtime.MemStats
 	runtime.GC()
 	runtime.ReadMemStats(&m1)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
-			
+
 			for j := 0; j < numIterations; j++ {
 				// Create test data that will trigger buffer pool usage
 				data := make([]string, 10)
 				for k := range data {
 					data[k] = fmt.Sprintf("item-%d-%d-%d", id, j, k)
 				}
-				
+
 				// This should use the buffer pool
 				result := StringJoinNonEmpty(data, ",")
 				if len(result) == 0 {
@@ -214,13 +214,13 @@ func TestMemoryPressure(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Measure memory after
 	runtime.GC()
 	runtime.ReadMemStats(&m2)
-	
+
 	// Check that memory usage is reasonable (this is a rough check)
 	allocDiff := m2.TotalAlloc - m1.TotalAlloc
 	if allocDiff > 100*1024*1024 { // 100MB threshold
@@ -232,34 +232,34 @@ func TestMemoryPressure(t *testing.T) {
 // TestErrorHandling tests proper error handling in concurrent scenarios
 func TestErrorHandling(t *testing.T) {
 	const numGoroutines = 20
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	errors := make(chan error, numGoroutines*4)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Test RandomString with invalid inputs
 			if _, err := RandomString(-1); err == nil {
 				errors <- fmt.Errorf("goroutine %d: RandomString(-1) should return error", id)
 			}
-			
+
 			if _, err := RandomString(2000); err == nil {
 				errors <- fmt.Errorf("goroutine %d: RandomString(2000) should return error", id)
 			}
-			
+
 			// Test RandomHex with invalid inputs
 			if _, err := RandomHex(-1); err == nil {
 				errors <- fmt.Errorf("goroutine %d: RandomHex(-1) should return error", id)
 			}
-			
+
 			if _, err := RandomHex(1000); err == nil {
 				errors <- fmt.Errorf("goroutine %d: RandomHex(1000) should return error", id)
 			}
-			
+
 			// Test SafeFromJSON with oversized input
 			oversized := string(make([]byte, 11*1024*1024)) // 11MB
 			var target map[string]interface{}
@@ -268,10 +268,10 @@ func TestErrorHandling(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 	close(errors)
-	
+
 	for err := range errors {
 		t.Error(err)
 	}
@@ -284,20 +284,20 @@ func BenchmarkConcurrentStringJoin(b *testing.B) {
 	for i := range data {
 		data[i] = fmt.Sprintf("item-%d", i)
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		var wg sync.WaitGroup
 		wg.Add(numGoroutines)
-		
+
 		for j := 0; j < numGoroutines; j++ {
 			go func() {
 				defer wg.Done()
 				StringJoinNonEmpty(data, ",")
 			}()
 		}
-		
+
 		wg.Wait()
 	}
 }
@@ -308,9 +308,9 @@ func BenchmarkBufferPool(b *testing.B) {
 	for i := range data {
 		data[i] = fmt.Sprintf("item-%d", i)
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		StringJoinNonEmpty(data, ",")
 	}

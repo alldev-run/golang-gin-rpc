@@ -162,13 +162,13 @@ func TestServiceLoggerWithFields(t *testing.T) {
 	config.OverrideConfig = TestConfig()
 
 	serviceLogger := NewServiceLoggerFromConfig("fields-test", config)
-	
+
 	// Test with additional fields
 	loggerWithFields := serviceLogger.With(
 		zap.String("component", "test"),
 		zap.Int("request_id", 12345),
 	)
-	
+
 	loggerWithFields.Info("Message with fields")
 
 	// Clean up
@@ -184,12 +184,12 @@ func TestCleanupOldLogs(t *testing.T) {
 	oldDate := time.Now().AddDate(0, 0, -3).Format("2006-01-02")
 	oldDir := filepath.Join(testDir, "test-service", oldDate)
 	os.MkdirAll(oldDir, 0755)
-	
+
 	// Create a file in old directory with old modification time
 	oldFile := filepath.Join(oldDir, "test-service.log")
 	file, _ := os.Create(oldFile)
 	file.Close()
-	
+
 	// Set file modification time to 3 days ago
 	oldTime := time.Now().AddDate(0, 0, -3)
 	os.Chtimes(oldFile, oldTime, oldTime)
@@ -198,7 +198,7 @@ func TestCleanupOldLogs(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 	recentDir := filepath.Join(testDir, "test-service", today)
 	os.MkdirAll(recentDir, 0755)
-	
+
 	// Create a file in recent directory
 	recentFile := filepath.Join(recentDir, "test-service.log")
 	file, _ = os.Create(recentFile)
@@ -245,10 +245,10 @@ func TestServiceLoggerConfigValidation(t *testing.T) {
 
 	// Test custom config
 	customConfig := ServiceLoggerConfig{
-		ServiceName:       "custom",
-		BaseDir:           "/custom/logs",
-		EnableDateFolder:  false,
-		SeparateByLevel:   true,
+		ServiceName:         "custom",
+		BaseDir:             "/custom/logs",
+		EnableDateFolder:    false,
+		SeparateByLevel:     true,
 		InheritGlobalConfig: false,
 	}
 

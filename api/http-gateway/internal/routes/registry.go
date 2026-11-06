@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/service"
-	"github.com/alldev-run/golang-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway/router"
 )
 
 type Services struct {

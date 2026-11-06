@@ -2,8 +2,8 @@ package mw
 
 import (
 	"net/http"
-	
-	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+
+	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 )
 
 func init() {
@@ -18,7 +18,7 @@ func Tracing() Middleware {
 				// 从请求中提取追踪信息
 				ctx := tracing.ExtractHeaders(r.Context(), r.Header)
 				r = r.WithContext(ctx)
-				
+
 				// 在响应头中添加追踪信息
 				traceID := tracing.GetTraceID(ctx)
 				spanID := tracing.GetSpanID(ctx)
@@ -29,7 +29,7 @@ func Tracing() Middleware {
 					w.Header().Set("X-Span-ID", spanID)
 				}
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}

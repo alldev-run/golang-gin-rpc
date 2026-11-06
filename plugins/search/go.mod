@@ -1,0 +1,36 @@
+module github.com/alldev-run/golang-gin-rpc/plugins/search
+
+go 1.26.0
+
+require (
+	github.com/alldev-run/golang-gin-rpc/plugins/db v0.0.0
+	github.com/elastic/go-elasticsearch/v8 v8.19.7
+	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/alldev-run/golang-gin-rpc/pkg v0.0.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.9.0 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-sql-driver/mysql v1.9.3 // indirect
+	github.com/lib/pq v1.11.2 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
+	go.opentelemetry.io/otel v1.45.0 // indirect
+	go.opentelemetry.io/otel/metric v1.45.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.45.0 // indirect
+	go.opentelemetry.io/otel/trace v1.45.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+)
+
+replace (
+	github.com/alldev-run/golang-gin-rpc/plugins/cache => ../cache
+	github.com/alldev-run/golang-gin-rpc/plugins/db => ../db
+)
+
+replace github.com/alldev-run/golang-gin-rpc/pkg => ../../pkg

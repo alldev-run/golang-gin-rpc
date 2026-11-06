@@ -9,17 +9,19 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
-	
+
+	"github.com/alldev-run/golang-gin-rpc/bootstrap/pluginconfig"
+
 	"gopkg.in/yaml.v3"
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/httpapi"
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/mw"
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/routes"
-	"github.com/alldev-run/golang-gin-rpc/pkg/bootstrap"
+	"github.com/alldev-run/golang-gin-rpc/bootstrap"
 	"github.com/alldev-run/golang-gin-rpc/pkg/config"
-	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
 	"github.com/alldev-run/golang-gin-rpc/pkg/logger"
-	"github.com/alldev-run/golang-gin-rpc/pkg/tracing"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
+	"github.com/alldev-run/golang-gin-rpc/plugins/tracing"
 )
 
 func main() {
@@ -52,16 +54,16 @@ func main() {
 	gatewayLoggerConfig.InheritGlobalConfig = false
 	gatewayLoggerConfig.OverrideConfig = loggerCfg
 	gatewayLoggerConfig.OverrideConfig.Level = logger.LogLevelDebug // API Gateway 需要详细日志
-	gatewayLoggerConfig.OverrideConfig.MaxSize = 200 // 更大的文件大小
+	gatewayLoggerConfig.OverrideConfig.MaxSize = 200                // 更大的文件大小
 	gatewayLoggerConfig.OverrideConfig.MaxBackups = 15
 	gatewayLoggerConfig.OverrideConfig.MaxAge = 45
-	
+
 	gatewayLogger := logger.GetServiceLoggerInstance("api-gateway", gatewayLoggerConfig)
 
-	gatewayLogger.Info("http-gateway starting", 
+	gatewayLogger.Info("http-gateway starting",
 		logger.String("version", "1.0.0"),
 		logger.String("config", configPath),
-		logger.String("service", gwCfg.ServiceName),
+		logger.String("service_name", gwCfg.ServiceName),
 		logger.String("protocols", getEnabledProtocols(gwCfg)),
 	)
 
@@ -90,7 +92,7 @@ func main() {
 	}
 	defer boot.Close()
 
-	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig())
+	frameworkGatewayBase := buildGatewayConfigFromFramework(boot.GetConfig(), boot.GetPluginConfig())
 	frameworkGatewayCfg := frameworkGatewayBase
 	if frameworkConfigPath != "" {
 		frameworkGatewayCfg, err = loadGatewayConfigWithBase(frameworkConfigPath, frameworkGatewayBase)
@@ -108,7 +110,7 @@ func main() {
 
 	// 创建业务处理器 - 框架已内置请求日志中间件
 	bizHandler := httpapi.NewRouter(mergedGwCfg, routeServices).Handler()
-	
+
 	if err := bootstrap.RegisterAPIGatewayServiceFactory(boot, bootstrap.APIGatewayServiceOptions{
 		Name:   gatewayServiceName,
 		Config: mergedGwCfg,
@@ -121,33 +123,24 @@ func main() {
 		log.Fatalf("failed to register api-gateway service factory: %v", err)
 	}
 
-	frameworkOptions := boot.FrameworkOptionsFromConfig()
-	frameworkOptions.Services = []string{gatewayServiceName}
-
 	serviceDBConfigPath := filepath.Join(filepath.Dir(configPath), "database.yml")
 	if _, err := os.Stat(serviceDBConfigPath); err == nil {
 		if err := bootstrap.LoadDatabaseConfig(boot, serviceDBConfigPath); err != nil {
 			log.Fatalf("failed to load service database config: %v", err)
 		}
-		frameworkOptions.InitDatabases = true
+		// v0.2 起组件启停由 plugins 段声明式控制（framework.init_* 已移除）。
+		// 若框架配置的 plugins 段禁用了 db，这里提示修正配置。
 		gatewayLogger.Info("service database config loaded and overrides framework database config",
 			logger.String("path", serviceDBConfigPath),
 		)
-	} else if frameworkConfigPath == "" {
-		frameworkOptions.InitDatabases = false
 	}
 
+	frameworkOptions := boot.FrameworkOptionsFromConfig()
 	if frameworkConfigPath == "" {
-		frameworkOptions.InitCache = false
-		frameworkOptions.InitDiscovery = false
-		frameworkOptions.InitTracing = false
-		frameworkOptions.InitAuth = false
-		frameworkOptions.InitMetrics = false
-		frameworkOptions.InitHealth = true
-		frameworkOptions.InitErrors = true
+		// 无框架配置文件时依赖全部走默认空值跳过，跳过覆盖校验。
 		frameworkOptions.ValidateDependencyCoverage = false
 	}
-
+	frameworkOptions.Services = []string{gatewayServiceName}
 	if err := boot.StartFramework(context.Background(), frameworkOptions); err != nil {
 		log.Fatalf("failed to start framework services: %v", err)
 	}
@@ -172,7 +165,7 @@ func main() {
 	if err := boot.StopFramework(shutdownCtx, frameworkOptions.Services...); err != nil {
 		gatewayLogger.Error("framework shutdown failed", logger.Error(err))
 	}
-	
+
 	gatewayLogger.Info("http-gateway stopped")
 }
 
@@ -226,10 +219,13 @@ func unmarshalGatewayConfig(data []byte, cfg *gateway.Config) error {
 	return yaml.Unmarshal(data, cfg)
 }
 
-func buildGatewayConfigFromFramework(cfg *config.GlobalConfig) *gateway.Config {
+func buildGatewayConfigFromFramework(cfg *config.GlobalConfig, plugins *pluginconfig.Config) *gateway.Config {
 	base := gateway.DefaultConfig()
 	if cfg == nil {
 		return base
+	}
+	if plugins == nil {
+		plugins = pluginconfig.Default()
 	}
 
 	base.Host = cfg.Server.HTTP.Host
@@ -239,40 +235,40 @@ func buildGatewayConfigFromFramework(cfg *config.GlobalConfig) *gateway.Config {
 	base.IdleTimeout = cfg.Server.HTTP.IdleTimeout
 	base.ServiceName = cfg.App.Name
 
-	base.CORS.AllowedOrigins = append([]string(nil), cfg.Security.CORS.AllowOrigins...)
-	base.CORS.AllowedMethods = append([]string(nil), cfg.Security.CORS.AllowMethods...)
-	base.CORS.AllowedHeaders = append([]string(nil), cfg.Security.CORS.AllowHeaders...)
-	base.CORS.AllowCredentials = cfg.Security.CORS.AllowCredentials
+	base.CORS.AllowedOrigins = append([]string(nil), plugins.Security.CORS.AllowOrigins...)
+	base.CORS.AllowedMethods = append([]string(nil), plugins.Security.CORS.AllowMethods...)
+	base.CORS.AllowedHeaders = append([]string(nil), plugins.Security.CORS.AllowHeaders...)
+	base.CORS.AllowCredentials = plugins.Security.CORS.AllowCredentials
 
-	base.RateLimit.Enabled = cfg.Security.RateLimit.Enabled
-	base.RateLimit.Requests = cfg.Security.RateLimit.Limit
-	base.RateLimit.Window = cfg.Security.RateLimit.Window.String()
+	base.RateLimit.Enabled = plugins.Security.RateLimit.Enabled
+	base.RateLimit.Requests = plugins.Security.RateLimit.Limit
+	base.RateLimit.Window = plugins.Security.RateLimit.Window.String()
 
-	base.Discovery.Enabled = cfg.Discovery.Enabled
-	base.Discovery.Type = cfg.Discovery.Type
-	base.Discovery.Timeout = cfg.Discovery.Timeout
-	base.Discovery.Namespace = cfg.Discovery.Config["namespace"]
+	base.Discovery.Enabled = plugins.Discovery.Enabled
+	base.Discovery.Type = plugins.Discovery.Type
+	base.Discovery.Timeout = plugins.Discovery.Timeout
+	base.Discovery.Namespace = plugins.Discovery.Config["namespace"]
 	if base.Discovery.Namespace == "" {
 		base.Discovery.Namespace = "default"
 	}
-	if cfg.Discovery.Address != "" {
-		base.Discovery.Endpoints = []string{cfg.Discovery.Address}
+	if plugins.Discovery.Address != "" {
+		base.Discovery.Endpoints = []string{plugins.Discovery.Address}
 	}
 	if base.Discovery.Options == nil {
 		base.Discovery.Options = make(map[string]string)
 	}
-	for k, v := range cfg.Discovery.Config {
+	for k, v := range plugins.Discovery.Config {
 		base.Discovery.Options[k] = v
 	}
 
 	base.Tracing = &tracing.Config{
-		Enabled:       cfg.Observability.Tracing.Enabled,
-		Type:          cfg.Observability.Tracing.Type,
-		Endpoint:      cfg.Observability.Tracing.Endpoint,
-		SampleRate:    cfg.Observability.Tracing.SampleRate,
-		ServiceName:   cfg.App.Name,
+		Enabled:        cfg.Observability.Tracing.Enabled,
+		Type:           cfg.Observability.Tracing.Type,
+		Endpoint:       cfg.Observability.Tracing.Endpoint,
+		SampleRate:     cfg.Observability.Tracing.SampleRate,
+		ServiceName:    cfg.App.Name,
 		ServiceVersion: cfg.App.Version,
-		Environment:   cfg.App.Environment,
+		Environment:    cfg.App.Environment,
 	}
 
 	return base
@@ -322,7 +318,7 @@ func resolveFrameworkConfigPath(gatewayConfigPath string) string {
 // getEnabledProtocols 获取启用的协议列表
 func getEnabledProtocols(cfg *gateway.Config) string {
 	var protocols []string
-	
+
 	if cfg.Protocols.HTTP {
 		protocols = append(protocols, "HTTP")
 	}
@@ -335,15 +331,15 @@ func getEnabledProtocols(cfg *gateway.Config) string {
 	if cfg.Protocols.JSONRPC {
 		protocols = append(protocols, "JSON-RPC")
 	}
-	
+
 	if len(protocols) == 0 {
 		return "HTTP"
 	}
-	
+
 	result := protocols[0]
 	for i := 1; i < len(protocols); i++ {
 		result += "/" + protocols[i]
 	}
-	
+
 	return result
 }

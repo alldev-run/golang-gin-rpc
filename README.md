@@ -1,57 +1,47 @@
 # github.com/alldev-run/golang-gin-rpc
  
- `github.com/alldev-run/golang-gin-rpc` 是一个基于 Go 的服务端项目骨架，围绕 `internal`（应用编排）和 `pkg`（可复用能力）组织，适合作为 HTTP / RPC 服务的起步框架。
- 
- ## 功能概览（按 `pkg` 模块）
+ `github.com/alldev-run/golang-gin-rpc` 是一个基于 Go 的服务端项目骨架，采用**插件化架构**：`pkg` 只保留核心内核，功能组件以独立 Go 模块的形式放在 `plugins/` 下（可单独搬去独立仓库维护），由框架内核按需加载——**未 import 的不参与链接，未启用的不参与运行**。
 
-- **基础能力**
-  - `pkg/config`：统一配置加载与管理
+ ## 功能概览
+
+- **核心内核（`pkg/`，独立 core 模块 `github.com/alldev-run/golang-gin-rpc/pkg`，始终链接）**
+  - `pkg/kernel`：插件契约、注册表、生命周期加载器（拓扑排序 / 环检测 / 回滚）
+  - `pkg/config`：统一配置加载与管理（支持插件按段自解析配置）
   - `pkg/logger`：结构化日志
-  - `pkg/errors`、`pkg/panicx`：错误与 panic 处理
-- **服务通信**
-  - `pkg/rpc`：`gRPC` / `JSON-RPC` 服务管理
-  - `pkg/gateway`：网关路由与转发
-  - `pkg/router`、`pkg/middleware`、`pkg/cors`：HTTP 路由与中间件
-  - `pkg/websocket`：WebSocket 服务
-- **数据与状态**
-  - `pkg/db`：数据库客户端、工厂与 `orm`
-  - `pkg/cache`：缓存抽象（含 `redis` / `memcache` 适配）
-  - `pkg/search`：搜索相关能力
-- **治理与可观测**
-  - `pkg/discovery`：服务发现（`consul`、`etcd`、`zookeeper`、`static`）
-  - `pkg/health`、`pkg/metrics`、`pkg/tracing`：健康检查、指标与链路追踪
-  - `pkg/loadbalancer`、`pkg/circuitbreaker`、`pkg/ratelimit`：流量治理能力
-- **安全与业务支撑**
-  - `pkg/auth`、`pkg/rbac`：认证与权限
-  - `pkg/requestid`、`pkg/response`、`pkg/status_code`：请求与响应辅助
-  - `pkg/messaging`、`pkg/audit`、`pkg/alert`：消息、审计与告警支持
+  - `pkg/errors`、`pkg/panicx`、`pkg/status_code`、`pkg/response`：错误与响应
+  - `pkg/requestid`、`pkg/cors`、`pkg/utils`、`pkg/version`：通用辅助
+- **插件模块（`plugins/<name>`，各自独立 go.mod，按需引入）**
+  - 服务通信：`rpc`（gRPC/JSON-RPC）、`gateway`（网关 + HTTP 中间件 + router）、`websocket`（游戏协议层：envelope 路由/会话恢复/房间/发送背压）、`messaging`（Kafka/NATS/RabbitMQ + 请求-应答）
+  - 数据与状态：`db`（驱动注册表：mysql/postgres/clickhouse/mongodb/elasticsearch…）、`cache`（redis/memcache/failover）、`search`
+  - 治理与可观测：`discovery`、`health`、`metrics`、`tracing`、`circuitbreaker`、`loadbalancer`、`ratelimit`
+  - 安全与业务：`auth`、`rbac`、`audit`、`upload`、`push`、`geoip`、`configcenter`、`actor`（Ask/定时消息/监督重启）
+  - 中间件库：`middleware`（独立 net/http 中间件：audit/auth/apikey/cors/ip_filter/rate_limiter/recovery 等）
+  - 游戏服：`gameserver`（九宫格 AOI 空间管理，供实时游戏房间/大世界邻居查询）
+  - 工具类：`alert`、`bloomfilter`、`scheduler`
 
-说明：以上是根目录 `pkg` 的主要模块分组，完整子目录以仓库实际代码为准。
+- **全量组合根（`bootstrap/`，根模块）**：`bootstrap.NewBootstrap` + `StartFramework` 装配全部内置插件（内部由 kernel 驱动）
+
+> 插件机制详见 [插件架构文档](docs/architecture/plugin-architecture.md)。
  
  ## 项目结构
  
  ```text
  github.com/alldev-run/golang-gin-rpc/
-├── configs/                  # 配置文件
+├── configs/                  # 配置文件（含 plugins.* 插件开关段）
 ├── internal/
 │   ├── app/                  # 应用启动与 HTTP Server 封装
-│   ├── bootstrap/            # 配置加载与模块初始化
+│   ├── bootstrap/            # 组合根：内置插件适配器 + kernel 驱动启动
 │   └── router/               # 路由注册
-├── pkg/
-│   ├── auth/                 # 认证
-│   ├── cache/                # 缓存
-│   ├── config/               # 配置
-│   ├── db/                   # 数据库与 ORM
-│   ├── discovery/            # 服务发现
-│   ├── gateway/              # 网关
-│   ├── logger/               # 日志
-│   ├── messaging/            # 消息队列
-│   ├── middleware/           # HTTP 中间件
-│   ├── rpc/                  # RPC
-│   ├── tracing/              # 链路追踪
-│   ├── websocket/            # WebSocket
-│   └── ...                   # 其他通用组件（见 pkg 目录）
+├── bootstrap/                # 全量组合根门面（链接全部内置插件）
+├── pkg/                      # 核心内核（kernel/config/logger/errors/...）
+├── plugins/                  # 功能插件（每个子目录一个独立 Go 模块）
+│   ├── db/                   #   例：数据库（驱动注册表 + mysql/postgres/... 子包）
+│   ├── gateway/              #   例：网关（含 middleware/gin|nethttp、router、httplog）
+│   └── ...                   #   其余 25 个插件模块
+├── tests/dbintegration/      # 端到端 db 集成测试（//go:build integration，需真实 MySQL）
+├── examples/                 # 各组件示例（独立 Go 模块，自带 go.mod，不进主模块 require 集）
 ├── main.go                   # 主入口
+├── go.work                   # 工作区：根模块 + ./plugins/*
 ├── start.sh                  # 启动脚本
 └── README.md                 # 项目说明
 ```
@@ -62,21 +52,32 @@
 
 - **加载主配置**
   - 通过 `bootstrap.NewBootstrap("./configs/config.yaml")`
-- **通过框架入口启动依赖与服务**
-  - `bootstrap.StartFramework(ctx, options)`
-  - 依赖初始化按需启用：数据库、缓存、服务发现、鉴权、链路追踪
-  - 托管服务按需选择：`api-gateway` / `rpc` / `websocket`
+- **通过 kernel 插件机制启动依赖**
+  - `bootstrap.StartFramework(ctx, options)` 内部：注册内置组件适配器 → `kernel.Loader.Build()`（过滤启用项 + 依赖拓扑排序）→ 按序 Start（失败回滚）
+  - 内置组件插件：`db` / `cache` / `discovery` / `tracing` / `auth` / `metrics` / `health` / `errors` / `upload`
+- **启动托管服务**
+  - `services` 按需选择：`api-gateway` / `rpc` / `websocket`
 - **启动 HTTP 应用**
   - 注册路由
   - 监听退出信号
 - **执行优雅关闭**
-  - `bootstrap.StopFramework(...)` 停止托管服务
+  - `bootstrap.StopFramework(...)`：托管服务 + 插件应用逆序停止
 
-### 服务组合（FrameworkOptions）
+### 服务组合（插件开关 + FrameworkOptions）
 
-`bootstrap.FrameworkOptions` 用于描述框架启动清单。
+组件启停现在由 kernel 插件机制承接，两种配置方式等价（`plugins` 优先）：
 
-- 依赖开关：`InitDatabases` / `InitCache` / `InitDiscovery` / `InitTracing` / `InitAuth`
+```yaml
+# 组件插件开关（唯一机制；v0.2 起已移除 framework.init_* 兼容键）
+plugins:
+  db:        { enabled: true }
+  cache:     { enabled: true }
+  discovery: { enabled: true }
+  health:    { enabled: true }   # db/cache 为软依赖,禁用时自动降级
+  metrics:   { enabled: true }
+  ...
+```
+
 - 托管服务：`Services: []string{bootstrap.ServiceRPC, bootstrap.ServiceAPIGateway, bootstrap.ServiceWebSocket}`
 - WebSocket 可选注册参数：`WebSocket: &bootstrap.WebSocketServiceOptions{...}`
 
@@ -90,25 +91,22 @@
 
 - `configs/config.yaml`（主配置，由 `bootstrap.NewBootstrap` 加载）
 
-推荐在 `configs/config.yaml` 中配置 `framework` 启动清单，例如：
+推荐在 `configs/config.yaml` 中同时配置 `plugins`（组件开关）与 `framework.services`（托管服务清单），例如：
 
 ```yaml
+plugins:
+  db:      { enabled: true }
+  cache:   { enabled: true }
+  metrics: { enabled: true }
+
 framework:
-  init_databases: true
-  init_cache: true
-  init_discovery: true
-  init_tracing: true
-  init_auth: true
-  init_metrics: true
-  init_health: true
-  init_errors: true
   validate_dependency_coverage: true
   services: ["rpc"]
 ```
 
-- `init_*` 决定 bootstrap 是否初始化对应依赖
+- `plugins.<name>.enabled` 决定内置组件插件是否参与启动（默认启用；未 import 的插件模块根本不进二进制）
 - `services` 决定托管服务启动清单（支持 `rpc` / `api-gateway` / `websocket`）
-- `validate_dependency_coverage` 会校验关键依赖是否已注入 bootstrap 容器
+- `validate_dependency_coverage` 会校验关键依赖是否已注入
 
 ### `http-gateway` 配置优先级
 
@@ -136,19 +134,22 @@ framework:
  当前主配置覆盖以下能力：
  
  - **server**
-   - HTTP / gRPC 服务监听地址与超时
+   - HTTP / gRPC 服务监听地址与超时；`shutdown_timeout` 优雅停机最长等待
+   - 兼容旧版扁平写法（`server.host/port`），`server.http` 段存在时以其为准
  - **database**
    - 主从数据库与连接池
  - **redis**
    - Redis 连接配置
  - **rpc**
-   - gRPC / JSON-RPC 服务配置
+   - gRPC / JSON-RPC 服务配置（`rpc.servers.*` 端口/超时/消息上限/reflection 均可配）
  - **discovery**
    - 服务发现注册信息
  - **messaging**
    - RabbitMQ / Kafka
+ - **gateway**
+   - 网关监听（默认端口顺延至 8082，避免与主应用 8080 冲突；`gateway.port` 可覆盖）
  - **observability**
-   - logging / tracing / metrics
+   - logging / tracing / metrics（`metrics.listen_addr` 控制 metrics 独立监听地址）
  - **security**
    - JWT 等安全配置
  
@@ -228,7 +229,7 @@ make docker-build  # 构建 Docker 镜像
 
 模板存放在：
 
-- `pkg/gateway/templates/`
+- `plugins/gateway/templates/`
 
 通过脚手架命令可以：
 
@@ -292,6 +293,7 @@ scaffold create-api --name my-gateway --template http-gateway
 Makefile：
 
 ```bash
+make init NAME=<app-name> [COMPONENTS=api-gateway,db,cache] [PORT=8080]   # 一条命令生成应用,交互选择组件
 make create-api NAME=<new-api> [TEMPLATE=http-gateway]
 make export-template NAME=<api-name> [TEMPLATE=http-gateway]
 ```
@@ -305,7 +307,7 @@ go run .\cmd\scaffold create-api --name demo-api --template http-gateway
 # 启动生成的项目
 go run .\api\demo-api
 
-# 将 api/demo-api 导出回模板（写入 pkg/gateway/templates/http-gateway，Go 文件会变成 .gotmpl）
+# 将 api/demo-api 导出回模板（写入 plugins/gateway/templates/http-gateway，Go 文件会变成 .gotmpl）
 go run .\cmd\scaffold export-template --name demo-api --template http-gateway
 ```
 
@@ -321,13 +323,14 @@ docker-compose down     # 停止服务
  
  项目内的服务发现模块位于：
  
- - `pkg/discovery`
+ - `plugins/discovery`
  
  当前支持的后端：
  
  - `consul`
  - `etcd`
  - `zookeeper`
+ - `nacos`
  - `static`
  
  ### Zookeeper 支持
@@ -364,7 +367,7 @@ docker-compose down     # 停止服务
  
  更详细的说明见：
  
- - `pkg/discovery/README.md`
+ - `plugins/discovery/README.md`
  
  ## RPC 能力
  
@@ -406,7 +409,7 @@ docker-compose down     # 停止服务
  
  tracing 模块位于：
  
- - `pkg/tracing`
+ - `plugins/tracing`
  
  当前支持：
  
@@ -424,8 +427,8 @@ docker-compose down     # 停止服务
  
  项目中已包含：
  
- - `pkg/health`
- - `pkg/gateway`
+ - `plugins/health`
+ - `plugins/gateway`
  
  可用于：
  
@@ -440,20 +443,20 @@ docker-compose down     # 停止服务
  
  ```bash
 go test ./pkg/...
-go test ./pkg/discovery/...
+go test ./plugins/discovery/...
 go test ./pkg/logger/...
-go test ./pkg/tracing/...
-go test ./pkg/rpc/...
+go test ./plugins/tracing/...
+go test ./plugins/rpc/...
 ```
 
-说明：`go test ./...` 会包含 `examples` 目录；若本地示例依赖未满足或存在示例编译约束，建议优先执行上面的 `pkg` 级回归命令。
+说明：`examples/` 已拆分为独立 Go 模块（`examples/go.mod`，加入 go.work），主模块的 `go test ./...` 不再包含示例；示例用 `cd examples && go build ./...` 或 `go run ./examples/<name>` 验证。
  
  ## 开发建议
 
 - **优先修改 `configs/config.yaml`**
   - 统一通过 bootstrap 加载配置
 - **新增服务发现后端时**
-  - 同步更新 `pkg/discovery` 与根 README
+  - 同步更新 `plugins/discovery` 与根 README
 - **新增模块时**
   - 尽量接入 bootstrap 统一初始化流程
 - **输出结构化日志时**
@@ -503,7 +506,7 @@ v1 := router.Group("/api/v1")
 ### 数据库操作
 
 ```go
-// 使用查询构建器（统一到 pkg/db/orm）
+// 使用查询构建器（统一到 plugins/db/orm）
 client := mysqlClient // 从 bootstrap 获取
 rows, err := orm.NewSelectBuilder(client, "users").
     Where("status = ?", "active").
@@ -536,39 +539,15 @@ Apache License 2.0 - See `LICENSE` file for details.
 - John James
 - Email: `nbjohn999@gmail.com`
  
- ## 相关文档
+## 相关文档
 
-### 📚 核心功能文档
-- `docs/API_USAGE_GUIDE.md` - API 使用指南
-- `docs/RPC_GUIDE.md` - RPC 使用指南  
-- `docs/MESSAGING_GUIDE.md` - 消息队列指南
-- `docs/DISCOVERY_GUIDE.md` - 服务发现指南
-- `docs/TRACING_GUIDE.md` - 链路追踪指南
+文档总索引（含完整指南及各插件 README）：[docs/README.md](docs/README.md)。
+[变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md)
 
-### 🗄️ 数据库相关
-- `docs/orm-usage-guide.md` - ORM 使用指南
-- `docs/ENTERPRISE_TRANSACTION_MANAGER.md` - 企业级事务管理器
-
-### 🚀 缓存相关
-- `docs/FAILOVER_CACHE_GUIDE.md` - 故障转移缓存指南
-- `docs/FILE_CACHE_GUIDE.md` - 文件缓存指南
-
-### 🌐 网关相关
-- `docs/gateway.md` - 网关基础指南
-- `docs/gateway-discovery.md` - 网关服务发现
-- `docs/gateway-auth-complete-guide.md` - 网关认证完整指南
-
-### 🔐 安全相关
-- `docs/RPC_AUTHENTICATION.md` - RPC 认证
-- `docs/JSON_RPC_TRACING.md` - JSON RPC 追踪
-
-### 🛠️ 框架相关
-- `docs/gin-router-system.md` - Gin 路由系统
-- `docs/production-deployment.md` - 生产环境部署指南
-
-### 📖 其他文档
-- `docs/README.md` - 文档总览
-- `pkg/discovery/README.md` - 服务发现包文档
+- [架构](docs/README.md#架构) · [数据库](docs/README.md#数据库) · [缓存](docs/README.md#缓存)
+- [RPC](docs/README.md#rpc) · [网关](docs/README.md#网关) · [服务发现](docs/README.md#服务发现)
+- [可观测性](docs/README.md#可观测性) · [消息](docs/README.md#消息) · [上传](docs/README.md#上传)
+- [安全](docs/README.md#安全) · [运维](docs/README.md#运维)
  
  ## 总结
  

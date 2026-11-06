@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
 )
 
 

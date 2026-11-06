@@ -7,3 +7,12 @@
 **/*.exe
 /.trunk
 /gateway
+# ZCode 会话本地数据
+.zcode/
+/bin/
+/scaffold
+/temp/
+.env
+/configs/config.local.yaml
+coverage.out
+coverage.html

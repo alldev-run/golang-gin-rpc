@@ -1,0 +1,413 @@
+# Application Configuration
+app:
+  name: "golang-gin-rpc"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
+
+# Framework Runtime Configuration
+# plugins 段：内置组件插件开关（kernel 构建期裁剪，默认启用）。
+plugins:
+  db:        { enabled: false }
+  cache:     { enabled: false }
+  discovery: { enabled: false }
+  tracing:   { enabled: false }
+  auth:      { enabled: false }
+  metrics:   { enabled: true }
+  health:    { enabled: true }
+  errors:    { enabled: true }
+  upload:    { enabled: false }
+
+# framework.services: 托管服务清单（api-gateway / rpc / websocket）。
+framework:
+  validate_dependency_coverage: true
+  services: ["api-gateway"]
+
+server:
+  http:
+    host: "0.0.0.0"
+    port: 8080
+    read_timeout: "30s"
+    write_timeout: "30s"
+    idle_timeout: "120s"
+  shutdown_timeout: "30s"
+
+# Observability Configuration
+# metrics.listen_addr: metrics 独立监听地址(endpoint 为路径或为空时的兜底)。
+observability:
+  metrics:
+    enabled: true
+    type: "prometheus"
+    endpoint: "/metrics"
+    listen_addr: ":9090"
+
+# Database Configuration
+database:
+  mysql_primary:
+    type: "mysql"
+    mysql:
+      host: "localhost"
+      port: 3306
+      database: "myapp"
+      username: "root"
+      password: "secret"
+      charset: "utf8mb4"
+      max_open_conns: 25
+      max_idle_conns: 10
+      conn_max_lifetime: "1h"
+      conn_max_idle_time: "30m"
+      # SQL logging configuration
+      log_enabled: true
+      log_level: "info"  # error, warn, info, debug, trace
+      slow_query_threshold: "100ms"
+
+  redis_cache:
+    type: "redis"
+    redis:
+      mode: "single"  # single, cluster, sentinel, master_slave
+      host: "localhost"
+      port: 6379
+      password: ""
+      database: 0
+      pool_size: 10
+      min_idle_conns: 2
+      max_retries: 3
+      dial_timeout: "5s"
+      read_timeout: "3s"
+      write_timeout: "3s"
+      pool_timeout: "4s"
+
+# Cache Configuration
+cache:
+  type: "redis"
+  redis:
+    mode: "single"  # single, cluster, sentinel, master_slave
+    host: "localhost"
+    port: 6379
+    password: ""
+    database: 0
+    pool_size: 10
+    min_idle_conns: 2
+
+# Logger Configuration
+logger:
+  level: "info"  # debug, info, warn, error, fatal, panic
+  env: "development"  # development, production, test, docker
+  log_path: "./logs/app.log"
+  output: "stdout"  # stdout, stderr, file
+  format: "json"  # json, text
+  enable_console_colors: true
+  enable_caller: true
+  enable_stacktrace: true
+  time_format: "2006-01-02T15:04:05Z07:00"
+  max_size: 100  # MB
+  max_backups: 10
+  max_age: 30  # days
+  compress: true
+  local_time: false
+  fields:
+    service: "github.com/alldev-run/golang-gin-rpc"
+  sampling:
+    enabled: false
+    rate: 0.1
+    tick: "1s"
+    initial: 10
+    thereafter: 100
+  
+  # Service-specific logging configuration
+  service_logging:
+    enabled: true
+    base_dir: "./logs"
+    enable_date_folders: true
+    separate_by_level: false  # Set to true in development for debugging
+    inherit_global_config: true
+    
+    # Per-service configuration overrides
+    services:
+      api-gateway:
+        base_dir: "./logs/api-gateway"
+        enable_date_folders: true
+        separate_by_level: true  # Separate levels for API debugging
+        inherit_global_config: true
+        override_config:
+          level: "debug"
+          format: "json"
+          max_size: 200  # Larger files for API logs
+          max_backups: 15
+          max_age: 45
+          compress: true
+      
+      rpc:
+        base_dir: "./logs/rpc"
+        enable_date_folders: true
+        separate_by_level: false
+        inherit_global_config: true
+        override_config:
+          level: "info"
+          format: "json"
+          max_size: 150
+          max_backups: 10
+          max_age: 30
+          compress: true
+      
+      websocket:
+        base_dir: "./logs/websocket"
+        enable_date_folders: true
+        separate_by_level: false
+        inherit_global_config: true
+        override_config:
+          level: "debug"  # Debug level for WebSocket connections
+          format: "json"
+          max_size: 100
+          max_backups: 7
+          max_age: 14
+          compress: true
+      
+      auth-service:
+        base_dir: "./logs/auth"
+        enable_date_folders: true
+        separate_by_level: true  # Security logs need level separation
+        inherit_global_config: true
+        override_config:
+          level: "info"
+          format: "json"
+          max_size: 100
+          max_backups: 30  # Keep auth logs longer
+          max_age: 90
+          compress: true
+      
+      metrics:
+        base_dir: "./logs/metrics"
+        enable_date_folders: false  # Single directory for metrics
+        separate_by_level: false
+        inherit_global_config: true
+        override_config:
+          level: "info"
+          format: "json"
+          max_size: 50
+          max_backups: 5
+          max_age: 7
+          compress: true
+    
+    # Component-specific logging configuration (for framework components like database)
+    components:
+      database:
+        base_dir: "./logs/database"
+        separate_by_level: true
+        override_config:
+          level: "debug"
+          max_size: 200
+          max_backups: 10
+          max_age: 30
+          enable_caller: true
+          enable_stacktrace: false
+    
+    # Log cleanup configuration
+    cleanup:
+      enabled: true
+      schedule: "0 2 * * *"  # Daily at 2 AM
+      max_age_days: 30
+      exclude_services: ["auth-service"]  # Keep auth logs longer
+
+# Tracing Configuration
+tracing:
+  type: "zipkin"
+  service_name: "github.com/alldev-run/golang-gin-rpc"
+  service_version: "1.0.0"
+  environment: "development"
+  enabled: false
+  host: "localhost"
+  port: 9411
+  endpoint: "/api/v2/spans"
+  username: ""
+  password: ""
+  sample_rate: 1.0
+  batch_timeout: "5s"
+  max_export_batch_size: 512
+  options:
+    timeout: "10s"
+    max_attempts: 3
+
+# RPC Configuration
+rpc:
+  servers:
+    grpc:
+      type: "grpc"
+      host: "localhost"
+      port: 50051
+      network: "tcp"
+      timeout: 30
+      max_msg_size: 4194304  # 4MB
+      enable_tls: false
+      cert_file: ""
+      key_file: ""
+      reflection: true
+    
+    jsonrpc:
+      type: "jsonrpc"
+      host: "localhost"
+      port: 8081
+      network: "tcp"
+      timeout: 30
+      max_msg_size: 4194304  # 4MB
+      enable_tls: false
+      cert_file: ""
+      key_file: ""
+  
+  timeout: 30s
+  graceful_shutdown_timeout: 10s
+
+# Service Discovery Configuration
+discovery:
+  enabled: false
+  registry_type: "consul"  # consul, etcd
+  registry_address: "localhost:8500"
+  timeout: 30s
+  health_check_interval: 30s
+  auto_register: true
+  service_name: "github.com/alldev-run/golang-gin-rpc"
+  service_address: "localhost"
+  service_port: 8080
+  service_tags:
+    - "go"
+    - "rpc"
+    - "api"
+    - "microservice"
+
+# Messaging Configuration
+messaging:
+  rabbitmq:
+    type: "rabbitmq"
+    host: "localhost"
+    port: 5672
+    username: "guest"
+    password: "guest"
+    database: "/"
+    options:
+      exchange_type: "fanout"
+      durable: true
+      auto_delete: false
+  
+  kafka:
+    type: "kafka"
+    host: "localhost"
+    port: 9092
+    username: ""
+    password: ""
+    database: ""
+    options:
+      batch_size: 100
+      linger_ms: 10
+      compression_type: "gzip"
+      acks: "all"
+      retries: 3
+
+# Gateway Configuration
+gateway:
+  # Server configuration
+  host: "0.0.0.0"
+  port: 8082  # 主应用占用 8080, JSON-RPC 占用 8081, gateway 顺延
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "60s"
+
+  # CORS configuration
+  cors:
+    allowed_origins: ["*"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]
+    allow_credentials: false
+    max_age: 86400
+
+  # Rate limiting
+  rate_limit:
+    enabled: false
+    requests: 100
+    window: "1m"
+
+  # IP Filter Configuration (Enterprise Security)
+  ip_filter:
+    enabled: false
+    mode: "blacklist"
+    ip_list: []
+    country_blacklist: []
+    country_whitelist: []
+    enable_geoip: false
+    geoip_db_path: ""
+    block_message: "Access denied"
+    block_status_code: 403
+    skip_paths: ["/health", "/metrics", "/ping"]
+    trust_proxy: true
+
+  # Service discovery
+  discovery:
+    type: "static"  # "consul", "etcd", "static"
+    endpoints: ["localhost:8500"]  # For consul/etcd
+    namespace: "default"
+    timeout: "5s"
+    options: {}
+
+  # Load balancing
+  load_balancer:
+    strategy: "round_robin"  # "round_robin", "random", "weighted", "least_connections"
+
+  # Routes configuration
+  routes:
+    - path: "/api/user/*"
+      method: "*"
+      service: "user-service"
+      strip_prefix: true
+      timeout: "30s"
+      retries: 3
+      headers:
+        X-Service: "user-service"
+      query: {}
+
+    - path: "/api/order/*"
+      method: "*"
+      service: "order-service"
+      strip_prefix: true
+      timeout: "30s"
+      retries: 3
+      headers:
+        X-Service: "order-service"
+      query: {}
+
+    - path: "/api/health"
+      method: "GET"
+      service: "health-service"
+      strip_prefix: false
+      timeout: "10s"
+      retries: 1
+      headers: {}
+      query: {}
+
+# File Upload Configuration
+upload:
+  enabled: false  # Set to true to enable file upload functionality
+  upload_dir: "./uploads"
+  max_file_size: 10485760  # 10MB in bytes
+  allowed_extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".gif"
+    - ".pdf"
+    - ".doc"
+    - ".docx"
+    - ".xls"
+    - ".xlsx"
+  allowed_mime_types:
+    - "image/jpeg"
+    - "image/png"
+    - "image/gif"
+    - "application/pdf"
+    - "application/msword"
+    - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    - "application/vnd.ms-excel"
+    - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  naming_strategy: "uuid"  # uuid, timestamp, original, custom
+  custom_name_template: "{date}_{original}_{random}"  # Used when naming_strategy is "custom"
+  preserve_extension: true
+  auto_create_dir: true
+  enable_overwrite: false

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
-	"github.com/alldev-run/golang-gin-rpc/pkg/websocket"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
+	"github.com/alldev-run/golang-gin-rpc/plugins/websocket"
 )
 
 const (
@@ -48,8 +48,8 @@ func (b *Bootstrap) RegisterAPIGatewayServiceFactory(options APIGatewayServiceOp
 				}
 				if service.httpService != nil {
 					boot.gateway = service.httpService.Gateway()
-					boot.setDependency("gateway", boot.gateway)
-					boot.setDependency("gateway.http_service", service.httpService)
+					boot.setDependency(DepGateway, boot.gateway)
+					boot.setDependency(DepGatewayHTTPService, service.httpService)
 				}
 				return nil
 			},
@@ -71,6 +71,8 @@ type managedAPIGatewayService struct {
 	name    string
 	config  *gateway.Config
 	httpOpt gateway.HTTPServiceOptions
+	// stopTimeout 来自 server.shutdown_timeout，ctx 为 nil 时的停机兜底超时。
+	stopTimeout time.Duration
 
 	httpService *gateway.HTTPService
 	server      *http.Server
@@ -133,8 +135,12 @@ func (s *managedAPIGatewayService) Stop(ctx context.Context) error {
 	}
 	stopCtx := ctx
 	if stopCtx == nil {
+		timeout := s.stopTimeout
+		if timeout <= 0 {
+			timeout = 30 * time.Second
+		}
 		var cancel context.CancelFunc
-		stopCtx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		stopCtx, cancel = context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 	}
 	err := s.server.Shutdown(stopCtx)
@@ -155,6 +161,17 @@ type WebSocketServiceOptions struct {
 	Config  websocket.ServerConfig
 	Path    string
 	Handler websocket.Handler
+	// Router, when set and Handler is nil, becomes the service handler
+	// (envelope dispatch by action).
+	Router *websocket.Router
+	// Rooms, when set, is kept in sync with connection lifecycles
+	// (rooms.Observer composed into the server observer) and closed on stop.
+	Rooms *websocket.RoomManager
+	// Manager, when provided, is used for connection tracking and broadcast
+	// instead of an internally created one. The factory registers every
+	// connection on entry and closes all live connections before the HTTP
+	// listener stops.
+	Manager *websocket.Manager
 }
 
 // APIGatewayServiceOptions controls api-gateway service registration.
@@ -169,25 +186,25 @@ func (b *Bootstrap) RegisterDefaultServiceFactories() error {
 	if err := b.RegisterServiceFactory(ServiceAPIGateway, func(boot *Bootstrap) (ManagedService, error) {
 		cfg := gateway.DefaultConfig()
 		cfg.Host = boot.config.Server.HTTP.Host
-		cfg.Port = boot.config.Server.HTTP.Port
+		cfg.Port = boot.resolveGatewayPort()
 		cfg.ReadTimeout = boot.config.Server.HTTP.ReadTimeout
 		cfg.WriteTimeout = boot.config.Server.HTTP.WriteTimeout
 		cfg.IdleTimeout = boot.config.Server.HTTP.IdleTimeout
-		cfg.CORS.AllowedOrigins = boot.config.Security.CORS.AllowOrigins
-		cfg.CORS.AllowedMethods = boot.config.Security.CORS.AllowMethods
-		cfg.CORS.AllowedHeaders = boot.config.Security.CORS.AllowHeaders
-		cfg.CORS.AllowCredentials = boot.config.Security.CORS.AllowCredentials
-		cfg.RateLimit.Enabled = boot.config.Security.RateLimit.Enabled
-		cfg.RateLimit.Requests = boot.config.Security.RateLimit.Limit
-		cfg.RateLimit.Window = boot.config.Security.RateLimit.Window.String()
-		cfg.Discovery.Type = boot.config.Discovery.Type
-		if boot.config.Discovery.Address != "" {
-			cfg.Discovery.Endpoints = []string{boot.config.Discovery.Address}
+		cfg.CORS.AllowedOrigins = boot.pluginConfig.Security.CORS.AllowOrigins
+		cfg.CORS.AllowedMethods = boot.pluginConfig.Security.CORS.AllowMethods
+		cfg.CORS.AllowedHeaders = boot.pluginConfig.Security.CORS.AllowHeaders
+		cfg.CORS.AllowCredentials = boot.pluginConfig.Security.CORS.AllowCredentials
+		cfg.RateLimit.Enabled = boot.pluginConfig.Security.RateLimit.Enabled
+		cfg.RateLimit.Requests = boot.pluginConfig.Security.RateLimit.Limit
+		cfg.RateLimit.Window = boot.pluginConfig.Security.RateLimit.Window.String()
+		cfg.Discovery.Type = boot.pluginConfig.Discovery.Type
+		if boot.pluginConfig.Discovery.Address != "" {
+			cfg.Discovery.Endpoints = []string{boot.pluginConfig.Discovery.Address}
 		}
-		cfg.Discovery.Namespace = firstNonEmpty(boot.config.Discovery.Config["namespace"], "default")
-		cfg.Discovery.Timeout = boot.config.Discovery.Timeout
+		cfg.Discovery.Namespace = firstNonEmpty(boot.pluginConfig.Discovery.Config["namespace"], "default")
+		cfg.Discovery.Timeout = boot.pluginConfig.Discovery.Timeout
 
-		service := &managedAPIGatewayService{name: ServiceAPIGateway, config: cfg}
+		service := &managedAPIGatewayService{name: ServiceAPIGateway, config: cfg, stopTimeout: boot.shutdownTimeoutOrDefault()}
 		return &managedServiceAdapter{
 			name: ServiceAPIGateway,
 			startFn: func(ctx context.Context) error {
@@ -196,8 +213,8 @@ func (b *Bootstrap) RegisterDefaultServiceFactories() error {
 				}
 				if service.httpService != nil {
 					boot.gateway = service.httpService.Gateway()
-					boot.setDependency("gateway", boot.gateway)
-					boot.setDependency("gateway.http_service", service.httpService)
+					boot.setDependency(DepGateway, boot.gateway)
+					boot.setDependency(DepGatewayHTTPService, service.httpService)
 				}
 				return nil
 			},
@@ -254,6 +271,9 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 		path = "/ws"
 	}
 	handler := options.Handler
+	if handler == nil && options.Router != nil {
+		handler = options.Router.Handler()
+	}
 	if handler == nil {
 		handler = func(ctx context.Context, conn *websocket.Conn) {
 			for {
@@ -270,17 +290,31 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 			}
 		}
 	}
+	// 房间与连接生命周期同步:Observer 链上追加 rooms.Observer。
+	if options.Rooms != nil {
+		cfg.Observer = websocket.NewCompositeObserver(cfg.Observer, options.Rooms.Observer())
+	}
 
 	return b.RegisterServiceFactory(name, func(boot *Bootstrap) (ManagedService, error) {
+		mgr := options.Manager
+		if mgr == nil {
+			mgr = websocket.NewManager()
+		}
 		return &managedServiceAdapter{
 			name: name,
 			startFn: func(ctx context.Context) error {
 				_ = ctx
 				if boot.websocketServer == nil {
 					server := websocket.NewServer(cfg)
-					server.Handle(path, handler)
+					server.Handle(path, func(hctx context.Context, conn *websocket.Conn) {
+						mgr.Register(conn)
+						defer mgr.Unregister(conn)
+						handler(hctx, conn)
+					})
 					boot.websocketServer = server
-					boot.setDependency("websocket.server", server)
+					boot.setDependency(DepWebSocketServer, server)
+					boot.websocketManager = mgr
+					boot.setDependency(DepWebSocketManager, mgr)
 				}
 				return boot.websocketServer.Start()
 			},
@@ -288,6 +322,13 @@ func (b *Bootstrap) RegisterWebSocketServiceFactory(options WebSocketServiceOpti
 				if boot.websocketServer == nil {
 					return nil
 				}
+				// 房间管理器随服务停止(空房回收 janitor)。
+				if options.Rooms != nil {
+					options.Rooms.Close()
+				}
+				// Drain live websocket connections first: http.Server.Shutdown
+				// cannot close hijacked websocket connections by itself.
+				_ = mgr.CloseAll()
 				if ctx == nil {
 					stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
@@ -316,6 +357,25 @@ func (b *Bootstrap) RegisterServiceFactory(name string, factory ServiceFactory) 
 	b.serviceFactories[name] = factory
 	b.serviceOrder = append(b.serviceOrder, name)
 	return nil
+}
+
+// RegisterServiceDependencies declares the dependency-container keys a managed
+// service needs; ValidateDependencyCoverage checks them when the service is
+// requested. Built-in services fall back to their historical requirements.
+func (b *Bootstrap) RegisterServiceDependencies(name string, keys ...string) {
+	b.serviceMu.Lock()
+	defer b.serviceMu.Unlock()
+	if b.serviceDeps == nil {
+		b.serviceDeps = make(map[string][]string)
+	}
+	b.serviceDeps[name] = append([]string(nil), keys...)
+}
+
+func (b *Bootstrap) serviceDependencies(name string) ([]string, bool) {
+	b.serviceMu.RLock()
+	defer b.serviceMu.RUnlock()
+	keys, ok := b.serviceDeps[name]
+	return keys, ok
 }
 
 // StartServices builds and starts managed services in registration order.
@@ -399,4 +459,3 @@ func (b *Bootstrap) getManagedService(name string) (ManagedService, bool) {
 	svc, exists := b.managedServices[name]
 	return svc, exists
 }
-

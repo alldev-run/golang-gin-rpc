@@ -1,0 +1,181 @@
+package middleware
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strings"
+	"time"
+
+	"github.com/alldev-run/golang-gin-rpc/pkg/panicx"
+	"github.com/alldev-run/golang-gin-rpc/pkg/response"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+)
+
+// Recovery creates a recovery middleware that recovers from any panics
+func Recovery(config ...RecoveryConfig) gin.HandlerFunc {
+	var cfg RecoveryConfig
+	if len(config) > 0 {
+		cfg = config[0]
+	} else {
+		cfg = DefaultRecoveryConfig()
+	}
+	if cfg.Logger == nil {
+		cfg.Logger = defaultLogger
+	}
+
+	return func(c *gin.Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Log the panic
+				cfg.Logger(c, err)
+
+				// Return error response
+				response.Error(c, "Internal server error", map[string]interface{}{
+					"error": fmt.Sprintf("%v", err),
+					"time":  time.Now().Unix(),
+				})
+				c.Abort()
+			}
+		}()
+
+		if cfg.LogAllRequests {
+			logRequest(c, cfg.RequestBodyLimit)
+		}
+
+		c.Next()
+	}
+}
+
+// defaultLogger is the default logger function
+func defaultLogger(c *gin.Context, err interface{}) {
+	// Get request information
+	method := c.Request.Method
+	path := c.Request.URL.Path
+	ip := c.ClientIP()
+	userAgent := c.Request.UserAgent()
+
+	// Get user information if available
+	var userID string
+	if uid, exists := c.Get("user_id"); exists {
+		userID = uid.(string)
+	}
+
+	// Get request ID if available
+	var requestID string
+	if rid, exists := c.Get("request_id"); exists {
+		requestID = rid.(string)
+	}
+
+	// Log the panic with context
+	pluginLogger().Error("Panic recovered",
+		zap.String("error", panicx.ErrorString(err)),
+		zap.String("method", method),
+		zap.String("path", path),
+		zap.String("ip", ip),
+		zap.String("user_agent", userAgent),
+		zap.String("user_id", userID),
+		zap.String("request_id", requestID),
+		zap.String("stack", panicx.Stack()),
+	)
+}
+
+// logRequest logs the request details
+func logRequest(c *gin.Context, bodyLimit int64) {
+	start := time.Now()
+
+	// Read request body if it exists
+	var body []byte
+	if c.Request.Body != nil {
+		// Skip reading binary stream types to avoid breaking upload parsing
+		contentType := c.Request.Header.Get("Content-Type")
+		isBinaryStream := contentType == "" ||
+			strings.HasPrefix(contentType, "multipart/form-data") ||
+			strings.HasPrefix(contentType, "application/octet-stream") ||
+			strings.HasPrefix(contentType, "application/pdf") ||
+			strings.HasPrefix(contentType, "image/") ||
+			strings.HasPrefix(contentType, "video/") ||
+			strings.HasPrefix(contentType, "audio/")
+		if !isBinaryStream {
+			var copied bytes.Buffer
+			teeReader := io.TeeReader(c.Request.Body, &copied)
+			body, _ = io.ReadAll(io.LimitReader(teeReader, bodyLimit))
+			c.Request.Body = io.NopCloser(io.MultiReader(bytes.NewReader(copied.Bytes()), c.Request.Body))
+		}
+	}
+
+	c.Next()
+
+	// Log response details
+	duration := time.Since(start)
+	statusCode := c.Writer.Status()
+
+	pluginLogger().Info("Request completed",
+		zap.String("method", c.Request.Method),
+		zap.String("path", c.Request.URL.Path),
+		zap.Int("status", statusCode),
+		zap.Duration("duration", duration),
+		zap.String("ip", c.ClientIP()),
+		zap.String("user_agent", c.Request.UserAgent()),
+		zap.ByteString("request_body", body),
+		zap.Int("response_size", c.Writer.Size()),
+	)
+}
+
+// RecoveryWithLogger creates a recovery middleware with a custom logger
+func RecoveryWithLogger(loggerFunc func(c *gin.Context, err interface{})) gin.HandlerFunc {
+	config := DefaultRecoveryConfig()
+	config.Logger = loggerFunc
+	return Recovery(config)
+}
+
+// RecoveryWithRequestLogging creates a recovery middleware that logs all requests
+func RecoveryWithRequestLogging(bodyLimit int64) gin.HandlerFunc {
+	config := DefaultRecoveryConfig()
+	config.LogAllRequests = true
+	config.RequestBodyLimit = bodyLimit
+	return Recovery(config)
+}
+
+// HandlePanic is a helper function to handle panics in goroutines
+func HandlePanic(operation string) {
+	if err := recover(); err != nil {
+		pluginLogger().Error("Panic in goroutine",
+			zap.String("operation", operation),
+			zap.String("error", panicx.ErrorString(err)),
+			zap.String("stack", panicx.Stack()),
+		)
+	}
+}
+
+// SafeGo runs a function in a goroutine with panic recovery
+func SafeGo(fn func()) {
+	go func() {
+		defer HandlePanic("goroutine")
+		fn()
+	}()
+}
+
+// ErrorHandler is a custom error handler that can be used with gin.Error()
+func ErrorHandler(c *gin.Context, err error) {
+	pluginLogger().Error("Request error",
+		zap.String("error", err.Error()),
+		zap.String("method", c.Request.Method),
+		zap.String("path", c.Request.URL.Path),
+		zap.String("ip", c.ClientIP()),
+	)
+
+	response.Error(c, err.Error(), nil)
+}
+
+// ErrorHandlerWithStatus creates an error handler with custom status code
+func ErrorHandlerWithStatus(statusCode int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(statusCode, gin.H{
+			"error": "Internal server error",
+			"code":  "INTERNAL_ERROR",
+		})
+	}
+}

@@ -44,7 +44,7 @@ func GetServiceLoggerInstance(serviceName string, config ServiceLoggerConfig) *z
 func createServiceLogger(serviceName string, config ServiceLoggerConfig) *zap.Logger {
 	// Build final configuration
 	var finalConfig Config
-	if config.InheritGlobalConfig && defaultL != nil {
+	if config.InheritGlobalConfig && defaultL.Load() != nil {
 		// Use global config as base
 		finalConfig = DefaultConfig() // We'll improve this later
 	} else {
@@ -123,7 +123,6 @@ func createServiceLogger(serviceName string, config ServiceLoggerConfig) *zap.Lo
 
 	// Create logger with options
 	options := []zap.Option{
-		zap.AddCallerSkip(1),
 		zap.AddCaller(),
 	}
 
@@ -164,10 +163,10 @@ func createServiceFileCores(serviceName string, serviceConfig ServiceLoggerConfi
 	if serviceConfig.SeparateByLevel {
 		// Create separate files for different levels
 		levelConfigs := []struct {
-			level      string
-			zapLevel   zapcore.Level
-			suffix     string
-			shouldLog  bool
+			level     string
+			zapLevel  zapcore.Level
+			suffix    string
+			shouldLog bool
 		}{
 			{"debug", zapcore.DebugLevel, "debug", level <= zapcore.DebugLevel},
 			{"info", zapcore.InfoLevel, "info", level <= zapcore.InfoLevel},

@@ -7,12 +7,12 @@ import (
 )
 
 type Config struct {
-	AllowedOrigins   []string
-	AllowedMethods   []string
-	AllowedHeaders   []string
-	ExposedHeaders   []string
-	AllowCredentials bool
-	MaxAge           int
+	AllowedOrigins     []string
+	AllowedMethods     []string
+	AllowedHeaders     []string
+	ExposedHeaders     []string
+	AllowCredentials   bool
+	MaxAge             int
 	OptionsPassthrough bool
 }
 

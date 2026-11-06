@@ -9,14 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/upload"
 	"gopkg.in/yaml.v3"
 )
 
-// Loader handles configuration loading from multiple sources
+// Loader handles configuration loading from multiple sources.
+// 它同时满足 kernel.ConfigSource（UnmarshalSection），供插件读取各自原始配置段。
 type Loader struct {
 	mu       sync.RWMutex
 	config   *GlobalConfig
+	raw      *yaml.Node // 原始 yaml 文档，供插件按段反序列化
 	watchers []func(*GlobalConfig)
 }
 
@@ -34,35 +35,11 @@ type GlobalConfig struct {
 	// Database configs
 	Database DatabaseConfig `yaml:"database" json:"database"`
 
-	// Redis cache configs
-	Redis RedisConfig `yaml:"redis" json:"redis"`
-
-	// RPC configs
-	RPC RPCConfig `yaml:"rpc" json:"rpc"`
-
-	// Service discovery
-	Discovery DiscoveryConfig `yaml:"discovery" json:"discovery"`
-
-	// Message queue
-	Messaging MessagingConfig `yaml:"messaging" json:"messaging"`
-
 	// Observability
 	Observability ObservabilityConfig `yaml:"observability" json:"observability"`
 
 	// Logger configuration (for service-level logging)
 	Logger LoggerConfig `yaml:"logger" json:"logger"`
-
-	// Security
-	Security SecurityConfig `yaml:"security" json:"security"`
-
-	// Upload service configuration
-	Upload UploadConfig `yaml:"upload" json:"upload"`
-}
-
-// UploadConfig wraps upload configuration with enabled flag
-type UploadConfig struct {
-	Enabled bool          `yaml:"enabled" json:"enabled"`
-	Config  upload.Config `yaml:",inline" json:",inline"`
 }
 
 // AppConfig application basic configuration
@@ -75,23 +52,18 @@ type AppConfig struct {
 }
 
 // FrameworkConfig controls bootstrap-managed dependency and service composition.
+// 组件插件开关由顶层 plugins.<name>.enabled 段驱动（v0.2 起不再支持
+// framework.init_* 兼容键）。
 type FrameworkConfig struct {
-	InitDatabases              bool     `yaml:"init_databases" json:"init_databases"`
-	InitCache                  bool     `yaml:"init_cache" json:"init_cache"`
-	InitDiscovery              bool     `yaml:"init_discovery" json:"init_discovery"`
-	InitTracing                bool     `yaml:"init_tracing" json:"init_tracing"`
-	InitAuth                   bool     `yaml:"init_auth" json:"init_auth"`
-	InitMetrics                bool     `yaml:"init_metrics" json:"init_metrics"`
-	InitHealth                 bool     `yaml:"init_health" json:"init_health"`
-	InitErrors                 bool     `yaml:"init_errors" json:"init_errors"`
 	ValidateDependencyCoverage bool     `yaml:"validate_dependency_coverage" json:"validate_dependency_coverage"`
 	Services                   []string `yaml:"services" json:"services"`
 }
 
 // ServerConfig server configuration
 type ServerConfig struct {
-	HTTP HTTPConfig `yaml:"http" json:"http"`
-	GRPC GRPCConfig `yaml:"grpc" json:"grpc"`
+	HTTP            HTTPConfig    `yaml:"http" json:"http"`
+	GRPC            GRPCConfig    `yaml:"grpc" json:"grpc"`
+	ShutdownTimeout time.Duration `yaml:"shutdown_timeout" json:"shutdown_timeout"`
 }
 
 // HTTPConfig HTTP server configuration
@@ -154,70 +126,6 @@ type DBPoolConfig struct {
 	ConnMaxIdleTime time.Duration `yaml:"conn_max_idle_time" json:"conn_max_idle_time"`
 }
 
-// RedisConfig Redis configuration
-type RedisConfig struct {
-	Mode         string      `yaml:"mode" json:"mode"`
-	Host         string      `yaml:"host" json:"host"`
-	Port         int         `yaml:"port" json:"port"`
-	Password     string      `yaml:"password" json:"password"`
-	Database     int         `yaml:"database" json:"database"`
-	PoolSize     int         `yaml:"pool_size" json:"pool_size"`
-	MinIdleConns int         `yaml:"min_idle_conns" json:"min_idle_conns"`
-	Nodes        []RedisNode `yaml:"nodes" json:"nodes"`
-}
-
-// RedisNode Redis cluster/sentinel node
-type RedisNode struct {
-	Host     string `yaml:"host" json:"host"`
-	Port     int    `yaml:"port" json:"port"`
-	Password string `yaml:"password" json:"password"`
-	Database int    `yaml:"database" json:"database"`
-	IsMaster bool   `yaml:"is_master" json:"is_master"`
-}
-
-// RPCConfig RPC configuration
-type RPCConfig struct {
-	Enabled     bool           `yaml:"enabled" json:"enabled"`
-	Protocol    string         `yaml:"protocol" json:"protocol"`
-	Degradation DegradationCfg `yaml:"degradation" json:"degradation"`
-}
-
-// DegradationCfg RPC degradation configuration
-type DegradationCfg struct {
-	Enabled              bool          `yaml:"enabled" json:"enabled"`
-	Level                string        `yaml:"level" json:"level"`
-	AutoDetect           bool          `yaml:"auto_detect" json:"auto_detect"`
-	CPUThreshold         float64       `yaml:"cpu_threshold" json:"cpu_threshold"`
-	MemoryThreshold      float64       `yaml:"memory_threshold" json:"memory_threshold"`
-	ErrorRateThreshold   float64       `yaml:"error_rate_threshold" json:"error_rate_threshold"`
-	LatencyThreshold     time.Duration `yaml:"latency_threshold" json:"latency_threshold"`
-	EnableCircuitBreaker bool          `yaml:"enable_circuit_breaker" json:"enable_circuit_breaker"`
-}
-
-// DiscoveryConfig service discovery configuration
-type DiscoveryConfig struct {
-	Enabled bool              `yaml:"enabled" json:"enabled"`
-	Type    string            `yaml:"type" json:"type"`
-	Address string            `yaml:"address" json:"address"`
-	Timeout time.Duration     `yaml:"timeout" json:"timeout"`
-	Config  map[string]string `yaml:"config" json:"config"`
-}
-
-// MessagingConfig message queue configuration
-type MessagingConfig struct {
-	Enabled bool         `yaml:"enabled" json:"enabled"`
-	Type    string       `yaml:"type" json:"type"`
-	Broker  BrokerConfig `yaml:"broker" json:"broker"`
-}
-
-// BrokerConfig message broker configuration
-type BrokerConfig struct {
-	Host     string `yaml:"host" json:"host"`
-	Port     int    `yaml:"port" json:"port"`
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
-}
-
 // ObservabilityConfig observability configuration
 type ObservabilityConfig struct {
 	Metrics  MetricsConfig  `yaml:"metrics" json:"metrics"`
@@ -228,10 +136,11 @@ type ObservabilityConfig struct {
 
 // MetricsConfig metrics configuration
 type MetricsConfig struct {
-	Enabled   bool   `yaml:"enabled" json:"enabled"`
-	Type      string `yaml:"type" json:"type"`
-	Endpoint  string `yaml:"endpoint" json:"endpoint"`
-	Namespace string `yaml:"namespace" json:"namespace"`
+	Enabled    bool   `yaml:"enabled" json:"enabled"`
+	Type       string `yaml:"type" json:"type"`
+	Endpoint   string `yaml:"endpoint" json:"endpoint"`
+	ListenAddr string `yaml:"listen_addr" json:"listen_addr"`
+	Namespace  string `yaml:"namespace" json:"namespace"`
 }
 
 // TracingConfig tracing configuration
@@ -372,46 +281,6 @@ type AlertChannel struct {
 	Config map[string]string `yaml:"config" json:"config"`
 }
 
-// SecurityConfig security configuration
-type SecurityConfig struct {
-	JWT       JWTConfig       `yaml:"jwt" json:"jwt"`
-	APIKey    APIKeyConfig    `yaml:"api_key" json:"api_key"`
-	CORS      CORSConfig      `yaml:"cors" json:"cors"`
-	RateLimit RateLimitConfig `yaml:"rate_limit" json:"rate_limit"`
-}
-
-// JWTConfig JWT configuration
-type JWTConfig struct {
-	Enabled    bool          `yaml:"enabled" json:"enabled"`
-	Secret     string        `yaml:"secret" json:"secret"`
-	Algorithm  string        `yaml:"algorithm" json:"algorithm"`
-	Expiration time.Duration `yaml:"expiration" json:"expiration"`
-}
-
-// APIKeyConfig API key configuration
-type APIKeyConfig struct {
-	Enabled    bool     `yaml:"enabled" json:"enabled"`
-	Keys       []string `yaml:"keys" json:"keys"`
-	HeaderName string   `yaml:"header_name" json:"header_name"`
-}
-
-// CORSConfig CORS configuration
-type CORSConfig struct {
-	Enabled          bool     `yaml:"enabled" json:"enabled"`
-	AllowOrigins     []string `yaml:"allow_origins" json:"allow_origins"`
-	AllowMethods     []string `yaml:"allow_methods" json:"allow_methods"`
-	AllowHeaders     []string `yaml:"allow_headers" json:"allow_headers"`
-	AllowCredentials bool     `yaml:"allow_credentials" json:"allow_credentials"`
-}
-
-// RateLimitConfig rate limiting configuration
-type RateLimitConfig struct {
-	Enabled bool          `yaml:"enabled" json:"enabled"`
-	Type    string        `yaml:"type" json:"type"`
-	Limit   int           `yaml:"limit" json:"limit"`
-	Window  time.Duration `yaml:"window" json:"window"`
-}
-
 // NewLoader creates a new configuration loader
 func NewLoader() *Loader {
 	return &Loader{
@@ -430,9 +299,19 @@ func (l *Loader) Load(path string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// 保留原始文档，供 UnmarshalSection 按段读取（插件自带配置结构体）。
+	var raw yaml.Node
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("failed to parse config: %w", err)
+	}
+	l.raw = &raw
+
 	if err := yaml.Unmarshal(data, l.config); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
+
+	// 兼容旧版扁平 server 段（host/port 直接位于 server 下）：映射到 server.http。
+	l.normalizeFlatServer()
 
 	// Apply environment variable overrides
 	l.applyEnvOverrides(l.config)
@@ -443,6 +322,35 @@ func (l *Loader) Load(path string) error {
 	}
 
 	return nil
+}
+
+// UnmarshalSection 将顶层 yaml 段 name 反序列化到 out。
+// 段不存在时返回 (false, nil)。满足 kernel.ConfigSource 接口。
+func (l *Loader) UnmarshalSection(name string, out any) (bool, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.unmarshalSectionLocked(name, out)
+}
+
+// unmarshalSectionLocked 是 UnmarshalSection 的无锁版本，供已持有
+// l.mu（如 Load 内部）的调用方复用，避免 RWMutex 不可重入导致死锁。
+func (l *Loader) unmarshalSectionLocked(name string, out any) (bool, error) {
+	if l.raw == nil || l.raw.Kind != yaml.DocumentNode || len(l.raw.Content) == 0 {
+		return false, nil
+	}
+	root := l.raw.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return false, nil
+	}
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		if root.Content[i].Value == name {
+			if err := root.Content[i+1].Decode(out); err != nil {
+				return true, fmt.Errorf("failed to decode config section %q: %w", name, err)
+			}
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Get returns the current configuration
@@ -477,7 +385,7 @@ func (l *Loader) notifyWatchers() {
 // applyEnvOverrides applies environment variable overrides to config
 func (l *Loader) applyEnvOverrides(config interface{}) {
 	v := reflect.ValueOf(config)
-	if v.Kind() != reflect.Ptr || v.IsNil() {
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return
 	}
 
@@ -536,6 +444,37 @@ func (l *Loader) setFieldValue(field reflect.Value, value string) {
 	}
 }
 
+// normalizeFlatServer 兼容旧版扁平 server 段：host/port 直接位于 server: 下时
+// 覆盖到 Server.HTTP（默认值由 DefaultConfig 预填，扁平段的存在即视为显式配置）。
+// 存在 server.http 段时以 server.http 为准，本函数不覆盖。
+func (l *Loader) normalizeFlatServer() {
+	var sec struct {
+		Host string      `yaml:"host"`
+		Port interface{} `yaml:"port"` // 兼容 int 与带引号字符串两种写法
+		HTTP *struct {
+			Host string `yaml:"host"`
+			Port int    `yaml:"port"`
+		} `yaml:"http"`
+	}
+	ok, err := l.unmarshalSectionLocked("server", &sec)
+	if err != nil || !ok || sec.HTTP != nil {
+		return
+	}
+	if sec.Host != "" {
+		l.config.Server.HTTP.Host = sec.Host
+	}
+	if sec.Port != nil {
+		switch v := sec.Port.(type) {
+		case int:
+			l.config.Server.HTTP.Port = v
+		case string:
+			if p, convErr := strconv.Atoi(v); convErr == nil {
+				l.config.Server.HTTP.Port = p
+			}
+		}
+	}
+}
+
 // validate validates the configuration
 func (l *Loader) validate() error {
 	config := l.config
@@ -571,18 +510,11 @@ func DefaultConfig() *GlobalConfig {
 			Labels:      map[string]string{},
 		},
 		Framework: FrameworkConfig{
-			InitDatabases:              true,
-			InitCache:                  true,
-			InitDiscovery:              true,
-			InitTracing:                true,
-			InitAuth:                   true,
-			InitMetrics:                true,
-			InitHealth:                 true,
-			InitErrors:                 true,
 			ValidateDependencyCoverage: true,
 			Services:                   []string{"rpc"},
 		},
 		Server: ServerConfig{
+			ShutdownTimeout: 30 * time.Second,
 			HTTP: HTTPConfig{
 				Enabled:        true,
 				Host:           "0.0.0.0",
@@ -617,36 +549,6 @@ func DefaultConfig() *GlobalConfig {
 				ConnMaxIdleTime: 10 * time.Minute,
 			},
 		},
-		Redis: RedisConfig{
-			Mode:         "single",
-			Host:         "localhost",
-			Port:         6379,
-			Database:     0,
-			PoolSize:     10,
-			MinIdleConns: 2,
-		},
-		RPC: RPCConfig{
-			Enabled:  true,
-			Protocol: "grpc",
-			Degradation: DegradationCfg{
-				Enabled:              true,
-				Level:                "normal",
-				AutoDetect:           true,
-				CPUThreshold:         80.0,
-				MemoryThreshold:      85.0,
-				ErrorRateThreshold:   50.0,
-				LatencyThreshold:     5 * time.Second,
-				EnableCircuitBreaker: true,
-			},
-		},
-		Discovery: DiscoveryConfig{
-			Enabled: false,
-			Type:    "consul",
-		},
-		Messaging: MessagingConfig{
-			Enabled: false,
-			Type:    "kafka",
-		},
 		Observability: ObservabilityConfig{
 			Metrics: MetricsConfig{
 				Enabled:   true,
@@ -668,26 +570,6 @@ func DefaultConfig() *GlobalConfig {
 			},
 			Alerting: AlertingConfig{
 				Enabled: false,
-			},
-		},
-		Security: SecurityConfig{
-			JWT: JWTConfig{
-				Enabled:    false,
-				Algorithm:  "HS256",
-				Expiration: 24 * time.Hour,
-			},
-			CORS: CORSConfig{
-				Enabled:          true,
-				AllowOrigins:     []string{"*"},
-				AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-				AllowHeaders:     []string{"*"},
-				AllowCredentials: false,
-			},
-			RateLimit: RateLimitConfig{
-				Enabled: false,
-				Type:    "token_bucket",
-				Limit:   100,
-				Window:  time.Minute,
 			},
 		},
 	}

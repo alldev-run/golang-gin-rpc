@@ -1,11 +1,11 @@
-
 package main
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+	"github.com/alldev-run/golang-gin-rpc/plugins/cache/ormcache"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 func main() {
@@ -77,11 +77,11 @@ func main() {
 
 	// Example 4: Failover cache with file cache
 	fmt.Println("\n=== Failover Cache with File Cache ===")
-	failoverConfig := orm.CacheConfig{
-		Type: orm.CacheTypeFailover,
-		FallbackOrder: []orm.CacheType{
-			orm.CacheTypeFile,    // Primary: File cache
-			orm.CacheTypeMemory,   // Secondary: Memory cache
+	failoverConfig := ormcache.CacheConfig{
+		Type: ormcache.CacheTypeFailover,
+		FallbackOrder: []ormcache.CacheType{
+			orm.CacheTypeFile,   // Primary: File cache
+			orm.CacheTypeMemory, // Secondary: Memory cache
 		},
 		FileConfig: &orm.FileCacheConfig{
 			Directory:       "/tmp/failover_cache",
@@ -91,7 +91,7 @@ func main() {
 		},
 	}
 
-	failoverCache, err := orm.NewCacheFromConfig(failoverConfig)
+	failoverCache, err := ormcache.NewCacheFromConfig(failoverConfig)
 	if err != nil {
 		fmt.Printf("Error creating failover cache: %v\n", err)
 		return

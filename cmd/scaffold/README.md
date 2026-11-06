@@ -50,8 +50,8 @@ go run .\api\my-gateway
 模板解析优先级如下：
 
 1. `SCAFFOLD_TEMPLATE_DIR` 环境变量指定目录
-2. 当前项目内 `./pkg/gateway/templates/<template>`
-3. 已下载模块缓存中的 `github.com/alldev-run/golang-gin-rpc/pkg/gateway/templates/<template>`
+2. 当前项目内 `./plugins/gateway/templates/<template>`
+3. 已下载模块缓存中的 `github.com/alldev-run/golang-gin-rpc/plugins/gateway/templates/<template>`
 
 可选：强制使用本地模板目录
 
@@ -60,11 +60,44 @@ export SCAFFOLD_TEMPLATE_DIR=/path/to/templates
 scaffold create-api --name my-gateway --template http-gateway
 ```
 
+## 初始化应用（推荐入口）
+
+`scaffold init` 一条命令生成最小可运行的应用骨架，并按需选择组件：
+
+```bash
+# 交互选单(回车=默认组件集)
+go run ./cmd/scaffold init --name my-app
+
+# 非交互,直接指定组件(编号或名称,逗号分隔)
+go run ./cmd/scaffold init --name my-app --components api-gateway,db,cache,metrics --port 8080
+
+# make 等价
+make init NAME=my-app COMPONENTS=api-gateway,db,cache
+```
+
+可选组件(9 内核组件 + 3 托管服务):
+
+| 类型 | 组件 |
+|---|---|
+| 服务 | `api-gateway`(HTTP 网关)、`rpc`(gRPC/JSON-RPC)、`websocket` |
+| 组件 | `db`、`cache`、`discovery`、`tracing`、`auth`、`metrics`、`health`、`errors`、`upload` |
+
+生成物 `api/<name>/`:
+
+```text
+api/<name>/
+├── main.go            # 极简装配:NewBootstrap → StartFramework → 信号等待 → StopFramework
+├── README.md          # 运行说明
+└── config/config.yaml # plugins.* 开关 + framework.services + 所选组件的配置段
+```
+
+组件选择同时落到两处:`plugins.<name>.enabled` 开关与 `framework.services` 服务列表;选 `db`/`cache` 等组件时还会生成对应配置段(数据库/Redis 连接信息按需修改)。未选组件不参与链接与运行。
+
 ## 生成 API 项目
 
 模板目录位于：
 
-- `pkg/gateway/templates/<template>/`
+- `plugins/gateway/templates/<template>/`
 
 在仓库根目录执行：
 
@@ -75,7 +108,7 @@ go run ./cmd/scaffold create-api --name <new-api> --template <template>
 示例（Windows PowerShell）：
 
 ```powershell
-# 从 pkg/gateway/templates/http-gateway 生成 api/demo-api
+# 从 plugins/gateway/templates/http-gateway 生成 api/demo-api
 go run .\cmd\scaffold create-api --name demo-api --template http-gateway
 
 # 启动生成的项目
@@ -95,7 +128,7 @@ go run ./cmd/scaffold export-template --name <api-name> --template <template>
 示例（Windows PowerShell）：
 
 ```powershell
-# 将 api/demo-api 导出回 pkg/gateway/templates/http-gateway
+# 将 api/demo-api 导出回 plugins/gateway/templates/http-gateway
 # 其中 *.go 会导出为 *.go.gotmpl，并自动注入 token
 go run .\cmd\scaffold export-template --name demo-api --template http-gateway
 ```

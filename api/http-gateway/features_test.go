@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/gateway"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway"
 )
 
 func TestHTTPGatewayConfig(t *testing.T) {
 	// 测试默认配置
 	config := gateway.DefaultConfig()
-	
+
 	// 验证日志配置
 	if config.Logging.Level != "info" {
 		t.Errorf("Expected log level 'info', got '%s'", config.Logging.Level)
@@ -18,7 +18,7 @@ func TestHTTPGatewayConfig(t *testing.T) {
 	if config.Logging.Format != "json" {
 		t.Errorf("Expected log format 'json', got '%s'", config.Logging.Format)
 	}
-	
+
 	// 验证追踪配置
 	if config.Tracing == nil {
 		t.Error("Tracing config should not be nil")
@@ -27,7 +27,7 @@ func TestHTTPGatewayConfig(t *testing.T) {
 			t.Errorf("Expected tracing type 'jaeger', got '%s'", config.Tracing.Type)
 		}
 	}
-	
+
 	// 验证协议配置
 	if !config.Protocols.HTTP {
 		t.Error("HTTP protocol should be enabled")
@@ -41,12 +41,12 @@ func TestHTTPGatewayConfig(t *testing.T) {
 	if config.Protocols.JSONRPC {
 		t.Error("JSON-RPC protocol should be disabled by default")
 	}
-	
+
 	fmt.Printf("✅ HTTP Gateway 配置验证通过\n")
 	fmt.Printf("   - 日志级别: %s\n", config.Logging.Level)
 	fmt.Printf("   - 日志格式: %s\n", config.Logging.Format)
 	fmt.Printf("   - 追踪类型: %s\n", config.Tracing.Type)
-	fmt.Printf("   - 启用协议: HTTP=%v, HTTP2=%v, gRPC=%v, JSON-RPC=%v\n", 
+	fmt.Printf("   - 启用协议: HTTP=%v, HTTP2=%v, gRPC=%v, JSON-RPC=%v\n",
 		config.Protocols.HTTP, config.Protocols.HTTP2, config.Protocols.GRPC, config.Protocols.JSONRPC)
 }
 
@@ -58,7 +58,7 @@ func TestHTTPGatewayFeatures(t *testing.T) {
 	config.Protocols.JSONRPC = true
 	config.Logging.Level = "debug"
 	config.Logging.Format = "console"
-	
+
 	// 验证配置更新
 	if !config.Tracing.Enabled {
 		t.Error("Tracing should be enabled")
@@ -69,7 +69,7 @@ func TestHTTPGatewayFeatures(t *testing.T) {
 	if !config.Protocols.JSONRPC {
 		t.Error("JSON-RPC protocol should be enabled")
 	}
-	
+
 	fmt.Printf("✅ HTTP Gateway 功能验证通过\n")
 	fmt.Printf("   - 追踪启用: %v\n", config.Tracing.Enabled)
 	fmt.Printf("   - gRPC 启用: %v\n", config.Protocols.GRPC)
@@ -79,7 +79,7 @@ func TestHTTPGatewayFeatures(t *testing.T) {
 
 func TestProtocolSupport(t *testing.T) {
 	config := gateway.DefaultConfig()
-	
+
 	// 测试协议配置
 	protocols := []struct {
 		name     string
@@ -91,13 +91,13 @@ func TestProtocolSupport(t *testing.T) {
 		{"gRPC", config.Protocols.GRPC, false},
 		{"JSON-RPC", config.Protocols.JSONRPC, false},
 	}
-	
+
 	for _, p := range protocols {
 		if p.enabled != p.expected {
 			t.Errorf("Protocol %s: expected %v, got %v", p.name, p.expected, p.enabled)
 		}
 	}
-	
+
 	fmt.Printf("✅ 协议支持验证通过\n")
 	for _, p := range protocols {
 		status := "禁用"
@@ -110,12 +110,12 @@ func TestProtocolSupport(t *testing.T) {
 
 func TestTracingIntegration(t *testing.T) {
 	config := gateway.DefaultConfig()
-	
+
 	// 启用追踪
 	config.Tracing.Enabled = true
 	config.Tracing.Type = "zipkin"
 	config.Tracing.SampleRate = 0.1
-	
+
 	// 验证追踪配置
 	if !config.Tracing.Enabled {
 		t.Error("Tracing should be enabled")
@@ -126,7 +126,7 @@ func TestTracingIntegration(t *testing.T) {
 	if config.Tracing.SampleRate != 0.1 {
 		t.Errorf("Expected sample rate 0.1, got %f", config.Tracing.SampleRate)
 	}
-	
+
 	fmt.Printf("✅ 追踪集成验证通过\n")
 	fmt.Printf("   - 追踪类型: %s\n", config.Tracing.Type)
 	fmt.Printf("   - 采样率: %.1f\n", config.Tracing.SampleRate)

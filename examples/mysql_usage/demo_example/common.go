@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/mysql"
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/mysql"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 // User 用户模型 - 统一使用 int64 ID

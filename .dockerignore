@@ -1,0 +1,13 @@
+.git
+**/.git
+bin/
+**/bin/
+scaffold
+*.log
+**/logs/
+tmp/
+**/tmp/
+coverage.out
+**/coverage.out
+coverage.html
+**/coverage.html

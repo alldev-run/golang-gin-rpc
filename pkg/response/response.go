@@ -162,7 +162,7 @@ func NoContent(c *gin.Context) {
 // PagedResponse represents a paginated response
 type PagedResponse struct {
 	Response
-	 Pagination Pagination `json:"pagination"`
+	Pagination Pagination `json:"pagination"`
 }
 
 // Pagination contains pagination information

@@ -14,12 +14,13 @@ GOCLEAN = $(GOCMD) clean
 GOTEST = $(GOCMD) test
 GOGET = $(GOCMD) get
 GOMOD = $(GOCMD) mod
+GOVET = $(GOCMD) vet
 
 # Build variables
 BUILD_FLAGS = -v
 LDFLAGS = -ldflags "-X main.version=$(shell git describe --tags --always 2>/dev/null || echo 'dev')"
 
-.PHONY: help build run test clean deps fmt vet lint docker-build docker-run proto proto-tools
+.PHONY: help build run test clean deps fmt vet lint docker-build docker-run proto proto-tools test-coverage-plugins coverage-gate
 
 # Default target
 help: ## Show this help message
@@ -29,15 +30,18 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ''
 	@echo 'Scaffold:'
-	@echo '  make create-api NAME=<new-api> [TEMPLATE=http-gateway] (templates live in pkg/gateway/templates)'
-	@echo '  make export-template NAME=<api-name> [TEMPLATE=http-gateway] (sync api/<name> back into pkg/gateway/templates)'
+	@echo '  make init NAME=<app-name> [COMPONENTS=api-gateway,db,cache] [PORT=8080] (interactive when COMPONENTS omitted)'
+	@echo '  make create-api NAME=<new-api> [TEMPLATE=http-gateway] (templates live in plugins/gateway/templates)'
+	@echo '  make export-template NAME=<api-name> [TEMPLATE=http-gateway] (sync api/<name> back into plugins/gateway/templates)'
 
 # Build targets
-build: ## Build the application
+build: ## Build the application and all plugin modules
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME) .
-	@echo "Build completed: $(BUILD_DIR)/$(APP_NAME)"
+	@echo "Building core and plugin modules..."
+	@for d in pkg/ plugins/*/; do (cd $$d && $(GOBUILD) ./... >/dev/null) || exit 1; done
+	@echo "Build completed: $(BUILD_DIR)/$(APP_NAME) (+ `ls -d plugins/*/ | wc -l | tr -d ' '` plugin modules)"
 
 build-debug: ## Build the application with debug symbols
 	@echo "Building $(APP_NAME) in debug mode..."
@@ -66,6 +70,9 @@ fmt: ## Format Go code
 	@echo "Formatting Go code..."
 	$(GOCMD) fmt ./...
 
+vet-plugins: ## Run go vet on the core module and all plugin modules
+	@for d in pkg/ plugins/*/; do (cd $$d && $(GOVET) ./... ) || exit 1; done
+
 vet: ## Run go vet
 	@echo "Running go vet..."
 	$(GOCMD) vet ./...
@@ -78,15 +85,29 @@ lint: ## Run linter (requires golangci-lint)
 		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi
 
-test: ## Run tests
-	@echo "Running tests..."
-	$(GOTEST) -v ./...
+test: ## Run tests (root, core and plugin modules)
+	@echo "Running tests (root module)..."
+	$(GOTEST) ./...
+	@echo "Running tests (core and plugin modules)..."
+	@failed=0; for d in pkg/ plugins/*/; do \
+		(cd $$d && $(GOTEST) ./... ) || failed=1; \
+	done; exit $$failed
 
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage..."
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+test-coverage-plugins: ## Statement coverage report for all plugin modules (source of the docs/architecture/plugin-architecture.md table)
+	@bash ./scripts/coverage_gate.sh report --all
+
+coverage-gate: ## Enforce the >=50% coverage gate for one plugin: make coverage-gate PLUGIN=db
+	@if [ -z "$(PLUGIN)" ]; then \
+		echo "usage: make coverage-gate PLUGIN=<plugin>"; \
+		exit 2; \
+	fi
+	@bash ./scripts/coverage_gate.sh gate $(PLUGIN)
 
 # Quality targets
 check: fmt vet test ## Run all quality checks (format, vet, test)
@@ -112,9 +133,13 @@ docker-build: ## Build Docker image
 	@echo "Building Docker image..."
 	docker build -t $(APP_NAME):latest .
 
-docker-run: ## Run Docker container
+docker-run: ## Run Docker container (mounts ./configs read-only; uses .env when present)
 	@echo "Running Docker container..."
-	docker run -p 8080:8080 --env-file .env $(APP_NAME):latest
+	@if [ -f .env ]; then \
+		docker run --rm -p 8080:8080 -v $(CURDIR)/configs:/app/configs:ro --env-file .env $(APP_NAME):latest; \
+	else \
+		docker run --rm -p 8080:8080 -v $(CURDIR)/configs:/app/configs:ro $(APP_NAME):latest; \
+	fi
 
 docker-compose-up: ## Start services with docker-compose
 	@echo "Starting services with docker-compose..."
@@ -125,12 +150,12 @@ docker-compose-down: ## Stop services with docker-compose
 	docker-compose down
 
 # Setup targets
-setup: ## Initial project setup
+setup: ## Initial project setup (dirs, default config, dependencies)
 	@echo "Setting up project..."
 	@mkdir -p $(CONFIG_DIR) $(LOG_DIR) $(TEMP_DIR)
 	@if [ ! -f $(CONFIG_DIR)/config.yaml ]; then \
 		echo "Creating default config file..."; \
-		cp $(CONFIG_DIR)/config.example.yaml $(CONFIG_DIR)/config.yaml 2>/dev/null || echo "Please create $(CONFIG_DIR)/config.yaml manually"; \
+		cp $(CONFIG_DIR)/config.example.yaml $(CONFIG_DIR)/config.yaml || { echo "Failed to copy $(CONFIG_DIR)/config.example.yaml; please create $(CONFIG_DIR)/config.yaml manually"; exit 1; }; \
 	fi
 	$(MAKE) deps
 
@@ -192,14 +217,21 @@ info: ## Show project information
 	@echo "Log Dir: $(LOG_DIR)"
 	@echo "Temp Dir: $(TEMP_DIR)"
 
-create-api: ## Create a new api project from template (default template: pkg/gateway/templates/http-gateway). Usage: make create-api NAME=foo [TEMPLATE=http-gateway]
+init: ## Create a new app skeleton under api/<NAME> with selected components (interactive when COMPONENTS omitted). Usage: make init NAME=foo [COMPONENTS=api-gateway,db,cache] [PORT=8080]
+	@if [ -z "$(NAME)" ]; then \
+		echo "missing NAME. example: make init NAME=my-app COMPONENTS=api-gateway,db,metrics PORT=8080"; \
+		exit 2; \
+	fi
+	@$(GOCMD) run ./cmd/scaffold init --name "$(NAME)" $(if $(COMPONENTS),--components "$(COMPONENTS)") --port "$(or $(PORT),8080)"
+
+create-api: ## Create a new api project from template (default template: plugins/gateway/templates/http-gateway). Usage: make create-api NAME=foo [TEMPLATE=http-gateway]
 	@if [ -z "$(NAME)" ]; then \
 		echo "missing NAME. example: make create-api NAME=user-gateway TEMPLATE=http-gateway"; \
 		exit 2; \
 	fi
 	@$(GOCMD) run ./cmd/scaffold create-api --name "$(NAME)" --template "$(or $(TEMPLATE),http-gateway)"
 
-export-template: ## Export api/<NAME> into pkg/gateway/templates/<TEMPLATE> (Go files become .gotmpl and tokens are injected). Usage: make export-template NAME=http-gateway [TEMPLATE=http-gateway]
+export-template: ## Export api/<NAME> into plugins/gateway/templates/<TEMPLATE> (Go files become .gotmpl and tokens are injected). Usage: make export-template NAME=http-gateway [TEMPLATE=http-gateway]
 	@if [ -z "$(NAME)" ]; then \
 		echo "missing NAME. example: make export-template NAME=zzz-demo TEMPLATE=http-gateway"; \
 		exit 2; \

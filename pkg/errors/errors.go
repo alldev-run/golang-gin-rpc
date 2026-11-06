@@ -15,35 +15,35 @@ type ErrorCode string
 // Error categories
 const (
 	// System errors (1000-1999)
-	CategorySystem    ErrorCode = "SYSTEM"
-	CategoryDatabase  ErrorCode = "DATABASE"
-	CategoryCache     ErrorCode = "CACHE"
-	CategoryNetwork   ErrorCode = "NETWORK"
-	CategoryAuth      ErrorCode = "AUTH"
-	CategoryBusiness  ErrorCode = "BUSINESS"
+	CategorySystem     ErrorCode = "SYSTEM"
+	CategoryDatabase   ErrorCode = "DATABASE"
+	CategoryCache      ErrorCode = "CACHE"
+	CategoryNetwork    ErrorCode = "NETWORK"
+	CategoryAuth       ErrorCode = "AUTH"
+	CategoryBusiness   ErrorCode = "BUSINESS"
 	CategoryValidation ErrorCode = "VALIDATION"
-	CategoryExternal  ErrorCode = "EXTERNAL"
+	CategoryExternal   ErrorCode = "EXTERNAL"
 )
 
 // Specific error codes
 const (
 	// System errors (1000-1999)
-	ErrCodeInternalServer    ErrorCode = "SYSTEM_1000"
-	ErrCodePanicRecovered    ErrorCode = "SYSTEM_1001"
-	ErrCodeConfigInvalid     ErrorCode = "SYSTEM_1002"
+	ErrCodeInternalServer     ErrorCode = "SYSTEM_1000"
+	ErrCodePanicRecovered     ErrorCode = "SYSTEM_1001"
+	ErrCodeConfigInvalid      ErrorCode = "SYSTEM_1002"
 	ErrCodeServiceUnavailable ErrorCode = "SYSTEM_1003"
-	ErrCodeTimeout           ErrorCode = "SYSTEM_1004"
+	ErrCodeTimeout            ErrorCode = "SYSTEM_1004"
 
 	// Database errors (2000-2999)
-	ErrCodeDBConnection      ErrorCode = "DATABASE_2000"
-	ErrCodeDBQuery          ErrorCode = "DATABASE_2001"
-	ErrCodeDBTransaction    ErrorCode = "DATABASE_2002"
-	ErrCodeDBMigration      ErrorCode = "DATABASE_2003"
-	ErrCodeDBDeadlock       ErrorCode = "DATABASE_2004"
+	ErrCodeDBConnection  ErrorCode = "DATABASE_2000"
+	ErrCodeDBQuery       ErrorCode = "DATABASE_2001"
+	ErrCodeDBTransaction ErrorCode = "DATABASE_2002"
+	ErrCodeDBMigration   ErrorCode = "DATABASE_2003"
+	ErrCodeDBDeadlock    ErrorCode = "DATABASE_2004"
 
 	// Cache errors (3000-3999)
-	ErrCodeCacheConnection   ErrorCode = "CACHE_3000"
-	ErrCodeCacheMiss        ErrorCode = "CACHE_3001"
+	ErrCodeCacheConnection    ErrorCode = "CACHE_3000"
+	ErrCodeCacheMiss          ErrorCode = "CACHE_3001"
 	ErrCodeCacheSerialization ErrorCode = "CACHE_3002"
 
 	// Network errors (4000-4999)
@@ -52,28 +52,28 @@ const (
 	ErrCodeRateLimited       ErrorCode = "NETWORK_4002"
 
 	// Auth errors (5000-5999)
-	ErrCodeUnauthorized      ErrorCode = "AUTH_5000"
-	ErrCodeForbidden         ErrorCode = "AUTH_5001"
-	ErrCodeTokenExpired      ErrorCode = "AUTH_5002"
-	ErrCodeTokenInvalid      ErrorCode = "AUTH_5003"
+	ErrCodeUnauthorized ErrorCode = "AUTH_5000"
+	ErrCodeForbidden    ErrorCode = "AUTH_5001"
+	ErrCodeTokenExpired ErrorCode = "AUTH_5002"
+	ErrCodeTokenInvalid ErrorCode = "AUTH_5003"
 
 	// Business errors (6000-6999)
-	ErrCodeResourceNotFound  ErrorCode = "BUSINESS_6000"
-	ErrCodeResourceExists    ErrorCode = "BUSINESS_6001"
-	ErrCodeBusinessRule      ErrorCode = "BUSINESS_6002"
+	ErrCodeResourceNotFound ErrorCode = "BUSINESS_6000"
+	ErrCodeResourceExists   ErrorCode = "BUSINESS_6001"
+	ErrCodeBusinessRule     ErrorCode = "BUSINESS_6002"
 
 	// Validation errors (7000-7999)
-	ErrCodeValidationFailed  ErrorCode = "VALIDATION_7000"
-	ErrCodeInvalidInput      ErrorCode = "VALIDATION_7001"
-	ErrCodeMissingField      ErrorCode = "VALIDATION_7002"
-	ErrCodeWebSocketProtoMessageNil       ErrorCode = "VALIDATION_7010"
-	ErrCodeWebSocketProtoDestinationNil   ErrorCode = "VALIDATION_7011"
-	ErrCodeWebSocketProtoPayloadType      ErrorCode = "VALIDATION_7012"
-	ErrCodeWebSocketProtoDestinationType  ErrorCode = "VALIDATION_7013"
-	ErrCodeWebSocketProtoFrameType        ErrorCode = "VALIDATION_7014"
+	ErrCodeValidationFailed              ErrorCode = "VALIDATION_7000"
+	ErrCodeInvalidInput                  ErrorCode = "VALIDATION_7001"
+	ErrCodeMissingField                  ErrorCode = "VALIDATION_7002"
+	ErrCodeWebSocketProtoMessageNil      ErrorCode = "VALIDATION_7010"
+	ErrCodeWebSocketProtoDestinationNil  ErrorCode = "VALIDATION_7011"
+	ErrCodeWebSocketProtoPayloadType     ErrorCode = "VALIDATION_7012"
+	ErrCodeWebSocketProtoDestinationType ErrorCode = "VALIDATION_7013"
+	ErrCodeWebSocketProtoFrameType       ErrorCode = "VALIDATION_7014"
 
 	// External service errors (8000-8999)
-	ErrCodeExternalService  ErrorCode = "EXTERNAL_8000"
+	ErrCodeExternalService   ErrorCode = "EXTERNAL_8000"
 	ErrCodeExternalTimeout   ErrorCode = "EXTERNAL_8001"
 	ErrCodeExternalRateLimit ErrorCode = "EXTERNAL_8002"
 )
@@ -91,16 +91,16 @@ const (
 
 // AppError represents a structured application error
 type AppError struct {
-	Code        ErrorCode   `json:"code"`
-	Message     string      `json:"message"`
-	Level       ErrorLevel  `json:"level"`
-	HTTPStatus  int         `json:"http_status"`
-	Details     interface{} `json:"details,omitempty"`
-	Timestamp   time.Time   `json:"timestamp"`
-	RequestID   string      `json:"request_id,omitempty"`
-	UserID      string      `json:"user_id,omitempty"`
-	StackTrace  string      `json:"stack_trace,omitempty"`
-	Cause       error       `json:"-"`
+	Code       ErrorCode   `json:"code"`
+	Message    string      `json:"message"`
+	Level      ErrorLevel  `json:"level"`
+	HTTPStatus int         `json:"http_status"`
+	Details    interface{} `json:"details,omitempty"`
+	Timestamp  time.Time   `json:"timestamp"`
+	RequestID  string      `json:"request_id,omitempty"`
+	UserID     string      `json:"user_id,omitempty"`
+	StackTrace string      `json:"stack_trace,omitempty"`
+	Cause      error       `json:"-"`
 }
 
 // Error implements the error interface
@@ -319,7 +319,7 @@ func getStackTrace() string {
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		frame, more := frames.Next()
-		sb.WriteString(fmt.Sprintf("%s:%d %s\n", frame.File, frame.Line, frame.Function))
+		fmt.Fprintf(&sb, "%s:%d %s\n", frame.File, frame.Line, frame.Function)
 		if !more {
 			break
 		}

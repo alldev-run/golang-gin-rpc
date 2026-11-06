@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/alldev-run/golang-gin-rpc/api/http-gateway/internal/model"
-	"github.com/alldev-run/golang-gin-rpc/pkg/middleware"
-	"github.com/alldev-run/golang-gin-rpc/pkg/router"
+	"github.com/alldev-run/golang-gin-rpc/plugins/gateway/router"
+	"github.com/alldev-run/golang-gin-rpc/plugins/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,8 +43,8 @@ func authMiddleware() gin.HandlerFunc {
 
 		if apiKey == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"message": "API Key required",
+				"success":    false,
+				"message":    "API Key required",
 				"request_id": middleware.GetRequestID(c),
 			})
 			c.Abort()
@@ -54,8 +54,8 @@ func authMiddleware() gin.HandlerFunc {
 		// 简单验证（实际应查询数据库）
 		if apiKey != "test-api-key" {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"message": "Invalid API Key",
+				"success":    false,
+				"message":    "Invalid API Key",
 				"request_id": middleware.GetRequestID(c),
 			})
 			c.Abort()
@@ -72,9 +72,9 @@ func handleUserCreate(c *gin.Context) {
 	var req model.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Invalid request data",
-			"error":   err.Error(),
+			"success":    false,
+			"message":    "Invalid request data",
+			"error":      err.Error(),
 			"request_id": middleware.GetRequestID(c),
 		})
 		return
@@ -119,9 +119,9 @@ func handleUserUpdate(c *gin.Context) {
 	var req model.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Invalid request data",
-			"error":   err.Error(),
+			"success":    false,
+			"message":    "Invalid request data",
+			"error":      err.Error(),
 			"request_id": middleware.GetRequestID(c),
 		})
 		return

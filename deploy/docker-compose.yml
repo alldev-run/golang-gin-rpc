@@ -1,0 +1,26 @@
+# 单机联调:游戏服进程 + 基础设施(mysql/redis)。
+# 完整中间件(mysql 主从/clickhouse/es/consul 等)见 docker-compose.integration.yml。
+services:
+  game:
+    build:
+      context: .
+      args: { APP_PATH: . }
+    ports:
+      - "8090:8090"   # http
+      - "8091:8091"   # websocket
+    depends_on:
+      redis: { condition: service_started }
+    volumes:
+      - ./configs:/app/configs:ro
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:

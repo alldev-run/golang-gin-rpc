@@ -4,6 +4,7 @@ package logger
 import (
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -12,10 +13,10 @@ import (
 )
 
 var (
-	once     sync.Once
-	defaultL *zap.Logger
+	once        sync.Once
+	defaultL    atomic.Pointer[zap.Logger]
+	defaultBase atomic.Pointer[zap.Logger]
 )
-
 
 // Init 初始化全局 logger（建议在 main 最开始调用一次）
 func Init(cfg Config) {
@@ -72,14 +73,14 @@ func Init(cfg Config) {
 			} else {
 				encoder = zapcore.NewConsoleEncoder(consoleEncoderConfig)
 			}
-			
+
 			var writer zapcore.WriteSyncer
 			if cfg.Output == LogOutputStderr {
 				writer = zapcore.AddSync(os.Stderr)
 			} else {
 				writer = zapcore.AddSync(os.Stdout)
 			}
-			
+
 			cores = append(cores, zapcore.NewCore(encoder, writer, zapLevel))
 		}
 
@@ -111,39 +112,52 @@ func Init(cfg Config) {
 		options := []zap.Option{
 			zap.AddCallerSkip(1), // 跳过 wrapper 层
 		}
-		
+
 		if cfg.EnableCaller {
 			options = append(options, zap.AddCaller())
 		}
-		
+
 		if cfg.EnableStacktrace {
 			options = append(options, zap.AddStacktrace(zapcore.ErrorLevel))
 		}
 
-		defaultL = zap.New(core, options...)
+		l := zap.New(core, options...)
+		defaultL.Store(l)
+		defaultBase.Store(l.WithOptions(zap.AddCallerSkip(-1)))
 	})
 }
 
 // L 获取全局 logger（如果未初始化，会用默认配置兜底）
 func L() *zap.Logger {
-	if defaultL == nil {
-		// 兜底：未调用 Init 时自动初始化为默认配置
-		Init(DefaultConfig())
+	if logger := defaultL.Load(); logger != nil {
+		return logger
 	}
-	return defaultL
+	Init(DefaultConfig())
+	return defaultL.Load()
+}
+
+// Base returns the global logger for direct use. Unlike L(), whose caller skip
+// accounts for this package's Info/Warn/... wrappers, Base reports the
+// immediate call site.
+func Base() *zap.Logger {
+	if l := defaultBase.Load(); l != nil {
+		return l
+	}
+	L()
+	return defaultBase.Load()
 }
 
 // GetServiceLogger gets or creates a service-specific logger using global config
 func GetServiceLogger(serviceName string) *zap.Logger {
 	config := DefaultServiceLoggerConfig(serviceName)
-	
+
 	// If global logger is initialized, try to inherit its config
-	if defaultL != nil {
+	if defaultL.Load() != nil {
 		// We need to access the global config, but it's not stored currently
 		// For now, use default config with inheritance enabled
 		config.InheritGlobalConfig = true
 	}
-	
+
 	return GetServiceLoggerFromConfig(serviceName, config)
 }
 
@@ -162,18 +176,18 @@ func NewServiceLogger(serviceName string) *ServiceLogger {
 func NewServiceLoggerFromConfig(serviceName string, config ServiceLoggerConfig) *ServiceLogger {
 	return &ServiceLogger{
 		serviceName: serviceName,
-		logger:      GetServiceLoggerInstance(serviceName, config),
+		logger:      GetServiceLoggerInstance(serviceName, config).WithOptions(zap.AddCallerSkip(1)),
 	}
 }
 
 // 快捷方法（类似 logrus 风格）
 
-func Debug(msg string, fields ...zap.Field) { L().Debug(msg, fields...) }
-func Info(msg string, fields ...zap.Field)  { L().Info(msg, fields...) }
-func Warn(msg string, fields ...zap.Field)  { L().Warn(msg, fields...) }
+func Debug(msg string, fields ...zap.Field)  { L().Debug(msg, fields...) }
+func Info(msg string, fields ...zap.Field)   { L().Info(msg, fields...) }
+func Warn(msg string, fields ...zap.Field)   { L().Warn(msg, fields...) }
 func Errorf(msg string, fields ...zap.Field) { L().Error(msg, fields...) }
-func Fatal(msg string, fields ...zap.Field) { L().Fatal(msg, fields...) }
-func Panic(msg string, fields ...zap.Field) { L().Panic(msg, fields...) }
+func Fatal(msg string, fields ...zap.Field)  { L().Fatal(msg, fields...) }
+func Panic(msg string, fields ...zap.Field)  { L().Panic(msg, fields...) }
 
 // With 创建带默认字段的子 logger（常用于请求上下文、trace 等）
 func With(fields ...zap.Field) *zap.Logger {
@@ -181,12 +195,12 @@ func With(fields ...zap.Field) *zap.Logger {
 }
 
 // Zap field helpers - 提供常用的字段构造函数
-func String(key, val string) zap.Field               { return zap.String(key, val) }
-func Int(key string, val int) zap.Field               { return zap.Int(key, val) }
-func Int64(key string, val int64) zap.Field           { return zap.Int64(key, val) }
-func Float64(key string, val float64) zap.Field       { return zap.Float64(key, val) }
-func Bool(key string, val bool) zap.Field             { return zap.Bool(key, val) }
+func String(key, val string) zap.Field                 { return zap.String(key, val) }
+func Int(key string, val int) zap.Field                { return zap.Int(key, val) }
+func Int64(key string, val int64) zap.Field            { return zap.Int64(key, val) }
+func Float64(key string, val float64) zap.Field        { return zap.Float64(key, val) }
+func Bool(key string, val bool) zap.Field              { return zap.Bool(key, val) }
 func Duration(key string, val time.Duration) zap.Field { return zap.Duration(key, val) }
-func Time(key string, val time.Time) zap.Field       { return zap.Time(key, val) }
-func Error(err error) zap.Field                       { return zap.Error(err) }
-func Any(key string, val interface{}) zap.Field       { return zap.Any(key, val) }
+func Time(key string, val time.Time) zap.Field         { return zap.Time(key, val) }
+func Error(err error) zap.Field                        { return zap.Error(err) }
+func Any(key string, val interface{}) zap.Field        { return zap.Any(key, val) }

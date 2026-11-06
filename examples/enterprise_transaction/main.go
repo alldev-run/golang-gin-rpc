@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alldev-run/golang-gin-rpc/pkg/db/orm"
+	"github.com/alldev-run/golang-gin-rpc/plugins/db/orm"
 )
 
 func main() {

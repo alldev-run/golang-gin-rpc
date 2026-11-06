@@ -19,19 +19,21 @@ import (
 // bufferPool provides reusable buffers to reduce GC pressure under high concurrency
 var bufferPool = sync.Pool{
 	New: func() any {
-		return make([]byte, 0, 1024) // Start with 1KB capacity
+		buf := make([]byte, 0, 1024)
+		return &buf
 	},
 }
 
 // getBuffer gets a buffer from the pool
-func getBuffer() []byte {
-	return bufferPool.Get().([]byte)
+func getBuffer() *[]byte {
+	return bufferPool.Get().(*[]byte)
 }
 
 // putBuffer returns a buffer to the pool after resetting it
-func putBuffer(buf []byte) {
-	if cap(buf) <= 64*1024 { // Only pool buffers up to 64KB
-		bufferPool.Put(buf[:0]) // Reset length but keep capacity
+func putBuffer(buf *[]byte) {
+	if cap(*buf) <= 64*1024 {
+		*buf = (*buf)[:0]
+		bufferPool.Put(buf)
 	}
 }
 
@@ -60,15 +62,14 @@ func StringJoinNonEmpty(elems []string, sep string) string {
 	for _, s := range elems {
 		if s != "" {
 			if !first {
-				buf = append(buf, sep...)
+				*buf = append(*buf, sep...)
 			} else {
 				first = false
 			}
-			buf = append(buf, s...)
+			*buf = append(*buf, s...)
 		}
 	}
-	res := string(buf)
-	return res
+	return string(*buf)
 }
 
 // StringContains checks if slice contains string
@@ -538,7 +539,7 @@ func StructToMap(obj interface{}) map[string]interface{} {
 	}
 
 	v := reflect.ValueOf(obj)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return make(map[string]interface{})
 		}
